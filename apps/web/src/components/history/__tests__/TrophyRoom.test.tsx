@@ -1,8 +1,20 @@
+import type { ReactElement } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { LeagueHistory, Trophy, UnclaimedMember } from '@/api/imports';
+
+// The season detail (draft, trades, keepers, weeks) fetches when a season opens; it has its own test.
+const api = vi.hoisted(() => ({ getSeasonDetail: vi.fn(async () => ({ data: { season: 2020, picks: [], transactions: [], matchups: [], keepers: [] } })) }));
+vi.mock('@/api/imports', () => ({ importApi: api }));
+
 import { TrophyRoom } from '../TrophyRoom';
 import { ClaimCard } from '../ClaimCard';
+
+const withQuery = (ui: ReactElement) => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+};
 
 const trophy = (over: Partial<Trophy>): Trophy => ({
   id: Math.random().toString(36).slice(2), season: null, member_id: 'A', trophy_key: 'champion', rank: null, value: null, detail: {}, source: 'imported', display_name: null, icon_key: null, is_hidden: false, ...over,
@@ -31,6 +43,8 @@ const history: LeagueHistory = {
     trophy({ trophy_key: 'founding_member', member_id: 'B', value: 2019, source: 'computed' }),
     trophy({ trophy_key: 'championship_drought', member_id: 'A', value: 1, source: 'computed', detail: { last_title: 2019 } }),
     trophy({ trophy_key: 'lowest_week', member_id: 'B', value: 40, source: 'computed', is_hidden: true }),
+    trophy({ trophy_key: 'custom', season: 2019, member_id: 'B', source: 'imported', display_name: 'The Sacko', detail: { award: 'The Sacko', winner_name: 'Bob' } }),
+    trophy({ trophy_key: 'custom', season: 2020, member_id: 'A', source: 'imported', display_name: 'The Sacko', detail: { award: 'The Sacko', winner_name: 'Alice' } }),
   ],
   sources: [{ platform: 'espn', externalLeagueId: '777', season: 2020, isPublicSource: true }],
   importedSettings: null,
@@ -38,8 +52,8 @@ const history: LeagueHistory = {
 };
 
 describe('TrophyRoom', () => {
-  it('lists seasons newest first with the champion, flags a disputed one, and opens the standings', () => {
-    render(<TrophyRoom history={history} currentUserId="user-alice" />);
+  it('lists seasons newest first with the champion, flags a disputed one, and opens the standings', async () => {
+    withQuery(<TrophyRoom history={history} currentUserId="user-alice" />);
     const seasons = screen.getByTestId('history-seasons');
     expect(seasons.textContent).toMatch(/2020-21.*2019-20/s);
     expect(seasons.textContent).toContain('Bob');
@@ -49,10 +63,20 @@ describe('TrophyRoom', () => {
     expect(list.textContent).toContain('Bench Bosses');
     expect(list.textContent).toContain('12-8');
     expect(list.textContent).toContain('Champ');
+    await waitFor(() => expect(api.getSeasonDetail).toHaveBeenCalledWith('l', 2020));
+  });
+
+  it('the league\'s own awards are their own shelf, one line per award with the roll of winners', () => {
+    withQuery(<TrophyRoom history={history} currentUserId="user-alice" />);
+    const awards = screen.getByTestId('history-awards');
+    expect(awards.textContent).toContain('The Sacko');
+    expect(awards.textContent).toContain('2020-21: Alice · 2019-20: Bob');
+    expect(awards.textContent).toContain('You');
+    expect(screen.getByTestId('history-records').textContent).not.toContain('The Sacko');
   });
 
   it('marks the signed-in manager, the unclaimed one, and says which records Citrus computed', () => {
-    render(<TrophyRoom history={history} currentUserId="user-alice" />);
+    withQuery(<TrophyRoom history={history} currentUserId="user-alice" />);
     const managers = screen.getByTestId('history-managers');
     expect(managers.textContent).toContain('You');
     expect(managers.textContent).toContain('Unclaimed');

@@ -1,12 +1,16 @@
 /**
- * IMPORT (2026-09-13): bring a league's history over from ESPN or Yahoo.
+ * IMPORT (2026-09-13): bring a league's history over from ESPN, Yahoo, or
+ * anywhere at all.
  *
  * The rule this page is built around: no hoops. A public ESPN league is a
- * pasted link. Yahoo is one tap on Connect and a pick from a list. A
- * private ESPN league gets the two honest ways forward (the commissioner
- * makes it public on ESPN, or the user signs in to ESPN here on the web);
- * that sign-in is web only, so the iOS build says "finish on the web"
- * rather than asking for a credential the App Store does not allow it to.
+ * pasted link. Anything else is screenshots of the pages the league cares
+ * about, read here and checked before they are written: Yahoo, Fantrax,
+ * CBS, a spreadsheet, with no login of any kind (2026-09-14). Yahoo's
+ * one-tap connection stays for when Yahoo approves it. A private ESPN
+ * league gets the two honest ways forward (the commissioner makes it public
+ * on ESPN, or the user signs in to ESPN here on the web); that sign-in is
+ * web only, so the iOS build says "finish on the web" rather than asking
+ * for a credential the App Store does not allow it to.
  *
  * The history attaches to a Citrus league the user commissions. With none,
  * the door is Create league; the import is one step after.
@@ -20,6 +24,7 @@ import { importApi, type EspnCredentials, type EspnDiscovery, type ImportJob, ty
 import Navbar from '@/components/Navbar';
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { ImportProgress } from '@/components/history/ImportProgress';
+import { ScreenshotImport } from '@/components/history/screenshots/ScreenshotImport';
 import { seasonLabel } from '@/components/history/trophyLabels';
 import { Chip, Eyebrow, HistoryButton, Panel, inputClass } from '@/components/history/ui';
 import { isNativeShell } from '@/lib/nativeAuth';
@@ -30,7 +35,7 @@ const dataOf = <T,>(res: unknown): T | null => ((res as { data?: T })?.data ?? n
 const SCORING_LABEL: Record<string, string> = { h2h_points: 'H2H points', h2h_categories: 'H2H categories', h2h_one_win: 'H2H categories', roto: 'Rotisserie', points: 'Total points', unknown: 'Custom' };
 
 export default function ImportLeague() {
-  usePageMeta({ title: 'Bring your league', description: 'Import every season, champion and record from Yahoo or ESPN into Citrus.', path: '/import' });
+  usePageMeta({ title: 'Bring your league', description: 'Import every season, champion and record from Yahoo, ESPN, Fantrax or anywhere into Citrus.', path: '/import' });
   const { user } = useAuth();
   const league = useLeague();
   const [params, setParams] = useSearchParams();
@@ -243,11 +248,17 @@ export default function ImportLeague() {
                 )}
               </Panel>
 
+              {/* ---- Screenshots, any platform ---------------------------------- */}
+              <Panel testId="import-screenshots">
+                <Eyebrow>✦ Yahoo, Fantrax, CBS, anywhere</Eyebrow>
+                <ScreenshotImport leagueId={target?.id ?? null} leagueName={target?.name ?? null} onJob={setJob} />
+              </Panel>
+
               {/* ---- Yahoo ----------------------------------------------------- */}
               <Panel testId="import-yahoo">
-                <Eyebrow>✦ Yahoo</Eyebrow>
+                <Eyebrow>✦ Yahoo, one tap</Eyebrow>
                 {connection.data && !connection.data.configured ? (
-                  <p className="mt-1 font-barlow text-[13px] leading-[1.45] text-white/60">Yahoo import is on its way. ESPN works today.</p>
+                  <p className="mt-1 font-barlow text-[13px] leading-[1.45] text-white/60">A one-tap Yahoo connection is on its way. Until then, screenshots above bring a Yahoo league over today.</p>
                 ) : native ? (
                   <p className="mt-1 font-barlow text-[13px] leading-[1.45] text-white/60">Connect Yahoo on the web at citrusfantasysports.com/import; your leagues appear here once you have.</p>
                 ) : !connection.data?.connected ? (
@@ -286,7 +297,7 @@ export default function ImportLeague() {
               </Panel>
 
               <p className="font-barlow text-[12px] text-white/55">
-                Somewhere else, or a spreadsheet? <Link to="/bring-your-league" className="text-pressbox-orange-soft">Send us the settings</Link> and a person sets it up.
+                Rather have a person do it? <Link to="/bring-your-league" className="text-pressbox-orange-soft">Send us the settings</Link> and we set it up.
               </p>
             </div>
           )}

@@ -25,6 +25,8 @@ function db(over: Record<string, any[]> = {}) {
     league_trophies: [
       { id: 't-old', league_id: LEAGUE, season: 2023, member_id: 'A', trophy_key: 'champion', rank: 1, value: null, detail: {}, source: 'imported', computed_from_job_id: 'job-0', retired_at: null, is_hidden: false },
       { id: 't-manual', league_id: LEAGUE, season: 2019, member_id: 'A', trophy_key: 'custom', rank: null, value: null, detail: {}, source: 'manual', computed_from_job_id: null, retired_at: null, display_name: 'Lost the trophy in a lake', is_hidden: false },
+      // The league's own award, imported from a screenshot: nothing in the season tables could rebuild it.
+      { id: 't-award', league_id: LEAGUE, season: 2023, member_id: 'B', trophy_key: 'custom', rank: null, value: null, detail: { award: 'The Sacko' }, source: 'imported', computed_from_job_id: 'job-0', retired_at: null, display_name: 'The Sacko', is_hidden: false },
       { id: 't-retired', league_id: LEAGUE, season: 2022, member_id: 'A', trophy_key: 'champion', rank: 1, value: null, detail: {}, source: 'imported', computed_from_job_id: null, retired_at: '2026-01-01T00:00:00Z', is_hidden: false },
       { id: 't-other', league_id: 'league-2', season: 2024, member_id: 'Z', trophy_key: 'champion', rank: 1, value: null, detail: {}, source: 'imported', computed_from_job_id: null, retired_at: null, is_hidden: false },
     ],
@@ -56,8 +58,9 @@ describe('TrophyService.recompute', () => {
     const rows = fake.rows('league_trophies');
     expect(rows.find((r) => r.id === 't-old')!.retired_at).toBeTruthy();
     expect(rows.find((r) => r.id === 't-manual')!.retired_at).toBeNull();
+    expect(rows.find((r) => r.id === 't-award')!.retired_at).toBeNull(); // the league's own award survives a recompute
     expect(rows.find((r) => r.id === 't-other')!.retired_at).toBeNull(); // another league, untouched
-    const live = rows.filter((r) => r.league_id === LEAGUE && !r.retired_at && r.source !== 'manual');
+    const live = rows.filter((r) => r.league_id === LEAGUE && !r.retired_at && r.source !== 'manual' && r.trophy_key !== 'custom');
     expect(live).toHaveLength(n);
     expect(n).toBeGreaterThan(5);
     expect(live.every((r) => r.computed_from_job_id === 'job-7')).toBe(true);
@@ -88,8 +91,8 @@ describe('TrophyService.list / decorate / addManual', () => {
     const fake = db();
     fake.rows('league_trophies').find((r) => r.id === 't-manual')!.is_hidden = true;
     const list = await new TrophyService(fake as any).list(LEAGUE);
-    expect(list.map((t) => t.id)).toEqual(['t-old', 't-manual']);
-    expect(list[1].is_hidden).toBe(true);
+    expect(list.map((t) => t.id)).toEqual(['t-old', 't-award', 't-manual']);
+    expect(list[2].is_hidden).toBe(true);
   });
 
   it('decorate changes presentation only, scoped to the league', async () => {

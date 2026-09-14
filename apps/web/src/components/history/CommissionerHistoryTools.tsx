@@ -13,8 +13,9 @@ import { leagueApi } from '@/api/leagues';
 import { playerApi } from '@/api/players';
 import { useToast } from '@/hooks/use-toast';
 import { FORMAT_LABEL, planFromImportedSettings } from './importedSettings';
-import { seasonLabel, statName } from './trophyLabels';
+import { platformLabel, seasonLabel, statName } from './trophyLabels';
 import { Chip, Eyebrow, HistoryButton, Panel, Row, inputClass } from './ui';
+import { CarryoverPanel } from './CarryoverPanel';
 
 export interface CommissionerHistoryToolsProps {
   leagueId: string;
@@ -55,7 +56,7 @@ export function CommissionerHistoryTools({ leagueId, history, managers, onChange
       {/* ---- confirm scoring and keepers ------------------------------------- */}
       {settings && plan && (
         <Panel testId="confirm-settings">
-          <Eyebrow>✦ Confirm your rules · from {settings.platform === 'espn' ? 'ESPN' : 'Yahoo'}, {seasonLabel(settings.season)}</Eyebrow>
+          <Eyebrow>✦ Confirm your rules · from {platformLabel(settings.platform)}, {seasonLabel(settings.season)}</Eyebrow>
           <p className="mt-1 font-condensed font-bold text-[16px] text-pressbox-text">
             {settings.scoringFormat ? FORMAT_LABEL[settings.scoringFormat] ?? settings.scoringFormat : 'Format not recognised'}
             {settings.draftType ? ` · ${settings.draftType.toLowerCase()} draft` : ''}
@@ -111,7 +112,7 @@ export function CommissionerHistoryTools({ leagueId, history, managers, onChange
           <div className="mt-3">
             <p className="font-plex text-[11px] uppercase tracking-[0.1em] text-white/55">Keepers</p>
             <p className="mt-1 font-barlow text-[13px] text-pressbox-text/85">
-              {plan.keeper.count > 0 ? `${plan.keeper.count} per team on ${settings.platform === 'espn' ? 'ESPN' : 'Yahoo'}. Neither platform records what a keeper costs; pick the rule your league plays by.` : 'The newest season had no keepers. Turn them on in league settings if your league keeps players.'}
+              {plan.keeper.count > 0 ? `${plan.keeper.count} per team on ${platformLabel(settings.platform)}. The source does not state what a keeper costs; pick the rule your league plays by.` : 'The newest season had no keepers. Turn them on in league settings if your league keeps players.'}
             </p>
             {plan.keeper.count > 0 && (
               <div className="mt-2 flex flex-col gap-2 sm:flex-row">
@@ -143,6 +144,9 @@ export function CommissionerHistoryTools({ leagueId, history, managers, onChange
 
       {/* ---- managers ------------------------------------------------------- */}
       <MemberTools leagueId={leagueId} history={history} managers={managers} busy={busy} run={run} />
+
+      {/* ---- keepers and traded picks into the next draft -------------------- */}
+      <CarryoverPanel leagueId={leagueId} onChanged={onChanged} />
 
       {/* ---- lock and recompute --------------------------------------------- */}
       <Panel testId="history-lock">

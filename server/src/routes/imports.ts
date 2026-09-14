@@ -9,7 +9,14 @@
  *   GET  /api/imports/yahoo/leagues                       any signed-in user with a connection; their NHL leagues, by chain
  *   POST /api/leagues/:leagueId/imports/espn              commissioner; starts a background job
  *   POST /api/leagues/:leagueId/imports/yahoo             commissioner; starts a background job
+ *   GET  /api/imports/screenshots/status                  any signed-in user; whether the reader is configured
+ *   POST /api/leagues/:leagueId/imports/screenshots/read  commissioner; reads screenshots into pages for review (nothing written)
+ *   POST /api/leagues/:leagueId/imports/screenshots/:jobId/confirm  commissioner; writes the reviewed pages as a background job
  *   GET  /api/leagues/:leagueId/imports/:jobId            member
+ *   GET  /api/leagues/:leagueId/history/seasons/:season   member; one season's draft, transactions, matchups and keepers
+ *   GET  /api/leagues/:leagueId/history/carryover         commissioner; keepers and traded picks waiting to land on the coming draft
+ *   POST /api/leagues/:leagueId/history/carryover/keepers commissioner; prefill keeper_designations
+ *   POST /api/leagues/:leagueId/history/carryover/picks   commissioner; rewrite draft_order with traded picks
  *   GET  /api/leagues/:leagueId/history                   member; the trophy room
  *   GET  /api/leagues/:leagueId/history/unclaimed         member; "which one is you?" and whether the caller still needs asking
  *   POST /api/leagues/:leagueId/history/claim             member
@@ -52,6 +59,12 @@ import { TrophyService } from '../services/import/TrophyService';
 import { MemberClaimService } from '../services/import/MemberClaimService';
 import { PlayerCrosswalkService } from '../services/import/PlayerCrosswalkService';
 import { YahooConnectionService } from '../services/import/YahooConnectionService';
+import { ScreenshotReader, MAX_IMAGES_PER_READ, MAX_IMAGE_BASE64_LENGTH, type ScreenshotImage } from '../import/screenshot/reader';
+import { extractedPageSchema } from '../import/screenshot/schema';
+import { ScreenshotImportService, SCREENSHOT_PLATFORMS } from '../services/import/ScreenshotImportService';
+import { DynastyCarryoverService } from '../services/import/DynastyCarryoverService';
+import { currentCitrusSeason } from '../services/import/LeagueImportService';
+import { keeperSeasonYear } from '@citrus/shared';
 
 const espnCredentials = z.object({
   espnS2: z.string().min(20).max(4000),
@@ -96,6 +109,23 @@ const schemas = {
     icon_key: z.string().max(40).nullable().optional(),
   }),
   resolvePlayer: z.object({ nhlPlayerId: z.number().int().positive() }),
+  screenshotRead: z.object({
+    platform: z.enum(['yahoo', 'espn', 'fantrax', 'cbs', 'sleeper', 'manual']),
+    leagueName: z.string().max(120).nullable().optional(),
+    season: z.number().int().min(1990).max(2100).nullable().optional(),
+    images: z.array(z.object({
+      data: z.string().min(100).max(MAX_IMAGE_BASE64_LENGTH).regex(/^[A-Za-z0-9+/=]+$/),
+      mediaType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/gif']),
+    })).min(1).max(MAX_IMAGES_PER_READ),
+  }),
+  screenshotConfirm: z.object({
+    platform: z.enum(['yahoo', 'espn', 'fantrax', 'cbs', 'sleeper', 'manual']),
+    leagueName: z.string().max(120).nullable().optional(),
+    pages: z.array(extractedPageSchema).min(1).max(40),
+    finished: z.record(z.string().regex(/^\d{4}$/), z.boolean()).optional(),
+    rostersAsKeepers: z.boolean().optional(),
+  }),
+  carryoverPicks: z.object({ draftSeason: z.number().int().min(1990).max(2100) }),
 };
 
 /** Accepts a pasted ESPN URL or a bare league id. */
@@ -201,6 +231,9 @@ importRoutes.get('/yahoo/leagues', async (c) => {
   }
 });
 
+// GET /api/imports/screenshots/status
+importRoutes.get('/screenshots/status', (c) => ok(c, { configured: new ScreenshotReader().isConfigured(), maxImages: MAX_IMAGES_PER_READ, platforms: SCREENSHOT_PLATFORMS }));
+
 export { importRoutes };
 
 // ---- league-scoped routes -----------------------------------------------------
@@ -254,6 +287,45 @@ leagueHistoryRoutes.post('/:leagueId/imports/yahoo', commissionerMiddleware, val
   }
 });
 
+// POST /api/leagues/:leagueId/imports/screenshots/read
+// The images are in this request and nowhere else afterwards: the reading is
+// what is kept (a raw payload on the job), and the commissioner reviews it
+// before anything is written.
+leagueHistoryRoutes.post('/:leagueId/imports/screenshots/read', commissionerMiddleware, validateBody(schemas.screenshotRead), async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const userId = c.get('userId');
+  const body = getValidatedBody<z.infer<typeof schemas.screenshotRead>>(c);
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new ScreenshotImportService(new LeagueImportService(supabase, supabaseAdmin), new ScreenshotReader());
+  try {
+    const outcome = await service.read({ leagueId, requestedBy: userId, images: body.images as ScreenshotImage[], platform: body.platform, leagueName: body.leagueName ?? null, season: body.season ?? null });
+    void new AuditService(supabase).log('LEAGUE_HISTORY_IMPORT', leagueId, { platform: body.platform, method: 'screenshot', step: 'read', jobId: outcome.job.id, images: body.images.length });
+    return created(c, outcome);
+  } catch (e) {
+    return handleError(c, e, 'Could not read the screenshots');
+  }
+});
+
+// POST /api/leagues/:leagueId/imports/screenshots/:jobId/confirm
+leagueHistoryRoutes.post('/:leagueId/imports/screenshots/:jobId/confirm', commissionerMiddleware, validateBody(schemas.screenshotConfirm), async (c) => {
+  const { leagueId, jobId } = c.req.param();
+  const userId = c.get('userId');
+  const body = getValidatedBody<z.infer<typeof schemas.screenshotConfirm>>(c);
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new ScreenshotImportService(new LeagueImportService(supabase, supabaseAdmin), new ScreenshotReader());
+  try {
+    const finished = body.finished ? Object.fromEntries(Object.entries(body.finished).map(([k, v]) => [Number(k), v])) : undefined;
+    const job = await service.confirm({
+      leagueId, jobId, requestedBy: userId, pages: body.pages, platform: body.platform, leagueName: body.leagueName ?? null,
+      finished, rostersAsKeepers: body.rostersAsKeepers, currentSeason: currentCitrusSeason(),
+    });
+    void new AuditService(supabase).log('LEAGUE_HISTORY_IMPORT', leagueId, { platform: body.platform, method: 'screenshot', step: 'confirm', jobId, pages: body.pages.length });
+    return ok(c, job);
+  } catch (e) {
+    return handleError(c, e, 'Could not import the reviewed pages');
+  }
+});
+
 // GET /api/leagues/:leagueId/imports/:jobId
 leagueHistoryRoutes.get('/:leagueId/imports/:jobId', membershipMiddleware, async (c) => {
   const { leagueId, jobId } = c.req.param();
@@ -299,6 +371,71 @@ leagueHistoryRoutes.get('/:leagueId/history', membershipMiddleware, async (c) =>
     });
   } catch (e) {
     return handleError(c, e, 'Failed to load league history');
+  }
+});
+
+// GET /api/leagues/:leagueId/history/seasons/:season
+// The parts of a season too long for the room's first paint: the draft, the
+// transaction log (trades carry picks as well as players), the weekly results
+// and the keeper list.
+leagueHistoryRoutes.get('/:leagueId/history/seasons/:season', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const season = Number(c.req.param('season'));
+  if (!Number.isInteger(season) || season < 1990 || season > 2100) return fail(c, AppError.badRequest('Season must be a start year, like 2024'));
+  const supabase = createUserClient(c.get('userToken'));
+  try {
+    const [picks, transactions, matchups, keepers] = await Promise.all([
+      supabase.from('league_season_drafts').select('overall_pick, round, pick_in_round, member_id, nhl_player_id, external_player_id, external_player_name, is_keeper, keeper_cost, auction_cost, source').eq('league_id', leagueId).eq('season', season).order('overall_pick', { ascending: true }),
+      supabase.from('league_season_transactions').select('id, occurred_at, type, member_id, counterparty_member_id, nhl_player_id, external_player_id, external_player_name, pick_season, pick_round, pick_original_member_id, faab_bid, external_transaction_id, source').eq('league_id', leagueId).eq('season', season).order('occurred_at', { ascending: true, nullsFirst: false }),
+      supabase.from('league_season_matchups').select('week, home_member_id, away_member_id, home_score, away_score, home_cat_wins, home_cat_losses, home_cat_ties, is_playoff, is_consolation, is_championship, winner_member_id, is_tie').eq('league_id', leagueId).eq('season', season).order('week', { ascending: true }),
+      supabase.from('league_season_keepers').select('member_id, external_player_id, external_player_name, nhl_player_id, round, round_next, years_kept, source').eq('league_id', leagueId).eq('season', season),
+    ]);
+    for (const r of [picks, transactions, matchups, keepers]) if (r.error) throw new Error(r.error.message);
+    return ok(c, { season, picks: picks.data ?? [], transactions: transactions.data ?? [], matchups: matchups.data ?? [], keepers: keepers.data ?? [] });
+  } catch (e) {
+    return handleError(c, e, 'Failed to load the season');
+  }
+});
+
+// GET /api/leagues/:leagueId/history/carryover
+leagueHistoryRoutes.get('/:leagueId/history/carryover', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new DynastyCarryoverService(supabase);
+  try {
+    const draftSeason = keeperSeasonYear(false);
+    const [keepers, picks] = await Promise.all([service.keeperPlan(leagueId, draftSeason), service.pickOwnership(leagueId)]);
+    return ok(c, { draftSeason, keepers, picks });
+  } catch (e) {
+    return handleError(c, e, 'Failed to load the carry-over');
+  }
+});
+
+// POST /api/leagues/:leagueId/history/carryover/keepers
+leagueHistoryRoutes.post('/:leagueId/history/carryover/keepers', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const supabase = createUserClient(c.get('userToken'));
+  try {
+    const seasonYear = keeperSeasonYear(false);
+    const result = await new DynastyCarryoverService(supabase).applyKeepers(leagueId, seasonYear);
+    void new AuditService(supabase).log('LEAGUE_HISTORY_IMPORT', leagueId, { method: 'carryover', step: 'keepers', seasonYear, ...result });
+    return ok(c, { seasonYear, ...result });
+  } catch (e) {
+    return handleError(c, e, 'Could not apply the keepers');
+  }
+});
+
+// POST /api/leagues/:leagueId/history/carryover/picks
+leagueHistoryRoutes.post('/:leagueId/history/carryover/picks', commissionerMiddleware, validateBody(schemas.carryoverPicks), async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const body = getValidatedBody<z.infer<typeof schemas.carryoverPicks>>(c);
+  const supabase = createUserClient(c.get('userToken'));
+  try {
+    const result = await new DynastyCarryoverService(supabase).applyPickOwnership(leagueId, body.draftSeason);
+    void new AuditService(supabase).log('LEAGUE_HISTORY_IMPORT', leagueId, { method: 'carryover', step: 'picks', draftSeason: body.draftSeason, applied: result.applied, skipped: result.skipped.length });
+    return ok(c, result);
+  } catch (e) {
+    return handleError(c, e, 'Could not apply the traded picks');
   }
 });
 

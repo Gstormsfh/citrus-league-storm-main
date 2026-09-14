@@ -23,7 +23,7 @@ import { ClaimCard } from '@/components/history/ClaimCard';
 import { TrophyRoom } from '@/components/history/TrophyRoom';
 import { CommissionerHistoryTools } from '@/components/history/CommissionerHistoryTools';
 import { EmptyState, Eyebrow, HistoryButton } from '@/components/history/ui';
-import { seasonLabel } from '@/components/history/trophyLabels';
+import { platformLabel, seasonLabel } from '@/components/history/trophyLabels';
 import { useToast } from '@/hooks/use-toast';
 
 const dataOf = <T,>(res: unknown): T | null => ((res as { data?: T })?.data ?? null);
@@ -96,7 +96,7 @@ export default function LeagueHistory() {
           <h1 className="mt-1 font-condensed font-extrabold text-[26px] uppercase tracking-[0.02em] leading-none text-pressbox-text">{leagueName || 'Trophy room'}</h1>
           <p className="mt-1.5 font-barlow text-[13px] text-white/55">
             {seasonsCount > 0
-              ? [founded != null ? `Founded ${seasonLabel(founded)}` : null, `${seasonsCount} ${seasonsCount === 1 ? 'season' : 'seasons'}`, sourceNames.length ? `from ${sourceNames.map((s) => (s === 'espn' ? 'ESPN' : s === 'yahoo' ? 'Yahoo' : s)).join(' and ')}` : null].filter(Boolean).join(' · ')
+              ? [founded != null ? `Founded ${seasonLabel(founded)}` : null, `${seasonsCount} ${seasonsCount === 1 ? 'season' : 'seasons'}`, sourceNames.length ? `from ${sourceNames.map(platformLabel).join(' and ')}` : null].filter(Boolean).join(' · ')
               : 'The record book starts with your first season.'}
           </p>
 

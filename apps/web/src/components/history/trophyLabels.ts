@@ -5,7 +5,7 @@
  */
 import type { HistoryMember, HistoryStanding, LeagueHistory, Trophy } from '@/api/imports';
 
-export type TrophySection = 'season' | 'record' | 'career' | 'h2h';
+export type TrophySection = 'season' | 'record' | 'career' | 'h2h' | 'awards';
 
 export interface TrophyLabel {
   title: string;
@@ -40,7 +40,7 @@ export const TROPHY_LABELS: Record<string, TrophyLabel> = {
   lifetime_h2h: { title: 'Lifetime head-to-head', section: 'h2h', kicker: 'Record' },
   toughest_opponent: { title: 'Toughest opponent', section: 'h2h', kicker: 'Nemesis' },
   favourite_victim: { title: 'Favourite opponent', section: 'h2h', kicker: 'Win rate' },
-  custom: { title: 'League trophy', section: 'career', kicker: 'Commissioner' },
+  custom: { title: 'League trophy', section: 'awards', kicker: 'League award' },
 };
 
 export function trophyLabel(t: Pick<Trophy, 'trophy_key' | 'display_name'>): TrophyLabel {
@@ -143,7 +143,7 @@ export function standingFor(standings: HistoryStanding[], season: number, member
 
 /** Group live, visible trophies by section, each in a stable order. */
 export function groupTrophies(trophies: Trophy[]): Record<TrophySection, Trophy[]> {
-  const out: Record<TrophySection, Trophy[]> = { season: [], record: [], career: [], h2h: [] };
+  const out: Record<TrophySection, Trophy[]> = { season: [], record: [], career: [], h2h: [], awards: [] };
   for (const t of trophies) {
     if (t.is_hidden) continue;
     out[trophyLabel(t).section].push(t);
@@ -151,13 +151,51 @@ export function groupTrophies(trophies: Trophy[]): Record<TrophySection, Trophy[
   out.season.sort((a, b) => (b.season ?? 0) - (a.season ?? 0) || (a.rank ?? 99) - (b.rank ?? 99));
   const recordOrder = ['highest_week', 'biggest_blowout', 'closest_game', 'lowest_week', 'longest_win_streak', 'longest_losing_streak', 'category_sweep', 'perfect_week', 'narrowest_category_win', 'category_dominance'];
   out.record.sort((a, b) => recordOrder.indexOf(a.trophy_key) - recordOrder.indexOf(b.trophy_key));
-  const careerOrder = ['most_championships', 'founding_member', 'tenure', 'all_time_win_pct', 'championship_drought', 'custom'];
+  const careerOrder = ['most_championships', 'founding_member', 'tenure', 'all_time_win_pct', 'championship_drought'];
   out.career.sort((a, b) => careerOrder.indexOf(a.trophy_key) - careerOrder.indexOf(b.trophy_key) || (b.value ?? 0) - (a.value ?? 0));
+  out.awards.sort((a, b) => (b.season ?? 9999) - (a.season ?? 9999));
   return out;
+}
+
+export interface AwardGroup {
+  name: string;
+  winners: Array<{ season: number | null; member_id: string | null; winner: string | null; note: string | null }>;
+}
+
+/**
+ * The league's own awards, one line per award with its roll of winners,
+ * newest first. Grouped on the name as the league writes it, so "The Sacko"
+ * handed out on Yahoo in 2019 and on Citrus in 2027 are one award.
+ */
+export function groupAwards(trophies: Trophy[]): AwardGroup[] {
+  const byName = new Map<string, AwardGroup>();
+  for (const t of trophies) {
+    if (t.trophy_key !== 'custom' || t.is_hidden) continue;
+    const name = (t.display_name ?? (t.detail?.award as string | undefined) ?? 'League trophy').trim();
+    const key = name.toLowerCase();
+    const g = byName.get(key) ?? { name, winners: [] };
+    g.winners.push({ season: t.season, member_id: t.member_id, winner: (t.detail?.winner_name as string | undefined) ?? null, note: (t.detail?.note as string | undefined) ?? null });
+    byName.set(key, g);
+  }
+  for (const g of byName.values()) g.winners.sort((a, b) => (b.season ?? 9999) - (a.season ?? 9999));
+  return [...byName.values()].sort((a, b) => b.winners.length - a.winners.length || a.name.localeCompare(b.name));
 }
 
 /** member_id -> display name, with a placeholder for a row the room does not know. */
 export function memberNamer(history: Pick<LeagueHistory, 'members'>) {
   const byId = new Map(history.members.map((m) => [m.member_id, m.display_name]));
   return (id: string | null | undefined) => (id ? byId.get(id) ?? 'Unknown manager' : 'Unknown manager');
+}
+
+/** How a platform is named to a person. */
+export function platformLabel(platform: string | null | undefined): string {
+  switch (platform) {
+    case 'espn': return 'ESPN';
+    case 'yahoo': return 'Yahoo';
+    case 'fantrax': return 'Fantrax';
+    case 'cbs': return 'CBS';
+    case 'sleeper': return 'Sleeper';
+    case 'manual': return 'screenshots';
+    default: return platform ?? '';
+  }
 }

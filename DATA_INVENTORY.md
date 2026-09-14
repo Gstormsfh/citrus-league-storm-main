@@ -133,8 +133,9 @@ Two migrations. `20260914110000_league_history_foundation.sql` carries into
 migration history the three tables that were applied to prod by hand on
 2026-08-26 (idempotent: `create table if not exists`, `drop policy if exists`).
 `20260914110100_league_import_platform.sql` is the automated Yahoo / ESPN
-import on top of it. **Written and verified on a Supabase branch database;
-NOT yet applied** to prod or staging as of 2026-09-13.
+import on top of it. A fourth, `20260914120000_league_import_screenshots.sql`, adds the screenshot
+path and the keeper/dynasty carry-over. **Written and verified on a Supabase
+branch database; NOT yet applied** to prod or staging as of 2026-09-14.
 
 Design rules the tables encode: an import is a copy, never a link; every raw
 API response is stored before it is parsed; every trophy carries a provenance
@@ -159,13 +160,27 @@ never get points-league records; nothing is hard-deleted (`retired_at`,
 | `external_player_ids` | (`platform`, `external_player_id`) → `nhl_player_id` with `match_method`, `confidence`, `is_ambiguous`. Shared across every league; resolved once, resolved everywhere | `PlayerCrosswalkService` on the **service role** after the API has verified the caller | Enabled. Any signed-in user SELECTs; **no authenticated write policy on purpose** (one user must not re-map a player for everyone) |
 | `oauth_connections` | One row per user per platform (Yahoo): guid, expiry, scopes, `revoked_at`. No token material; access tokens are never persisted; ESPN credentials are never stored anywhere | API server on the service role after verifying the caller (Yahoo OAuth callback) | Enabled. Users SELECT their own row; **no client write policy** |
 | `yahoo_provider_tokens` | AES-256-GCM sealed Yahoo refresh token per user (`YAHOO_TOKEN_ENCRYPTION_KEY`, held only by the API server; user id as AAD), same posture as `apple_provider_tokens`. Yahoo rotates refresh tokens on use, so every refresh re-seals the row. `20260914110200_yahoo_oauth.sql`; runbook `docs/RUNBOOKS/LEAGUE_IMPORT.md` | `YahooConnectionService` on the service role | Enabled, **zero policies**: service role only |
+| `league_season_keepers` | The keeper list as the source showed it in a season (player, cost round, next year's round), kept for the carry-over into the next Citrus draft. `20260914120000_league_import_screenshots.sql` | `writeSeason` (replaced as a set per season and source) | Enabled. Members SELECT; commissioner writes |
+| `league_pick_ownership` | Future draft picks that changed hands: `draft_season`, `round`, original and current owner member. `applied_at` set once the commissioner applied the row to `draft_order`. Same migration | `writeSeason` (unapplied rows replaced per draft season); `DynastyCarryoverService.applyPickOwnership` stamps `applied_at` | Enabled. Members SELECT; commissioner writes |
+
+Screenshot imports (`import_jobs.method = 'screenshot'`, 2026-09-14) store the
+vision model's reading as a raw payload (`endpoint = vision:record_league_pages`);
+the images themselves are never stored. `league_season_transactions` gains
+`pick_season`, `pick_round`, `pick_original_member_id` so a traded draft pick is
+a trade asset like a player. Managers from screenshots are keyed
+`name:<normalised manager name>` in `league_member_identities` (no account id
+exists on a page), the same key the foundation's paste path uses; a later API
+import of the same league is reconciled by the commissioner's merge tool.
 SECURITY DEFINER functions, all `SET search_path = public`:
 `citrus_claim_league_member(uuid, text)` (token path from an invite link, or
 list-pick for a league member; merges into the caller's existing owner-linked
-row so the foundation seed never leaves one person with two rows) and
+row so the foundation seed never leaves one person with two rows),
 `citrus_merge_league_members(uuid, uuid, text)` (commissioner, or the claim
 path; re-points every history row; refuses when both rows have standings in a
-shared season). Views `league_season_results` and `league_member_honours`
+shared season), and `citrus_apply_imported_keepers(uuid, integer, jsonb)`
+(commissioner; prefills `keeper_designations` as `designated` rows for the
+coming season from the imported keeper list, leaving approved and locked rows
+alone; needed because the keeper table's insert policy is per team owner). Views `league_season_results` and `league_member_honours`
 (titles, finals lost, playoff seasons, best finish, career record) are what the
 trophy room and the "which one is you?" list read.
 

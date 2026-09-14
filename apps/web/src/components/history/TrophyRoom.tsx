@@ -6,8 +6,9 @@
  */
 import { useState } from 'react';
 import type { LeagueHistory, Trophy } from '@/api/imports';
-import { careerLine, groupTrophies, memberNamer, ordinal, seasonLabel, trophyLabel, trophyValueLine } from './trophyLabels';
+import { careerLine, groupAwards, groupTrophies, memberNamer, ordinal, seasonLabel, trophyLabel, trophyValueLine } from './trophyLabels';
 import { Chip, Eyebrow, Panel, Row } from './ui';
+import { SeasonDetail } from './SeasonDetail';
 
 export interface TrophyRoomProps {
   history: LeagueHistory;
@@ -72,10 +73,29 @@ export function TrophyRoom({ history, currentUserId }: TrophyRoomProps) {
                 </ol>
               )}
               {open && rows.length === 0 && <p className="pb-2 pl-[80px] font-barlow text-[12px] text-white/55">No standings were recorded for this season.</p>}
+              {open && history.league?.id && <SeasonDetail leagueId={history.league.id} season={s.season} nameOf={nameOf} />}
             </div>
           );
         })}
       </Panel>
+
+      {/* ---- the league's own awards ---------------------------------------- */}
+      {grouped.awards.length > 0 && (
+        <Panel testId="history-awards">
+          <Eyebrow>✦ League awards</Eyebrow>
+          {groupAwards(grouped.awards).map((a, i, arr) => (
+            <Row key={a.name} last={i === arr.length - 1}>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-condensed font-bold text-[16px] text-pressbox-text">{a.name}</span>
+                <span className="block font-barlow text-[12px] text-white/55">
+                  {a.winners.map((w) => `${w.season != null ? seasonLabel(w.season) : 'All time'}: ${w.member_id ? nameOf(w.member_id) : w.winner ?? 'Unknown'}`).join(' · ')}
+                </span>
+              </span>
+              {a.winners.some((w) => mine && w.member_id === mine) && <Chip tone="orange">You</Chip>}
+            </Row>
+          ))}
+        </Panel>
+      )}
 
       {/* ---- record book --------------------------------------------------- */}
       {grouped.record.length > 0 && (
