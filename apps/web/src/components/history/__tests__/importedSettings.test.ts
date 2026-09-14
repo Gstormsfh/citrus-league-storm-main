@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ImportedSettings } from '@/api/imports';
 import { planFromImportedSettings, CATEGORY_ID_BY_KEY } from '../importedSettings';
-import { progressLine, isSettled } from '../importProgress';
+import { progressLine, isSettled } from '../importProgressStatus';
 import type { ImportJob } from '@/api/imports';
 
 const base = (over: Partial<ImportedSettings> = {}): ImportedSettings => ({
