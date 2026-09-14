@@ -9,6 +9,7 @@ python3 data-pipeline/draftkit/canonical_review.py validate tmp/projection-audit
 python3 data-pipeline/draftkit/canonical_review.py review tmp/projection-audit/canonical/canonical.json --team NYR --output /tmp/nyr-review.json
 python3 data-pipeline/draftkit/canonical_review.py apply tmp/projection-audit/canonical/canonical.json --patch /tmp/review-patch.json --output /tmp/canonical-reviewed.json
 python3 data-pipeline/draftkit/canonical_review.py history /tmp/canonical-reviewed.json
+python3 data-pipeline/draftkit/canonical_review.py publication-review /tmp/canonical-reviewed.json --reason "why this is publishable" --reviewer "name" --output /tmp/canonical-publishable.json
 python3 data-pipeline/draftkit/canonical_review.py stage-payload /tmp/canonical-reviewed.json --output /tmp/canonical-stage-args.json
 ```
 
@@ -33,6 +34,8 @@ Player IDs, source records, imported workbook inputs, exposure units and baselin
 Team notes retain the original ordered note objects, including coordinates and source references; only their `text` may change. Appended notes require `authority: "manual_review"`. The patch carries dated evidence separately. Reviewers must not label an assumed camp lineup or imported injury scenario as verified without supporting evidence.
 
 Each edit rejects a stale base revision, records the complete previous affected records, reason, evidence and timestamp, derives counts from rates times exposure exactly once, rebuilds team workload ledgers, and hashes the complete new document. Missing forecasts remain missing. Zero exposure remains zero. Invalid rates, unsupported statistics, altered source coordinates and mismatched lineup IDs fail validation.
+
+`publication-review` (2026-09-14) is the explicit publication gate as a recorded step: it clears only the `ROSTER_ROLE_SCENARIOS_NOT_CONFIRMED` blocker, sets `contract.publication_ready`, appends a `publication_review` record (reviewer, reason, time) to `review_history`, and re-digests, so the revision stays honest. Any other blocker refuses. Availability changes have their own front door — `availability_patch.py` and `docs/RUNBOOKS/AVAILABILITY_REVIEW.md` — which produces the patch this editor applies.
 
 The staging export is only the argument object for `canonical_stage_projection_run(p_payload jsonb)`. A separate authorized service-role operator can stage it, call `canonical_validate_projection_run(p_run_id uuid)`, inspect its errors, and only then consider `canonical_activate_projection_run(p_run_id uuid, p_expected_revision text, p_expected_active_revision text)`. Staging is not publication. These commands do not run any RPC. The database validator independently checks the payload; a local `publication_ready` flag is not sufficient authority.
 
