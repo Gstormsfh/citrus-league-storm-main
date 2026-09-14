@@ -37,15 +37,21 @@ describe('Free Agents available-player row current availability', () => {
     expect(screen.queryByText(/^active$/i)).toBeNull();
     expect(screen.getByText('Kevin Fiala')).toBeTruthy();
   });
-  it('shows Unknown for absent evidence and for a cached report after expiry', () => {
+  // NO PILL FOR NO EVIDENCE (2026-09-14): absent evidence and expired
+  // evidence both render no badge — not "Unknown", and never the legacy
+  // active flag or a stale OUT.
+  it('renders no badge for absent evidence and for a cached report after expiry', () => {
     vi.useFakeTimers(); vi.setSystemTime(now);
     const view = renderPlayer(resolvePlayerAvailability({}, now));
-    expect(screen.getByText('Unknown')).toBeTruthy();
+    expect(screen.queryByText('Unknown')).toBeNull();
+    expect(document.querySelector('[data-availability-status]')).toBeNull();
     expect(screen.queryByText(/^active$/i)).toBeNull();
+    expect(screen.getByText('Kevin Fiala')).toBeTruthy();
     view.unmount();
     vi.setSystemTime(new Date('2026-09-14T00:00:00Z'));
     renderPlayer();
-    expect(screen.getByText('Unknown')).toBeTruthy();
+    expect(screen.queryByText('Unknown')).toBeNull();
     expect(screen.queryByText('OUT')).toBeNull();
+    expect(document.querySelector('[data-availability-status]')).toBeNull();
   });
 });

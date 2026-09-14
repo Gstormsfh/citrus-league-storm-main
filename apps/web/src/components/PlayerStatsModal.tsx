@@ -2,6 +2,7 @@ import { playerEligiblePositionsLabel } from '@citrus/shared';
 import { PlayerAffiliationDetails } from '@/components/player/PlayerAffiliationDetails';
 import { PlayerAvailabilityDetails } from '@/components/player/PlayerAvailabilityDetails';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
+import { heroMetricTile } from '@/components/player/heroMetricTile';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { seasonProjectionSummary, scoreGameLog } from '@/components/player/projectionScoring';
@@ -796,17 +797,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
     { key: 'wk', label: 'LAST 7 DAYS', value: weekPoints != null ? weekPoints.toFixed(1) : '–', tone: weekPoints != null ? 'sage' : 'plain' },
     { key: 'szn', label: 'PROJECTION', value: hasProjection ? String(Math.round(heroProjectedPts)) : '–', onClick: hasProjection ? () => setShowProjectionBreakdown(v => !v) : undefined },
     { key: 'rank', label: 'POS RANK', value: positionRank ?? '–' },
-    {
-      key: 'xg',
-      label: indexEntry?.gar_per_60 != null ? 'GAR / 60' : 'xG / 60',
-      value:
-        indexEntry?.gar_per_60 != null
-          ? `${indexEntry.gar_per_60 >= 0 ? '+' : ''}${indexEntry.gar_per_60.toFixed(2)}`
-          : indexEntry?.xg_per_60 != null
-            ? indexEntry.xg_per_60.toFixed(2)
-            : '–',
-      tone: indexEntry?.gar_per_60 != null || indexEntry?.xg_per_60 != null ? 'orange' : 'plain',
-    },
+    // GSAx for a goalie, GAR/60 else xG/60 for a skater: see heroMetricTile.
+    heroMetricTile(indexEntry, projectionGoalie),
   ];
   const heroGameCount = futureGames.length;
 

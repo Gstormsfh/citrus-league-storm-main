@@ -252,13 +252,16 @@ describe('DraftPoolRow — identity', () => {
 
   it('does not infer current injury from an undated IR field', () => {
     render(<DraftPoolRow {...base} player={mkPlayer({ status: 'IR' })} />);
-    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    // NO PILL FOR NO EVIDENCE (2026-09-14): nothing renders, not "Unknown".
+    expect(document.querySelector('[data-availability-status]')).toBeNull();
+    expect(screen.queryByText('Unknown')).toBeNull();
     expect(screen.queryByText('IR')).toBeNull();
   });
 
   it('does not infer health from an undated active field', () => {
     render(<DraftPoolRow {...base} player={mkPlayer({ status: 'ACT' })} />);
-    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    expect(document.querySelector('[data-availability-status]')).toBeNull();
+    expect(screen.queryByText('Healthy')).toBeNull();
   });
 });
 

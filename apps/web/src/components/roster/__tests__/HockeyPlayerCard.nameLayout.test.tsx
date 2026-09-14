@@ -91,9 +91,9 @@ describe('HockeyPlayerCard — the name never loses a width contest', () => {
     },
   );
 
-  it('unknown evidence stays on the meta row without crowding the name', () => {
+  it('unknown evidence renders no pill and leaves the name alone', () => {
     const { container } = render(<HockeyPlayerCard player={player()} />);
-    expect(screen.getByText('Unknown').parentElement?.textContent).toContain('COL');
+    expect(document.querySelector('[data-availability-status]')).toBeNull();
     expect(container.querySelector('h3')?.textContent).toBe('Cale Makar');
   });
 });
