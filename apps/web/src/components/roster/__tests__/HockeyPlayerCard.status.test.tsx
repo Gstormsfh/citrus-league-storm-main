@@ -22,13 +22,18 @@ describe('HockeyPlayerCard dated availability', () => {
     });
   it('does not turn a legacy injured/IR-eligible field into current evidence', () => {
     render(<HockeyPlayerCard player={player()} />);
-    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    // NO PILL FOR NO EVIDENCE (2026-09-14): nothing renders, not "Unknown".
+    expect(document.querySelector('[data-availability-status]')).toBeNull();
+    expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
     expect(screen.queryByText('IR')).not.toBeInTheDocument();
   });
   it('expires a cached report without claiming recovery', () => {
     vi.setSystemTime(new Date('2026-09-18'));
     render(<HockeyPlayerCard player={player(evidence('out'))} />);
-    expect(screen.getByText('Unknown')).toHaveAttribute('title', expect.stringContaining('expired'));
+    // Expired evidence renders no pill: not a stale OUT, not "Healthy", and
+    // not "Unknown". The details card is where expiry is explained.
+    expect(document.querySelector('[data-availability-status]')).toBeNull();
+    expect(screen.queryByText('OUT')).not.toBeInTheDocument();
     expect(screen.queryByText('Healthy')).not.toBeInTheDocument();
   });
 });

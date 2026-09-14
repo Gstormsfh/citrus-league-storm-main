@@ -204,8 +204,11 @@ export function PressBoxPlayerRow({
       </span>
 
       <button type="button" onClick={onPress} className="flex-1 min-w-0 text-left" aria-label={`Open player card for ${player.name}`}>
-        <span className={cn(PB_ROW_NAME, 'block text-pressbox-text')}>
-          {player.name}
+        {/* The badge sits beside the truncating name, not inside it: inside,
+            a long name ("Jacob Markstrom…") clipped the OUT pill with the
+            ellipsis and the one row that needed the badge lost it. */}
+        <span className="flex items-center gap-1 min-w-0">
+          <span className={cn(PB_ROW_NAME, 'block min-w-0 text-pressbox-text')}>{player.name}</span>
           <PlayerAvailabilityBadge availability={player.availability} />
         </span>
 

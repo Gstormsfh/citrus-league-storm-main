@@ -111,13 +111,16 @@ describe('FreeAgentRow — everything the decision needs, on one 64px line', () 
     clean.unmount();
 
     row({ player: player({ status: 'IR' }) });
-    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    // NO PILL FOR NO EVIDENCE (2026-09-14): nothing renders, not "Unknown".
+    expect(document.querySelector('[data-availability-status]')).toBeNull();
+    expect(screen.queryByText('Unknown')).toBeNull();
     expect(screen.queryByText('IR')).toBeNull();
   });
 
   it("an undated ACT field cannot establish current health", () => {
     row({ player: player({ status: 'ACT' }) });
-    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    expect(document.querySelector('[data-availability-status]')).toBeNull();
+    expect(screen.queryByText('Healthy')).toBeNull();
   });
 
   it('reuses the roster position palette rather than inventing a second one', () => {
