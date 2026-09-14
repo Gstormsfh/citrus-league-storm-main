@@ -61,7 +61,7 @@ export default function Dangle() {
   return (
     <DarkLayout>
       <Navbar />
-      <main className="relative pt-24 pb-20" data-testid="dangle-landing">
+      <main className="relative pt-app-header pb-20" data-testid="dangle-landing">
         <section className="max-w-[1100px] mx-auto px-6 py-12 md:py-16 text-center">
           <div className="font-plex font-semibold text-[11px] tracking-[0.18em] uppercase text-pressbox-orange-soft mb-4">
             Heard it on the Steve Dangle Podcast · Free · {OPENING_NIGHT_LABEL}

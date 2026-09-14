@@ -283,7 +283,7 @@ export default function PreviewDashboardPrimitives() {
     <DarkLayout>
       <Navbar />
 
-      <main className="relative max-w-[1280px] mx-auto px-6 pt-24 pb-16">
+      <main className="relative max-w-[1280px] mx-auto px-6 pt-app-header pb-16">
         {/* Page header */}
         <div className="mb-10">
           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-2 font-bold">

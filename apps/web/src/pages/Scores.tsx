@@ -113,7 +113,7 @@ export default function Scores() {
         />
       </div>
 
-      <div className="relative z-10 max-w-2xl mx-auto pb-app-chrome lg:pt-24 lg:pb-8">
+      <div className="relative z-10 max-w-2xl mx-auto pb-app-chrome lg:pt-app-header lg:pb-8">
         <div className="sticky top-0 z-sticky-raised">
           <ScoresDateStrip selected={selectedDate} onSelect={selectDate} />
         </div>

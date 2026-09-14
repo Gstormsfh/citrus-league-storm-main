@@ -60,11 +60,15 @@ describe('FreeAgents.tsx — the face is the shared Mug', () => {
   });
 
   it('every desktop table row draws the 28px face through the adapter', () => {
-    const faces = PAGE.match(/<Mug\b[^>]*\/>/g) ?? [];
-    // Trending table, Projected table, the main Available table. The phone
-    // lists that used to sit beside them are FreeAgentRows now.
-    expect(faces.length).toBeGreaterThanOrEqual(3);
-    for (const tag of faces) {
+    // The main Available table draws its own row; the Trending and Projected
+    // cards share FreeAgentSummaryTable (2026-09-14), which draws the face
+    // once for both. The phone lists beside them are FreeAgentRows.
+    const SUMMARY = readFileSync(resolve(__dirname, '../../components/freeagents/FreeAgentSummaryTable.tsx'), 'utf8');
+    const pageFaces = PAGE.match(/<Mug\b[^>]*\/>/g) ?? [];
+    const summaryFaces = SUMMARY.match(/<Mug\b[^>]*\/>/g) ?? [];
+    expect(pageFaces.length).toBeGreaterThanOrEqual(1);
+    expect(summaryFaces).toHaveLength(1);
+    for (const tag of [...pageFaces, ...summaryFaces]) {
       expect(tag).toMatch(/p=\{mugFromDirectory\(player\)\}/);
       expect(tag).toMatch(/size="xs"/);
     }

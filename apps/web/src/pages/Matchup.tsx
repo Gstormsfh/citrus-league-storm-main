@@ -4939,7 +4939,7 @@ const Matchup = () => {
       <main className={cn(
         "w-full",
         // Mobile: Full height scrollable, no padding for navbar
-        "lg:pt-24 lg:pb-8",
+        "lg:pt-app-header lg:pb-8",
         // Mobile: Account for bottom nav
         "pb-app-chrome"
       )}>

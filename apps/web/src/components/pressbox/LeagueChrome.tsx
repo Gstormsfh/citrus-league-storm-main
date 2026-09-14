@@ -138,6 +138,11 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
           chatUnread={unread}
         />
       </div>
+      {/* THE BREATH UNDER THE BAR (2026-09-14): 8px of in-flow space between
+          the sticky chrome and the first tile. It sits OUTSIDE the sticky
+          element on purpose: inside, it would stay pinned and cost 8px of
+          viewport on every scroll; here it scrolls away with the content. */}
+      <div aria-hidden="true" className="lg:hidden h-2" data-testid="pb-league-chrome-gap" />
       {/* The chat sheet exists only while open, like the menu: LeagueNotifications
           reads the store and the profile, and nothing about it needs to mount
           under every league page's tests. */}

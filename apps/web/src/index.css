@@ -217,6 +217,18 @@
     padding-bottom: calc(116px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom)));
   }
 
+  /* THE TOP CHROME (2026-09-14). The desktop Navbar is `fixed` and takes no
+     flow space: brand row 48px + tab row 44px = 92px plus the safe-area
+     inset. Every page used to hardcode `lg:pt-24` (96px) under it, a 4px
+     gap that read as cramped, and two pages (Contact `pt-16`, the player
+     dashboard `pt-20`) sat partly UNDER the bar. One utility, one number:
+     the bar's height plus a 12px breath, so a change to the Navbar moves
+     every page in one place. The phone headers are in flow and carry
+     their own bottom spacing. */
+  .pt-app-header {
+    padding-top: calc(104px + var(--safe-area-inset-top,env(safe-area-inset-top)));
+  }
+
   /* PRESS BOX skeleton shimmer (PR3, motion board 2b): the tile colour
      with a lighter band sweeping through, 1.6s, on the existing
      citrus-shimmer keyframe. Rows stagger via animation-delay in the

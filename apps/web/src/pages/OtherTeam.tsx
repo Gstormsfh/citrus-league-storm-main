@@ -598,7 +598,7 @@ const OtherTeam = () => {
           })()
         )}
       </div>
-      <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
+      <main className="hidden lg:block w-full lg:pt-app-header lg:pb-8">
         <div className="w-full m-0 p-0">
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto scrollbar-pressbox px-2 lg:px-6 order-1 lg:order-2">

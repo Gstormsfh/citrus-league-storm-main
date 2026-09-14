@@ -218,7 +218,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]">
         <PressBoxAppHeader title="Player" logoSrc="/favicon.svg" onBack={goBack} backLabel="Back to players" />
       </div>
-      <main className={cn(PB_TYPE, 'relative pt-20 max-lg:pt-3 pb-12 pb-app-chrome max-lg:font-barlow')}>{children}</main>
+      <main className={cn(PB_TYPE, 'relative pt-app-header max-lg:pt-3 pb-12 pb-app-chrome max-lg:font-barlow')}>{children}</main>
       <HockeyFooter variant="app" />
     </DarkLayout>
   );
