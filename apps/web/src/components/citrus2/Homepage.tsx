@@ -8,7 +8,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import Navbar from '@/components/Navbar';
-import { MASCOT_LIST } from '@/constants/mascots';
 // Siblings are imported by module, not through '@/components/citrus2'. The
 // barrel (index.ts) re-exports this file, so importing the barrel from here
 // makes Homepage <-> index a cycle. Rollup reported it as a cyclic cross-chunk
@@ -23,7 +22,6 @@ import { CtaBanner } from './CtaBanner';
 import { Faq, type FaqEntry } from './Faq';
 import { GameModeCard } from './GameModeCard';
 import { FeatureCard } from './FeatureCard';
-import { MascotCard } from './MascotCard';
 import { StormyChatTile } from './StormyChatTile';
 import { MascotAvatar } from './MascotAvatar';
 // Real hockey iconography, replacing generic lucide
@@ -47,11 +45,38 @@ import { OPENING_NIGHT_LABEL } from '@/lib/season';
 // HERO
 // =============================================================================
 
-// Inline component to render a mascot action scene as the hero visual.
-function SceneVisual({ src, alt }: { src: string; alt: string }) {
+// The storefront leads with the product, not a character. Mascots belong in
+// the places where they have a role (for example, Stormy's assistant section
+// below), rather than becoming decoration on every marketing card.
+function ProductVisual() {
   return (
-    <div className="relative w-full aspect-square max-w-[520px] mx-auto rounded-[28px] overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
-      <img src={src} alt={alt} className="w-full h-full object-cover" loading="eager" />
+    <div className="relative w-full max-w-[520px] mx-auto rounded-[28px] overflow-hidden border border-white/10 bg-gradient-to-br from-pressbox-surface to-[#101c14] p-4 sm:p-6 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+      <div className="flex items-center justify-between border-b border-white/10 pb-4">
+        <div>
+          <p className="font-plex text-[10px] font-semibold uppercase tracking-[0.16em] text-pressbox-text/55">Your league</p>
+          <p className="mt-1 font-condensed text-2xl font-extrabold uppercase text-pressbox-text">Draft night</p>
+        </div>
+        <span className="rounded-md bg-pressbox-orange/15 px-2.5 py-1 font-plex text-[10px] font-semibold uppercase tracking-[0.12em] text-pressbox-orange-soft ring-1 ring-pressbox-orange/30">Open</span>
+      </div>
+      <div className="grid grid-cols-3 gap-3 py-5">
+        {[
+          ['Set up', CrossedSticksIcon],
+          ['Draft', DraftIcon],
+          ['Compete', ScoreboardIcon],
+        ].map(([label, Icon]) => {
+          const CardIcon = Icon as React.ComponentType<{ className?: string }>;
+          return (
+            <div key={label as string} className="rounded-xl border border-white/10 bg-black/15 p-3 sm:p-4">
+              <CardIcon className="h-5 w-5 text-pressbox-orange" />
+              <p className="mt-5 font-condensed text-base font-bold uppercase text-pressbox-text">{label as string}</p>
+            </div>
+          );
+        })}
+      </div>
+      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+        <p className="font-plex text-[10px] font-semibold uppercase tracking-[0.14em] text-pressbox-text/55">Built for the whole season</p>
+        <p className="mt-2 font-barlow text-sm leading-relaxed text-pressbox-text/75">Your draft, your scoring, and a live matchup in one league home.</p>
+      </div>
     </div>
   );
 }
@@ -75,7 +100,7 @@ function getHeroSlides(): HeroSlide[] {
       sub: 'Season-long leagues with your buddies, live scoring on every shift, and projections from an expected-goals model built for the NHL. There are no entry fees and no payouts. It is just hockey.',
       primary: { label: 'Create a league', to: '/create-league' },
       secondary: { label: 'Try a mock draft first', to: '/armchair-gm?tab=mockdraft' },
-      visual: <SceneVisual src="/mascots/scene-squad.webp" alt="The Citrus Squad on the bench" />,
+      visual: <ProductVisual />,
     },
   ];
 }
@@ -93,11 +118,9 @@ const GAME_MODES: Array<{
   accent: AccentName;
   icon: React.ComponentType<{ className?: string }>;
   to: string;
-  scene?: string;
 }> = [
   {
     label: 'Fantasy Hockey',
-    scene: '/mascots/scene-squad.webp',
     sub: 'Snake, auction or salary-cap draft, your own scoring, and a live draft room. This is the main event.',
     badge: 'Season',
     accent: 'orange',
@@ -106,7 +129,6 @@ const GAME_MODES: Array<{
   },
   {
     label: 'Daily Pickem',
-    scene: '/mascots/scene-pickem.webp',
     sub: "Pick the winner of every game on tonight's slate. It locks at puck drop and settles at the final horn.",
     badge: 'Daily',
     accent: 'sage',
@@ -115,7 +137,6 @@ const GAME_MODES: Array<{
   },
   {
     label: 'Survivor Pool',
-    scene: '/mascots/scene-survivor.webp',
     sub: "One team a week, and you can only use each team once. Lose and you're out. The last manager standing takes it.",
     badge: 'Weekly',
     accent: 'butter',
@@ -124,7 +145,6 @@ const GAME_MODES: Array<{
   },
   {
     label: 'Confidence Pool',
-    scene: '/mascots/scene-confidence.webp',
     sub: 'Rank your weekly picks by how sure you are. The ones you are most confident in are worth the most.',
     badge: 'Weekly',
     accent: 'peach',
@@ -133,7 +153,6 @@ const GAME_MODES: Array<{
   },
   {
     label: 'Stanley Cup Brackets',
-    scene: '/mascots/scene-cup.webp',
     sub: 'Fill in the whole bracket before the first round starts and score it round by round through the Cup Final.',
     badge: 'Apr–Jun',
     accent: 'orange',
@@ -142,7 +161,6 @@ const GAME_MODES: Array<{
   },
   {
     label: 'Mock Draft',
-    scene: '/mascots/scene-draft.webp',
     sub: 'A 12-team mock against AI managers, no account needed. Good for testing a strategy before the real draft.',
     badge: 'Anytime',
     accent: 'sage',
@@ -156,11 +174,9 @@ const REAL_FEATURES: Array<{
   desc: string;
   icon: React.ComponentType<{ className?: string }>;
   accent: AccentName;
-  scene?: string;
 }> = [
   {
     label: 'An expected-goals model',
-    scene: '/mascots/scene-xg-model.webp',
     desc: 'Every shot gets an expected-goal value from a gradient-boosted model trained on shot location, shot type and the passing sequence before the shot. Player projections start there, not at last season\'s point totals.',
     icon: XGModelIcon,
     accent: 'orange',
@@ -173,14 +189,12 @@ const REAL_FEATURES: Array<{
   },
   {
     label: 'Live scoring on every shift',
-    scene: '/mascots/scene-livescoring.webp',
     desc: 'Goals, assists, hits and blocks land in your matchup as they happen during the game, not after the box score posts.',
     icon: ShiftIcon,
     accent: 'butter',
   },
   {
     label: 'Stormy, the assistant GM',
-    scene: '/mascots/scene-stormy-ai.webp',
     desc: 'Stormy knows your roster and your scoring settings before you ask, and he quotes the number he is leaning on when he answers.',
     icon: ScoreboardIcon,
     accent: 'peach',
@@ -198,8 +212,6 @@ const REAL_FEATURES: Array<{
     accent: 'orange',
   },
 ];
-
-const MASCOT_ACCENTS: AccentName[] = ['orange', 'butter', 'sage', 'peach'];
 
 const FAQ: FaqEntry[] = [
   {
@@ -346,20 +358,6 @@ export function Homepage() {
               An example. In your league he reads your actual roster and settings.
             </p>
           </div>
-        </div>
-      </section>
-
-      {/* The Squad */}
-      <section className={SECTION}>
-        <SectionHeader
-          eyebrow="Roll call"
-          title="The Citrus Squad."
-          sub="Four characters who show up around the app. Stormy is the assistant GM. Lemon, Kiwi and Pineapple turn up in drafts, matchups and the league chat."
-        />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {MASCOT_LIST.map((m, i) => (
-            <MascotCard key={m.id} id={m.id} accent={MASCOT_ACCENTS[i]} />
-          ))}
         </div>
       </section>
 

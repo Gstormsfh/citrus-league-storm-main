@@ -52,3 +52,16 @@ describe('site claims guard', () => {
     });
   }
 });
+
+describe('homepage visual hierarchy', () => {
+  it('keeps mascot scenes out of the storefront hero and card grids', () => {
+    const homepage = readFileSync(join(SRC, 'components/citrus2/Homepage.tsx'), 'utf8');
+
+    // Mascots have a role in the product (notably Stormy's assistant surface),
+    // but marketing should lead with the league experience rather than repeat
+    // character art in the hero and every card.
+    expect(homepage).not.toMatch(/scene-[a-z-]+\.webp/);
+    expect(homepage).not.toContain('MascotCard');
+    expect(homepage).not.toContain('MASCOT_LIST');
+  });
+});
