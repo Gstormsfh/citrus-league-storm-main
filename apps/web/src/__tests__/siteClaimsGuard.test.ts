@@ -70,7 +70,8 @@ describe('homepage visual hierarchy', () => {
 
     expect(homepage).toContain('Actual product screens');
     expect(homepage).toContain('/product-demo/player-dashboard-demo-390.png');
-    expect(homepage).toContain('/product-demo/player-analysis-demo-390.png');
+    expect(homepage).toContain('Shot heatmap');
+    expect(homepage).toContain("-translate-y-[55%]");
     expect(homepage).toMatch(/width="390"\s+height="844"/);
     expect(homepage).toContain('Demo data · mobile layout');
   });
