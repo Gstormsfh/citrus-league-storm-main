@@ -46,6 +46,28 @@ Record the `runtime_revision` the export prints. Activation needs it verbatim
 as the compare-and-swap value; if anything publishes in between, activation
 refuses and you start at step 2 again.
 
+## 2b. Sync scope with the directory
+
+The database validator requires the document's `scope_player_ids` to equal
+`player_directory` for the season, and the directory refreshes on its own
+schedule. A signing that lands between two publications fails activation with
+`DIRECTORY_COVERAGE_MISMATCH` (it did on 2026-09-14: Jacob Melanson, listed at
+15:01 UTC). So every pass reconciles first:
+
+```sh
+node scripts/ops/projection-release/replacement/publish.mjs directory --out tmp/canonical/directory-<date>.json
+python3 data-pipeline/draftkit/canonical_review.py scope-sync tmp/canonical/source-<rev8>.json \
+  --directory tmp/canonical/directory-<date>.json \
+  --reason "directory refresh" --reviewer "<your name>" --output tmp/canonical/synced-<date>.json
+```
+
+`scope-sync` brings in directory players that already have a canonical
+record and records them in `review_history`. It refuses a directory player
+with no record (that is a `player_additions` review) and refuses to drop a
+scoped player the directory lost. If it says the scope already matches, use
+the export as-is and skip ahead. **Use the synced file as `--source` for
+everything below** — the patch's `base_revision` must be the synced revision.
+
 ## 3. Patch, apply, publication review
 
 ```sh
@@ -93,7 +115,11 @@ node scripts/ops/projection-release/replacement/publish.mjs activate --run-id <u
 
 `stage` sends the file's bytes verbatim (never a JavaScript re-serialization —
 that can rewrite a number and break the digest). `validate` must return
-`valid: true`. `activate` without `--yes` prints the swap it would make and
+`valid: true`. Both `validate` and `activate` can exceed PostgREST's statement
+timeout — the validator walks every player, the activator materializes every
+ROS and daily row. When that happens the tool prints the exact `select …`
+statement to paste into the Supabase SQL editor; nothing was committed by the
+cancelled call. `activate` without `--yes` prints the swap it would make and
 re-reads the active revision; with `--yes` it performs the single-transaction
 switch and prints the new `status`. Then open one changed player's card on
 production and read the sentence.

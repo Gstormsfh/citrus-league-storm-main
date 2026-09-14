@@ -10,6 +10,7 @@
  *
  *   node scripts/ops/projection-release/replacement/publish.mjs status
  *   node scripts/ops/projection-release/replacement/publish.mjs export   --out tmp/canonical/source.json
+ *   node scripts/ops/projection-release/replacement/publish.mjs directory --out tmp/canonical/directory.json
  *   node scripts/ops/projection-release/replacement/publish.mjs stage    --payload tmp/canonical/stage-args.json
  *   node scripts/ops/projection-release/replacement/publish.mjs validate --run-id <uuid>
  *   node scripts/ops/projection-release/replacement/publish.mjs activate --run-id <uuid> --revision <sha> --expected-active <sha> --yes
@@ -65,7 +66,17 @@ async function rest(cfg, pathname, init = {}) {
     headers: { apikey: cfg.key, Authorization: `Bearer ${cfg.key}`, 'Content-Type': 'application/json', ...(init.headers || {}) },
   });
   const text = await res.text();
-  if (!res.ok) throw new Error(`${init.method || 'GET'} ${pathname} → ${res.status}: ${text.slice(0, 2000)}`);
+  if (!res.ok) {
+    // PostgREST runs with the role's statement_timeout. The validator walks
+    // every player and the activator materializes every ROS/daily row, so
+    // either can exceed it. That is not a failure of the run: the statement
+    // was cancelled, nothing committed. The same call from the Supabase SQL
+    // editor (or the Supabase connector) has no such limit.
+    if (text.includes('"57014"') && init.sql) {
+      throw new Error(`${pathname} hit the PostgREST statement timeout (nothing committed). Run this exact statement in the Supabase SQL editor instead:\n\n${init.sql}\n`);
+    }
+    throw new Error(`${init.method || 'GET'} ${pathname} → ${res.status}: ${text.slice(0, 2000)}`);
+  }
   return text;
 }
 
@@ -92,6 +103,22 @@ async function exportSource(cfg, out) {
   return { out, bytes: body.length, source_revision: active.source_revision, runtime_revision: active.revision, runtime_run_id: active.run_id };
 }
 
+async function directory(cfg, out) {
+  // The validator requires scope_player_ids == player_directory for the season.
+  // Read the live ids so the editor's scope-sync can reconcile drift.
+  if (fs.existsSync(out)) throw new Error(`${out} exists; choose a new filename`);
+  const ids = [];
+  for (let offset = 0; ; offset += 1000) {
+    const text = await rest(cfg, `/rest/v1/player_directory?season=eq.${SEASON}&select=player_id&order=player_id.asc&offset=${offset}&limit=1000`);
+    const rows = JSON.parse(text);
+    ids.push(...rows.map((r) => String(r.player_id)));
+    if (rows.length < 1000) break;
+  }
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, JSON.stringify(ids) + '\n', { flag: 'wx' });
+  return { out, directory_ids: ids.length };
+}
+
 async function stage(cfg, payloadFile) {
   const body = fs.readFileSync(payloadFile, 'utf8');
   if (!body.trimStart().startsWith('{"p_payload"') && !/^\{\s*"p_payload"/.test(body)) throw new Error('payload file must be the stage-payload output: {"p_payload": …}');
@@ -100,19 +127,26 @@ async function stage(cfg, payloadFile) {
 }
 
 async function validate(cfg, runId) {
-  const text = await rest(cfg, '/rest/v1/rpc/canonical_validate_projection_run', { method: 'POST', body: JSON.stringify({ p_run_id: runId }) });
+  if (!UUID.test(runId)) throw new Error('run-id must be a uuid');
+  const sql = `select public.canonical_validate_projection_run('${runId}'::uuid);`;
+  const text = await rest(cfg, '/rest/v1/rpc/canonical_validate_projection_run', { method: 'POST', body: JSON.stringify({ p_run_id: runId }), sql });
   return JSON.parse(text);
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const SHA = /^[0-9a-f]{64}$/;
+
 async function activate(cfg, runId, revision, expectedActive, yes) {
+  if (!UUID.test(runId) || !SHA.test(revision) || !SHA.test(expectedActive)) throw new Error('run-id must be a uuid; revision and expected-active must be 64-hex digests');
   const before = await status(cfg);
   if (before.revision !== expectedActive) {
     throw new Error(`refusing: active runtime revision is ${before.revision}, not the expected ${expectedActive}. Re-read status and start the review again.`);
   }
   const plan = { season: SEASON, staged_run_id: runId, staged_revision: revision, replaces_runtime_revision: before.revision, replaces_run_id: before.run_id };
   if (!yes) return { dry_run: true, plan, note: 'add --yes to activate' };
+  const sql = `select public.canonical_activate_projection_run('${runId}'::uuid, '${revision}', '${expectedActive}');`;
   const text = await rest(cfg, '/rest/v1/rpc/canonical_activate_projection_run', {
-    method: 'POST', body: JSON.stringify({ p_run_id: runId, p_expected_revision: revision, p_expected_active_revision: expectedActive }),
+    method: 'POST', body: JSON.stringify({ p_run_id: runId, p_expected_revision: revision, p_expected_active_revision: expectedActive }), sql,
   });
   const after = await status(cfg);
   return { plan, result: JSON.parse(text), after };
@@ -125,10 +159,11 @@ async function main() {
   let out;
   if (verb === 'status') out = await status(cfg);
   else if (verb === 'export') out = await exportSource(cfg, a.out || `tmp/canonical/source-${Date.now()}.json`);
+  else if (verb === 'directory') out = await directory(cfg, a.out || `tmp/canonical/directory-${Date.now()}.json`);
   else if (verb === 'stage') out = await stage(cfg, a.payload);
   else if (verb === 'validate') out = await validate(cfg, a['run-id']);
   else if (verb === 'activate') out = await activate(cfg, a['run-id'], a.revision, a['expected-active'], a.yes === true);
-  else throw new Error('verb must be one of status | export | stage | validate | activate');
+  else throw new Error('verb must be one of status | export | directory | stage | validate | activate');
   console.log(JSON.stringify(out, null, 2));
 }
 

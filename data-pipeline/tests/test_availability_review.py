@@ -7,7 +7,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'draftkit'))
 from availability_patch import PatchError, build_patch
-from canonical_review import PUBLICATION_GATE, apply_patch, digest, publication_review, rebuild, validate
+from canonical_review import PUBLICATION_GATE, apply_patch, digest, publication_review, rebuild, scope_sync, validate
 from canonical_inputs import VERSION
 from projection_contract import ContractError
 
@@ -124,6 +124,43 @@ class PublicationReviewTest(unittest.TestCase):
         edited = apply_patch(doc, build_patch(doc, [row()], **ARGS))
         with self.assertRaisesRegex(ContractError, 'reviewer'):
             publication_review(edited, reason='r', reviewer=' ')
+
+
+class ScopeSyncTest(unittest.TestCase):
+    def scoped(self):
+        doc = document()
+        doc['scope_player_ids'] = ['1']            # the directory knew only the goalie at import time
+        doc['players'][0]['directory_present'] = True
+        doc['players'][1]['directory_present'] = False
+        rebuild(doc)
+        doc['revision'] = digest(doc)
+        return doc
+
+    def test_brings_an_already_canonical_player_into_scope_and_records_it(self):
+        doc = self.scoped()
+        synced = scope_sync(doc, ['1', '2'], reason='directory refresh listed Matthews', reviewer='Garrett Storms', now='2026-09-14T23:30:00+00:00')
+        self.assertEqual(synced['scope_player_ids'], ['1', '2'])
+        self.assertTrue(synced['players'][1]['directory_present'])
+        self.assertEqual(synced['revision'], digest(synced))
+        last = synced['review_history'][-1]
+        self.assertEqual(last['scope_sync'], {'reviewer': 'Garrett Storms', 'added': ['2']})
+        self.assertEqual(last['updates'][0]['before'], {'directory_present': False})
+        self.assertEqual(synced['coverage']['directory_covered'], 2)
+        validate(synced)
+
+    def test_refuses_a_directory_player_with_no_record(self):
+        with self.assertRaisesRegex(ContractError, "player_additions review: \\['3'\\]"):
+            scope_sync(self.scoped(), ['1', '2', '3'], reason='r', reviewer='x')
+
+    def test_refuses_to_drop_a_scoped_player_the_directory_lost(self):
+        with self.assertRaisesRegex(ContractError, "not a sync: \\['1'\\]"):
+            scope_sync(self.scoped(), ['2'], reason='r', reviewer='x')
+
+    def test_refuses_a_no_op_and_an_anonymous_sync(self):
+        with self.assertRaisesRegex(ContractError, 'already matches'):
+            scope_sync(self.scoped(), ['1'], reason='r', reviewer='x')
+        with self.assertRaisesRegex(ContractError, 'reviewer'):
+            scope_sync(self.scoped(), ['1', '2'], reason='r', reviewer='')
 
 
 if __name__ == '__main__':
