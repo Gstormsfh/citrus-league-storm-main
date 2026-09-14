@@ -43,6 +43,28 @@ test('reviewed primary survives ingestion, preserves secondary evidence and limi
  assert.deepEqual((await db.query('SELECT slot_assignments FROM team_lineups')).rows[0].slot_assignments,{'8475692':'slot-RW-1'});
  await assert.rejects(db.exec(corrections),/preimage changed/);
  await db.exec('ROLLBACK');
+ const restoreMigration=readFileSync(new URL('../../../supabase/migrations/20260914010000_position_override_return_to_feed.sql',import.meta.url),'utf8');
+ await db.exec(restoreMigration);
+ await db.exec("UPDATE player_position_events SET id='4ec90dbc-a2ee-4d86-89a6-15956f0275e6' WHERE player_id=8475768");
+ const restoration=readFileSync(new URL('./restore-schwartz-nhl-baseline.sql',import.meta.url),'utf8');
+ await db.exec(`INSERT INTO team_lineups(starters,slot_assignments) VALUES('[8475768]','{"8475768":"slot-LW-1"}')`);
+ await assert.rejects(db.exec(restoration),/restoration conflicts with active lineup/);
+ await db.exec("ROLLBACK; DELETE FROM team_lineups WHERE starters @> '[8475768]'::jsonb");
+ await db.exec(restoration);
+ assert.equal((await db.query('SELECT position_code FROM player_current_directory WHERE player_id=8475768')).rows[0].position_code,'C');
+ await assert.rejects(db.exec(restoration),/restoration preimage changed/);
+ await db.exec('ROLLBACK');
+ const prior=(await db.query("SELECT id FROM player_position_events WHERE player_id=8475692 ORDER BY sequence DESC LIMIT 1")).rows[0].id;
+ await assert.rejects(db.query("INSERT INTO player_position_events(season,player_id,position_code,feed_position_at_review,effective_on,source_urls,reason,recorded_by,event_action) VALUES(2026,8475692,'C','C',CURRENT_DATE,'[\"https://api-web.nhle.com/v1/roster/LAK/current\"]','restore official source','test','restore_feed')"),/restored_position_requires_predecessor/);
+ await db.query("INSERT INTO player_position_events(season,player_id,position_code,feed_position_at_review,effective_on,source_urls,reason,recorded_by,event_action,supersedes) VALUES(2026,8475692,'C','C',CURRENT_DATE,'[\"https://api-web.nhle.com/v1/roster/LAK/current\"]','restore official source','test','restore_feed',$1)",[prior]);
+ assert.equal((await db.query('SELECT position_code FROM player_current_directory WHERE player_id=8475692')).rows[0].position_code,'C');
+ await db.exec("UPDATE player_directory SET position_code='LW' WHERE player_id=8475692");
+ assert.equal((await db.query('SELECT position_code FROM player_current_directory WHERE player_id=8475692')).rows[0].position_code,'LW','restoration must follow later feed changes, not pin C');
+ assert.equal((await db.query('SELECT count(*)::int AS n FROM player_position_events WHERE player_id=8475692')).rows[0].n,2,'original evidence remains');
+ assert.deepEqual((await db.query('SELECT slot_assignments FROM team_lineups')).rows[0].slot_assignments,{'8475692':'slot-RW-1'},'identity governance never rewrites saved rosters');
+ await db.exec('SET ROLE authenticated');
+ await assert.rejects(db.exec("UPDATE player_position_events SET event_action='restore_feed'"),/permission denied/);
+ await db.exec('RESET ROLE');
 
  } finally { await db.close(); }
 });

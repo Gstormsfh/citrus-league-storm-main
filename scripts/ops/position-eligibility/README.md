@@ -2,6 +2,12 @@
 
 PR487 merged as `0bfd7dfc0e686bf4b0f92c20cf8e980b70a4b609`. The propagation patch reads existing primary plus secondary evidence consistently. The primary-correction migration and reviewed two-player SQL were **applied to production on 2026-09-13 at 23:19 UTC**. No secondary eligibility was granted and no forecasts were modified. See [the activation receipt](activation-receipt.md). Web/API deployment is tracked separately from database activation.
 
+## Source priority audit — 2026-09-14 UTC
+
+The original two NHLPA-derived primary corrections were a source-priority error. Fresh HTTP200 NHL roster responses at 00:52:37 UTC explicitly report `positionCode: C` for Zuccarello8475692 and Schwartz8475768. `/roster/LAK/current` and `/roster/COL/current` redirect to the exact `20262027` season. NHLPA and historical wing reports do not authorize replacing that official baseline. The original events and activation receipt remain historical evidence, not current source-preference guidance. See [the process audit](process-audit.md).
+
+NHL official roster/landing data is the primary identity baseline. A conflicting third-party profile is a review signal only. A primary override requires an explicit owner decision plus a recorded comparison with the exact-ID official response, season, capture time and body hash. Manual secondary eligibility is a separate owner decision and must not be inferred from a primary conflict. Return to the feed uses an append-only `restore_feed` event; it must not delete history or pin today's feed value as a new manual primary. Every correction/revocation requires fresh starter and daily-roster impact review.
+
 ## Live read-only evidence
 
 Production `player_current_directory`, season 2026: 1,453 identities, 1,391 NULL eligibility cells, 62 non-NULL cells, **zero multi-position cells**. This supersedes the earlier saved 1,435-row snapshot.
@@ -26,7 +32,13 @@ Current primary means the Citrus 2026 read at review; historical listing counts 
 
 This is a bounded seven-player discrepancy audit, not a manual role audit of all NHL players. Source disagreement is explicit; a third-party profile is not used to break a tie.
 
-## Recommended policy and next input
+## Approved manual policy and implementation boundary
+
+Owner decision on 2026-09-13: maintain secondary eligibility manually, with protected owner records and audit/provenance, until a reliable role/appearance process is available. Do not grant secondary positions automatically from game-count thresholds. Each concrete addition still needs the approved player, season, position and supporting record; this policy approval itself grants no positions.
+
+Implementation is incomplete for secondary records: `player_position_events` protects primary corrections only. The existing roster sync still computes listing-based secondary cells and can replace `eligible_positions`, including with a single primary. Directly editing that raw field is therefore not a protected manual workflow. A secondary event store/resolver and sync protection remain required before claiming the approved policy is enforced in production. No migration, sync behavior or player eligibility changed in this documentation-only audit.
+
+## Evidence requirements for manual review
 
 Adopt reviewed eligibility events, not automatic thresholds over this static feed. First correct independently verified primaries. For secondary additions require a dated official lineup/role statement or reviewed game-role evidence that actually distinguishes C/LW/RW/D. Record the player ID, effective season/date, added position, source URL, observation dates/game IDs, reviewer, reason and superseded event. A starting lineup label, faceoff count or shift interval alone does not prove positional minutes.
 
