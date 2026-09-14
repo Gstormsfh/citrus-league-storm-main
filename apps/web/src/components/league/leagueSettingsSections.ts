@@ -456,7 +456,7 @@ export function buildLeagueSettingsSections(input: LeagueSettingsInput): Setting
             help: input.draftReadiness.ready
               ? 'Managers see this on their league page, and the draft starts itself when the clock gets there. Leave it empty for no scheduled draft'
               : input.draftReadiness.reason === 'size_unset'
-                ? "Set the league size first — the draft can't start, on a clock or by hand, without it"
+                ? "Set the league size first. The draft can't start, on a clock or by hand, without it"
                 : `${input.draftReadiness.have} of ${input.draftReadiness.size} teams are in. Managers see this time on their league page, but the draft only starts itself if the league is full when the clock gets there`,
             value: draft.scheduledDraftTime,
             inputType: 'datetime-local',

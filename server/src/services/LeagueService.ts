@@ -469,7 +469,7 @@ export class LeagueService {
     if (scheduling && !(typeof sizeAfterWrite === 'number' && sizeAfterWrite > 0)) {
       return {
         success: false,
-        error: "Set the league size before scheduling the draft — the draft can't start without it.",
+        error: "Set the league size before scheduling the draft. The draft can't start without it.",
       };
     }
 

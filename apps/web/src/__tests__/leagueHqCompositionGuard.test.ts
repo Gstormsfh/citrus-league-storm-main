@@ -106,9 +106,10 @@ describe('League HQ composition', () => {
   });
 
   it('makes the draft CTA hot when the viewer can actually act', () => {
-    expect(SOURCE).toMatch(
-      /isCommissioner && league\.draft_status === 'not_started' && teams\.length >= \(league\.settings\?\.teamsCount \|\| 12\)/,
-    );
+    // ONE OWNER OF TRUTH (2026-09-14): readiness comes from leagues.league_size
+    // through lib/draftReadiness, never from settings.teamsCount || 12.
+    expect(SOURCE).toMatch(/isCommissioner && league\.draft_status === 'not_started' && readiness\.ready/);
+    expect(SOURCE).not.toMatch(/teamsCount \|\| 12/);
   });
 });
 

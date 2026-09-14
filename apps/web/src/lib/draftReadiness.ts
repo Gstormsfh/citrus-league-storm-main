@@ -61,7 +61,7 @@ export function draftReadiness(
       missing: 0,
       ready: false,
       reason: 'size_unset',
-      message: "The league size isn't set. Set it in the draft settings — the draft can't start without it.",
+      message: "The league size isn't set. Set it in the draft settings. The draft can't start without it.",
     };
   }
 

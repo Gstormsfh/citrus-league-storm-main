@@ -539,7 +539,7 @@ const LeagueDashboard = () => {
         description: iso
           ? readiness.ready
             ? `${new Date(iso).toLocaleString()}. Every manager sees it on their league page.`
-            : `${new Date(iso).toLocaleString()}. ${readiness.have} of ${readiness.size} teams are in — the draft won't start until the league is full.`
+            : `${new Date(iso).toLocaleString()}. ${readiness.have} of ${readiness.size} teams are in. The draft won't start until the league is full.`
           : 'Nobody is waiting on a clock now.',
       });
     } catch (err) {
@@ -1046,7 +1046,7 @@ const LeagueDashboard = () => {
       // A scheduled time on a short roster is a join deadline, not a start:
       // the sweep will decline roster_incomplete at that minute. Say so now,
       // to the one person who can fill the seats.
-      if (isCommissioner && !readiness.ready) description += ` — ${readiness.message}`;
+      if (isCommissioner && !readiness.ready) description += ` ${readiness.message}`;
     } else if (isCommissioner) {
       description = readiness.ready
         ? 'All teams are ready. Set up and start the draft.'
@@ -2620,7 +2620,7 @@ const LeagueDashboard = () => {
                 <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">
                   {teams.length}
                   <span className="text-white/55 mx-1.5 text-2xl md:text-3xl">/</span>
-                  <span className="text-pastel-orange">{readiness.size ?? '—'}</span>
+                  <span className="text-pastel-orange">{readiness.size ?? '–'}</span>
                 </div>
                 <p className="text-xs text-white/55 mt-2">
                   {readiness.size == null ? 'League size not set' : `Filled · max ${readiness.size}`}
@@ -2703,7 +2703,7 @@ const LeagueDashboard = () => {
                     </div>
                     <div className="font-calistoga text-xl text-pastel-cream mb-2">League pulse</div>
                     <p className="text-xs text-white/70 leading-relaxed">
-                      <span className="font-bold text-pastel-cream tabular-nums">{teams.length}</span> of <span className="font-bold text-pastel-cream tabular-nums">{readiness.size ?? '—'}</span> teams in.
+                      <span className="font-bold text-pastel-cream tabular-nums">{teams.length}</span> of <span className="font-bold text-pastel-cream tabular-nums">{readiness.size ?? '–'}</span> teams in.
                       {' '}
                       {league.draft_status === 'not_started' && 'Draft is on deck.'}
                       {league.draft_status === 'in_progress' && 'Draft is live. Get in there.'}
