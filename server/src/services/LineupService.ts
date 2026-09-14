@@ -765,8 +765,19 @@ export class LineupService {
             roster_date: dateStr,
             slot_type: slotType,
             slot_id: slotType !== 'bench' ? (slotAssignments[playerId] || null) : null,
-            is_locked: true,
-            locked_at: new Date().toISOString(),
+            // 2026-09-14: is_locked means "this player's game has started"
+            // (createDailyRosterSnapshots) or "this day is complete"
+            // (lockCompletedDays). Every date this writer touches is today
+            // or later, so nothing is locked yet. It used to write
+            // is_locked: true, which froze today's and future rows against
+            // the snapshot writer's delete-unlocked-then-insert, so a
+            // lineup edit made before puck drop could not replace them —
+            // and disagreed with MatchupService.backfillDailyRostersIfMissing
+            // (is_locked: date < today), which races this writer on every
+            // Matchup page load. Both writers now produce identical rows,
+            // so whichever lands first no longer matters.
+            is_locked: false,
+            locked_at: null,
             // Task 1B: label the provenance. This writer is inferring
             // today/future rows from the current base team_lineups; that
             // is the definition of 'reconstructed'.

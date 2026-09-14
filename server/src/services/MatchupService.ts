@@ -1327,9 +1327,12 @@ export class MatchupService {
     // fantasy_matchup_lines is read by getMatchupScores() and by
     // verify_matchup_scores(), and until 2026-08-11 nothing anywhere wrote it —
     // so every matchup had a score with nothing behind it and the verifier could
-    // never pass. persist_matchup_lines is idempotent (it deletes and rewrites
-    // this matchup's lines) and is granted to service_role only, so it must go
-    // through the admin client.
+    // never pass. persist_matchup_lines deletes and rewrites this matchup's
+    // lines under a per-matchup advisory lock (migration 20260914171000), so
+    // concurrent callers for the same matchup — two tabs, or a page load
+    // racing the scheduled scorer — serialize instead of the second one
+    // failing on the (matchup_id, player_id) unique key. It is granted to
+    // service_role only, so it must go through the admin client.
     //
     // A failure here does NOT fail scoring: the score is still correct, we just
     // lost the explanation. But it must be loud, because a silent miss is what
