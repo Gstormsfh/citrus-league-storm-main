@@ -1,3 +1,4 @@
+import { useLoadTiming } from '@/hooks/useLoadTiming';
 import React, { useEffect, useRef, useState } from 'react';
 import { MemoryRouter, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { useMatchupRouteLifetime } from '@/hooks/useMatchupRouteLifetime';
@@ -64,7 +65,9 @@ function Harness({ week }: { week: number }) {
     DEMO_LEAGUE_ID_FOR_GUESTS: 'demo', CACHE_TTL: 30000, profile: null,
     setTimeout, clearTimeout, window: routeWindow,
   });
-  const scope = new Proxy({ ...stable.current, loadLifetimeRef, loadingRef, urlLeagueId: 'league', urlWeekId: String(week),
+  const loadTiming = useLoadTiming(`user:league:${week}`, state.FrozenRostersByDate,
+    state.Loading, (state.MyTeam?.length ?? 0) > 0, true, true);
+  const scope = new Proxy({ ...stable.current, loadTiming, loadLifetimeRef, loadingRef, urlLeagueId: 'league', urlWeekId: String(week),
     resetDate: () => setState(previous => ({ ...previous, SelectedDate: null })),
     selectedMatchupId: null, currentMatchup: state.CurrentMatchup, userTeam: { id: 'home' }, error: state.Error, loading: state.Loading,
   } as Record<string, any>, {
@@ -79,7 +82,7 @@ function Harness({ week }: { week: number }) {
   // Match the real route dependency; recreating the effect on every setter would hide the bug.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(createEffect(scope), [week]);
-  return <pre data-testid="state">{JSON.stringify(state)}</pre>;
+  return <pre ref={loadTiming.rootRef} data-testid="state">{JSON.stringify(state)}</pre>;
 }
 const state = () => JSON.parse(screen.getByTestId('state').textContent!);
 beforeEach(() => { vi.useFakeTimers(); calls = []; lookups = new Map(); writes = []; routeWindow = { location: { href: '' } }; replies = new Map([1,2,3].map(w => [w, deferred()])); frozen = null; ensureGate = null; });
@@ -194,6 +197,7 @@ it('unmount clears both loader timers while keeping the current route functional
   expect(vi.getTimerCount()).toBe(2);
   await go(2); expect(vi.getTimerCount()).toBe(2);
   replies.get(2)!.resolve(fixture(2)); await flush(); expectWeek(2);
+  await act(async () => { await vi.advanceTimersByTimeAsync(100); }); // diagnostic next-frame callback
   expect(vi.getTimerCount()).toBe(0);
   view.unmount(); expect(vi.getTimerCount()).toBe(0);
 });
@@ -203,6 +207,7 @@ it('StrictMode setup-cleanup-setup does not leave the new lifetime locked', asyn
   </Routes></MemoryRouter></React.StrictMode>);
   await flush(); expect(calls).toEqual([1]);
   replies.get(1)!.resolve(fixture(1)); await flush(); expectWeek(1);
+  await act(async () => { await vi.advanceTimersByTimeAsync(100); }); // diagnostic next-frame callback
   expect(vi.getTimerCount()).toBe(0);
 });
 
@@ -217,4 +222,51 @@ it('current-route ensure failure remains nonfatal', async () => {
   ensureGate = deferred(); renderRoutes(); await flush();
   ensureGate.reject(new Error('existing roster unavailable')); await flush();
   expect(calls).toEqual([1]); replies.get(1)!.resolve(fixture(1)); await flush(); expectWeek(1);
+});
+
+it('diagnostics separate service/frozen completion and reject obsolete week completion', async () => {
+  const view = render(<Harness key={1} week={1} />);
+  await flush();
+  const read = () => JSON.parse(screen.getByTestId('state').getAttribute('data-load-timing')!);
+  expect(read().stages.serviceStarted).toEqual(expect.any(Number));
+  expect(read().stages.loadSettled).toBeUndefined();
+  view.rerender(<Harness key={2} week={2} />);
+  await flush();
+  replies.get(1)!.resolve(fixture(1));
+  await flush();
+  expect(read().stages.serviceFinished).toBeUndefined();
+  replies.get(2)!.resolve(fixture(2));
+  await flush();
+  expect(read().stages.serviceFinished).toEqual(expect.any(Number));
+  expect(read().stages.frozenFinished).toEqual(expect.any(Number));
+  expect(read().stages.loadSettled).toEqual(expect.any(Number));
+  expect(read().stages.firstLineupCommit).toEqual(expect.any(Number));
+  expect(read().stages.usableDataComplete).toEqual(expect.any(Number));
+});
+it('diagnostics do not report a usable lineup when the service fails', async () => {
+  render(<Harness week={1} />);
+  await flush();
+  replies.get(1)!.resolve({ data: null, error: new Error('service failed') } as any);
+  await flush();
+  const timing = JSON.parse(screen.getByTestId('state').getAttribute('data-load-timing')!);
+  expect(timing.stages.error).toEqual(expect.any(Number));
+  expect(timing.stages.loadSettled).toEqual(expect.any(Number));
+  expect(timing.stages.usableDataComplete).toBeUndefined();
+});
+
+it('diagnostics wait for frozen hydration instead of calling service data a completed lineup', async () => {
+  frozen = deferred();
+  render(<Harness week={1} />);
+  await flush();
+  replies.get(1)!.resolve(fixture(1));
+  await flush();
+  const read = () => JSON.parse(screen.getByTestId('state').getAttribute('data-load-timing')!);
+  expect(read().stages.serviceFinished).toEqual(expect.any(Number));
+  expect(read().stages.frozenStarted).toEqual(expect.any(Number));
+  expect(read().stages.dataDelivered).toBeUndefined();
+  expect(read().stages.firstLineupCommit).toBeUndefined();
+  frozen.resolve({ data: [] });
+  await flush();
+  expect(read().stages.frozenFinished).toEqual(expect.any(Number));
+  expect(read().stages.firstLineupCommit).toEqual(expect.any(Number));
 });

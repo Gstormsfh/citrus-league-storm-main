@@ -3,16 +3,17 @@ import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { ScoringCalculator, DEFAULT_SCORING } from '@citrus/shared';
 
-const api = vi.hoisted(() => ({ league: vi.fn(), team: vi.fn(), navigation: vi.fn(), scores: vi.fn() }));
+const api = vi.hoisted(() => ({ league: vi.fn(), team: vi.fn(), navigation: vi.fn(), scores: vi.fn(), matchup: vi.fn() }));
 vi.mock('@/api/leagues', () => ({ leagueApi: { getLeague: api.league, getMyTeam: api.team } }));
-vi.mock('@/api/matchups', () => ({ matchupApi: { getUserMatchup: api.navigation, getDailyScores: api.scores } }));
-vi.mock('../LeagueService', () => ({ LeagueService: { getLeagueTeams: vi.fn() } }));
+vi.mock('@/api/matchups', () => ({ matchupApi: { getUserMatchup: api.navigation, getDailyScores: api.scores, getMatchup: api.matchup } }));
+vi.mock('../LeagueService', () => ({ LeagueService: { getLeagueTeams: vi.fn(), getUserTeam: vi.fn() } }));
 vi.mock('../PlayerService', () => ({ PlayerService: { getPlayersByIds: vi.fn(), getAllPlayers: vi.fn() } }));
 vi.mock('../ScheduleService', () => ({ ScheduleService: {} }));
 vi.mock('../DemoLeagueService', () => ({ DEMO_LEAGUE_ID_FOR_GUESTS: 'demo' }));
 import { MatchupService, type Matchup } from '../MatchupService';
 import { LeagueService } from '../LeagueService';
 import { PlayerService } from '../PlayerService';
+import { consumeScopedRead, normalizedPlayerScope } from '@/lib/scopedRead';
 
 const now = new Date('2026-09-12T19:00:00Z');
 const matchup = {
@@ -63,6 +64,7 @@ beforeEach(() => {
   vi.mocked(PlayerService.getPlayersByIds).mockResolvedValue([]);
   vi.mocked(PlayerService.getAllPlayers).mockResolvedValue([]);
   vi.spyOn(MatchupService, 'getRosterPlayerIds').mockResolvedValue(['8470001', '8470002']);
+  vi.spyOn(MatchupService, 'getDailyProjectionsForMatchup').mockResolvedValue(new Map());
   vi.spyOn(MatchupService, 'getTeamRecord').mockResolvedValue({ wins: 2, losses: 1 });
   vi.spyOn(MatchupService, 'getMatchupRosters').mockResolvedValue(rosterResult() as never);
 });
@@ -164,4 +166,25 @@ describe('captured latency replay', () => {
       }, null, 2));
     }
   });
+});
+
+it.each(['week', 'id'])('starts projections before player details in the %s entrypoint', async entry => {
+  api.matchup.mockResolvedValue({ data: matchup });
+  vi.mocked(LeagueService.getUserTeam).mockResolvedValue({ team: { id: 'home' } } as never);
+  vi.mocked(LeagueService.getLeagueTeams).mockResolvedValue({ teams: [{ id: 'home' }, { id: 'away' }] } as never);
+  const details = deferred<never[]>();
+  vi.mocked(PlayerService.getPlayersByIds).mockReturnValue(details.promise);
+  const projection = new Map([[8470001, { player_id: 8470001, projected_goals: 0, projected_plus_minus: -2 }]]);
+  vi.mocked(MatchupService.getDailyProjectionsForMatchup).mockResolvedValue(projection);
+  vi.mocked(MatchupService.getMatchupRosters).mockImplementation(async (_m, _p, _z, _u, _d, receipt) => {
+    expect(await consumeScopedRead(receipt, normalizedPlayerScope(['8470002', 8470001], '2026-09-12'),
+      () => { throw new Error('unexpected fallback'); })).toBe(projection);
+    return rosterResult() as never;
+  });
+  const pending = entry === 'week' ? run() : MatchupService.getMatchupDataById(matchup.id, 'caller-a');
+  await vi.advanceTimersByTimeAsync(0);
+  expect(MatchupService.getDailyProjectionsForMatchup).toHaveBeenCalledExactlyOnceWith(['8470001', '8470002'], '2026-09-12');
+  expect(MatchupService.getMatchupRosters).not.toHaveBeenCalled();
+  details.resolve([]);
+  expect((await pending).error).toBeNull();
 });
