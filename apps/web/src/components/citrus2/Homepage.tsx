@@ -79,7 +79,7 @@ function ProductVisual() {
           alt={activeScreen.alt}
           width="390"
           height="844"
-          className="block h-auto w-full animate-fade-in motion-reduce:animate-none"
+          className="block h-auto w-full object-top animate-fade-in motion-reduce:animate-none"
           fetchPriority="high"
         />
       </div>
@@ -107,7 +107,8 @@ function ProductVisual() {
           ))}
         </div>
         <p id="product-screen-preview" className="mt-2 px-1 font-barlow text-xs text-pressbox-text/70">
-          <span className="font-semibold text-pressbox-text">{activeScreen.label}.</span> {activeScreen.detail}
+          <span className="font-semibold text-pressbox-text">{activeScreen.label}.</span> {activeScreen.detail}{' '}
+          <span className="text-pressbox-orange-soft/80">Demo data.</span>
         </p>
       </div>
     </figure>
