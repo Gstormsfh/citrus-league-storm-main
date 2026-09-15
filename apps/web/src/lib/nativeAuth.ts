@@ -153,7 +153,12 @@ async function sha256Hex(input: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export type NativeAppleResult = { error: AuthError | null; cancelled?: boolean };
+/**
+ * `completed` is the difference from the browser hand-off: when it is true the
+ * Supabase session already exists by the time this resolves, so the caller
+ * finishes sign-in itself instead of waiting for a deep link that never comes.
+ */
+export type NativeAppleResult = { error: AuthError | null; cancelled?: boolean; completed?: boolean };
 
 export async function signInWithAppleNative(supabase: SupabaseClient): Promise<NativeAppleResult> {
   const { AppleSignIn, SignInScope } = await import('@capawesome/capacitor-apple-sign-in');
@@ -192,7 +197,7 @@ export async function signInWithAppleNative(supabase: SupabaseClient): Promise<N
       await supabase.auth.updateUser({ data: { full_name: name, first_name: result.givenName ?? undefined, last_name: result.familyName ?? undefined } });
     } catch { /* the session exists; a missing name is cosmetic */ }
   }
-  return { error: null };
+  return { error: null, completed: true };
 }
 
 /**

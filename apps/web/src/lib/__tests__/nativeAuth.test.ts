@@ -93,9 +93,11 @@ describe('native Sign in with Apple', () => {
 
   it('sends Apple the SHA-256 of the nonce and Supabase the raw nonce with the identity token', async () => {
     const supabase = mkSupabase();
-    const { error, cancelled } = await signInWithAppleNative(supabase);
+    const { error, cancelled, completed } = await signInWithAppleNative(supabase);
     expect(error).toBeNull();
     expect(cancelled).toBeUndefined();
+    // The session exists when this resolves; the page finishes sign-in itself.
+    expect(completed).toBe(true);
 
     const sent = appleSignInMock.mock.calls[0][0] as { nonce: string; scopes: string[] };
     expect(sent.scopes).toEqual(['EMAIL', 'FULL_NAME']);
