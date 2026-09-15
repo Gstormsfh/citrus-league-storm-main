@@ -163,12 +163,15 @@ const StormyChatBubbleSession = () => {
   // 2026-09-09 and never wired to the sheet below, which is why the open
   // chat ran under the keyboard and took the header off the top of the
   // screen with it.
-  const viewport = useVisualViewport();
   const auth = useAuth();
   const league = useLeague();
   const activeLeague = league?.activeLeague ?? null;
 
   const [isOpen, setIsOpen] = useState(false);
+  // The page pin is for the OPEN phone sheet only. This component mounts on
+  // every route, so an unconditional pin put every text field in the app
+  // under the keyboard (2026-09-15, see useVisualViewport.ts).
+  const viewport = useVisualViewport(isOpen && isMobile);
   const [isMinimized, setIsMinimized] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);

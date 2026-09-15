@@ -79,7 +79,9 @@ export function StormyPhone({
   // QA PASS 1 (2026-09-09): with the keyboard up, the layer is sized to the
   // VISIBLE viewport and the bottom nav (under the keyboard anyway) is no
   // longer subtracted, so the composer sits right on the keyboard.
-  const viewport = useVisualViewport();
+  // This layer only mounts while the sheet is open, and it is the fixed
+  // layer the pin exists for.
+  const viewport = useVisualViewport(true);
   const layerStyle: React.CSSProperties = viewport.keyboardOpen && viewport.height
     ? { top: viewport.offsetTop, height: viewport.height, bottom: 'auto' }
     : { bottom: `calc(${BOTTOMNAV_H}px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom)))` };
