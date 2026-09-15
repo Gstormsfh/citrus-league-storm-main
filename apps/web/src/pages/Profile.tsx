@@ -2643,18 +2643,21 @@ const Profile = () => {
                                 or are deleted if no managers remain. Your identity is removed from shared draft history.
                                 This action cannot be undone.
                               </p>
-                              <div>
-                                <Label htmlFor="deleteConfirmation" className="text-sm font-bold text-pastel-cream">
-                                  Type <span className="font-bold text-pastel-orange">DELETE</span> to confirm:
-                                </Label>
-                                <Input
+                              {/* Checkbox, not a typed word (2026-09-15, App Review 4.0):
+                                  a text field here raises the on-screen keyboard over the
+                                  dialog on an iPad in landscape. Same 'DELETE' contract. */}
+                              <label htmlFor="deleteConfirmation" className="mt-2 flex items-start gap-3 cursor-pointer select-none">
+                                <input
                                   id="deleteConfirmation"
-                                  value={deleteConfirmation}
-                                  onChange={(e) => setDeleteConfirmation(e.target.value)}
-                                  placeholder="DELETE"
-                                  className="mt-2 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-red-400/50"
+                                  type="checkbox"
+                                  checked={deleteConfirmation === 'DELETE'}
+                                  onChange={(e) => setDeleteConfirmation(e.target.checked ? 'DELETE' : '')}
+                                  className="mt-0.5 h-5 w-5 shrink-0 accent-[#FF9800]"
                                 />
-                              </div>
+                                <span className="text-sm font-bold text-pastel-cream">
+                                  I understand this deletes my account and cannot be undone.
+                                </span>
+                              </label>
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>

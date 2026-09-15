@@ -109,7 +109,89 @@ export async function beginNativeOAuth(
   if (!data?.url) return { error: new AuthError('OAuth URL missing from Supabase response') };
 
   const { Browser } = await import('@capacitor/browser');
-  await Browser.open({ url: data.url, presentationStyle: 'popover' });
+  // FULLSCREEN, NOT POPOVER (2026-09-15, App Review 2.1a on iPad Air M3).
+  // A popover SFSafariViewController on iPad is a small centered sheet, and
+  // the reviewer got a blank one. Fullscreen is what every iPhone user was
+  // already getting and is the presentation Apple's own examples use.
+  await Browser.open({ url: data.url, presentationStyle: 'fullscreen' });
+  return { error: null };
+}
+
+/**
+ * NATIVE SIGN IN WITH APPLE (2026-09-15, App Review rejection of 1.0 (18)).
+ *
+ * Until now Apple sign-in inside the shell was the same web OAuth hand-off
+ * as Google: open Supabase's authorize URL in a browser sheet, bounce
+ * through appleid.apple.com, come back on the custom scheme. On the
+ * reviewer's iPad that sheet rendered blank. Apple's expectation on its own
+ * platform is the system sheet (ASAuthorizationController): no browser, no
+ * redirect, Face ID confirms, and the app receives an identity token.
+ *
+ * The exchange is Supabase's documented native path: the app asks Apple for
+ * an identity token bound to a nonce, then `signInWithIdToken` verifies the
+ * token's audience (our bundle id, which must be listed in the Supabase
+ * Apple provider's client ids) and the nonce (Apple carries SHA-256 of what
+ * we sent; Supabase receives the raw value and hashes it itself).
+ *
+ * Apple sends the user's name ONCE, on the first authorization, and never
+ * again; it is written to auth metadata in that same call so the profile
+ * can pick it up. Cancelling the sheet is not an error worth a toast.
+ *
+ * Web sign-in is untouched: this runs only when isNativeShell() is true.
+ */
+/** The token audience Apple issues on-device: the bundle id. It must be listed in the Supabase Apple provider's client ids. */
+export const NATIVE_APPLE_CLIENT_ID = 'com.citrussports.app';
+
+function randomNonce(bytes = 32): string {
+  const buf = new Uint8Array(bytes);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export type NativeAppleResult = { error: AuthError | null; cancelled?: boolean };
+
+export async function signInWithAppleNative(supabase: SupabaseClient): Promise<NativeAppleResult> {
+  const { AppleSignIn, SignInScope } = await import('@capawesome/capacitor-apple-sign-in');
+  const rawNonce = randomNonce();
+  // The plugin hands `nonce` to ASAuthorizationAppleIDRequest unchanged
+  // (verified in its Swift source, 0.1.4). Apple expects the SHA-256 there
+  // and echoes it in the token; Supabase takes the RAW value and hashes.
+  const hashedNonce = await sha256Hex(rawNonce);
+
+  let result: { idToken: string; givenName: string | null; familyName: string | null; email: string | null };
+  try {
+    result = await AppleSignIn.signIn({ scopes: [SignInScope.Email, SignInScope.FullName], nonce: hashedNonce });
+  } catch (e) {
+    // The plugin rejects with code SIGN_IN_CANCELED when the sheet is dismissed.
+    const message = e instanceof Error ? e.message : String(e);
+    const code = (e as { code?: string } | null)?.code ?? '';
+    if (/CANCELED|cancel/i.test(code + ' ' + message)) return { error: null, cancelled: true };
+    return { error: new AuthError(message || 'Sign in with Apple failed') };
+  }
+
+  if (!result?.idToken) {
+    return { error: new AuthError('Apple returned no identity token') };
+  }
+
+  const { error } = await supabase.auth.signInWithIdToken({
+    provider: 'apple',
+    token: result.idToken,
+    nonce: rawNonce,
+  });
+  if (error) return { error };
+
+  const name = [result.givenName, result.familyName].filter(Boolean).join(' ').trim();
+  if (name) {
+    // First authorization only: Apple never sends the name again.
+    try {
+      await supabase.auth.updateUser({ data: { full_name: name, first_name: result.givenName ?? undefined, last_name: result.familyName ?? undefined } });
+    } catch { /* the session exists; a missing name is cosmetic */ }
+  }
   return { error: null };
 }
 
