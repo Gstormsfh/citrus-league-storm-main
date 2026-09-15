@@ -33,7 +33,7 @@ export function useStartMockDraft() {
       const { leagueId, aiSeats, error } = await LeagueService.createPracticeDraft(options);
       if (error || !leagueId) {
         toast({
-          title: "Couldn't start the mock draft",
+          title: "Couldn't start mock draft",
           description: userMessage(error, 'Please try again.'),
           variant: 'destructive',
         });
