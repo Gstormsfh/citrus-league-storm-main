@@ -9,37 +9,37 @@
 // `lib/__tests__/featureFlags.test.ts` now pins the consumer list.
 
 /**
- * PRACTICE DRAFT ENTRY ON LEAGUE HQ (Sleeper-gap 4, "the ritual").
+ * THE MOCK DRAFT ON LEAGUE HQ (Sleeper-gap 4, "the ritual").
  *
- * WHAT IT GATES (the only consumer, 2026-09-03):
+ * WHAT IT GATES (the only consumer):
  *   apps/web/src/pages/LeagueDashboard.tsx renders, inside the Draft Room
  *   card and only while `draft_status === 'not_started'`, a ghost
- *   "Run a mock draft" entry to /armchair-gm?tab=mockdraft: the Mock Draft
- *   Simulator (components/armchair-gm/MockDraftSimulator.tsx). That surface
- *   is React state only. It reads the player list and writes nothing, so a
- *   practice pick can never reach a real league, a real draft, standings,
- *   or a notification. The entry is a tertiary ghost under the real Draft
- *   Room action, never a second orange verb (DESIGN_DIRECTION.md rule 3).
+ *   "Run a mock draft" entry to /mock-draft?league=<id>. That page creates a
+ *   throwaway league through POST /api/leagues/practice — a real `leagues`
+ *   row carrying `settings.practice = true`, this league's size, rounds,
+ *   roster slots and scoring, one human seat and AI in every other — and
+ *   opens the live V2 room on it. Same room, same engine, same clock. The
+ *   entry is a tertiary ghost under the real Draft Room action, never a
+ *   second orange verb (DESIGN_DIRECTION.md rule 3).
  *
- * WHAT IT DOES NOT GATE:
- *   The T15 throwaway-league practice mode (a real `leagues` row carrying
- *   `settings.practice = true`, ignited through start_draft_v2, eleven
- *   autopick seats, soft-delete on leave) is DESIGN ONLY. No
- *   createPracticeLeague service, no route, no client wrapper, no
- *   aggregation-query guardrail and no janitor exist in this repo
- *   (DESIGN_T15 §6, "Files NOT authored yet"). Flipping this flag cannot
- *   turn that mode on. The test named above trips the moment such a
- *   service appears, so this flag's contract is re-read before its blast
- *   radius grows from zero DB writes to real league rows. That mode also
- *   still owes the §5 nine-bar ratification the architect deferred to
- *   post-twelve (docs/ARCHITECT_INBOX.md, Entry 17).
+ * WHAT KEEPS A MOCK FROM COUNTING (pinned by lib/__tests__/featureFlags.test.ts):
+ *   the server's league list filters `settings.practice`; the deploy freeze
+ *   gate skips practice leagues and a nightly sweep soft-deletes them after
+ *   24h (supabase/migrations/…practice_drafts_stay_out_of_the_gate.sql); the
+ *   room never claims a mock as the user's active league; the only creator
+ *   is server/src/services/PracticeDraftService.ts.
+ *
+ * The client-side Mock Draft Simulator (/armchair-gm?tab=mockdraft) is NOT
+ * gated here and is not what a signed-in manager sees. It stays public for
+ * the marketing pages that promise a mock "with no account needed".
  *
  * Flip history:
  *   2026-08-09  false. Architect Entry 13: UI location deferred to the
  *               Sunday walk. No later inbox entry names one, and no
  *               consumer ever landed.
  *   2026-09-03  true. Launch: the ritual is on, pointed at the simulator.
- *               A one-line revert here hides the HQ entry again.
+ *   2026-09-14  true. The server half landed; the entry points at the real
+ *               room. A one-line revert here hides the HQ entry again.
  */
 export const FEATURE_PRACTICE_DRAFT = true;
 

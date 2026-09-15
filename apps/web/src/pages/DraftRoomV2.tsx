@@ -1,6 +1,6 @@
 import { rankDraftCandidates } from '@/components/draft/draftDecision';
 import { draftReadiness } from '@/lib/draftReadiness';
-import { projectionSettings } from '@citrus/shared';
+import { projectionSettings, isPracticeLeagueSettings } from '@citrus/shared';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 // Phase 4.5 chunk 11g DR-3 (2026-07-29) — the visual room.
 //
@@ -29,7 +29,7 @@ import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 // immediately with `#<id>` fallbacks and hydrates as names resolve.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ConnectionBanner } from '@/components/draft/v2/ConnectionBanner';
 import { CompletionMomentBanner } from '@/components/draft/v2/CompletionMomentBanner';
@@ -145,12 +145,19 @@ export default function DraftRoomV2() {
    */
   const { activeLeagueId, setActiveLeagueId, loading: leaguesLoading } = useLeague();
   const claimedLeagueRef = useRef<string | null>(null);
+  // THE MOCK DRAFT IS A REAL DRAFT (2026-09-14): but it is not one of the
+  // user's leagues, so the room must not claim it as the active league. The
+  // hook that opens a mock passes ?mock=1 so this is known before the league
+  // row loads; the row's settings.practice confirms it on a cold refresh.
+  const [searchParams] = useSearchParams();
+  const [mockLeague, setMockLeague] = useState<{ practiceOf: string | null } | null>(null);
+  const isMock = searchParams.get('mock') === '1' || mockLeague !== null;
   useEffect(() => {
-    if (!leagueId || leaguesLoading) return;
+    if (!leagueId || leaguesLoading || isMock) return;
     if (activeLeagueId === leagueId || claimedLeagueRef.current === leagueId) return;
     claimedLeagueRef.current = leagueId;
     setActiveLeagueId(leagueId);
-  }, [leagueId, activeLeagueId, leaguesLoading, setActiveLeagueId]);
+  }, [leagueId, activeLeagueId, leaguesLoading, setActiveLeagueId, isMock]);
   const { offsetMs: clockOffsetMs, updateOffset } = useClockOffsetEstimator();
 
   // DR-2 (2026-07-29) — fetch the caller's teamId. Non-fatal on
@@ -574,9 +581,14 @@ export default function DraftRoomV2() {
     (async () => {
       try {
         const { apiClient } = await import('@/api/client');
-        const res = await apiClient.get<{ name?: string }>(`/api/leagues/${leagueId}`);
-        const name = (res?.data as { name?: string } | undefined)?.name;
+        const res = await apiClient.get<{ name?: string; settings?: unknown }>(`/api/leagues/${leagueId}`);
+        const row = res?.data as { name?: string; settings?: unknown } | undefined;
+        const name = row?.name;
         if (!cancelled && typeof name === 'string' && name.trim()) setLeagueName(name.trim());
+        if (!cancelled && isPracticeLeagueSettings(row?.settings)) {
+          const of = (row?.settings as { practiceOf?: unknown }).practiceOf;
+          setMockLeague({ practiceOf: typeof of === 'string' ? of : null });
+        }
       } catch {
         // The header keeps its generic title.
       }
@@ -671,6 +683,19 @@ export default function DraftRoomV2() {
         teams={teams}
       />
       <IdentityFailureBanner />
+      {isMock && (
+        <div
+          role="status"
+          data-testid="mock-draft-banner"
+          className="mx-3 md:container md:mx-auto md:px-4 mt-2 rounded-lg border border-pastel-orange/40 bg-pastel-orange/10 px-3 py-2 text-xs md:text-sm text-pastel-cream flex flex-wrap items-center gap-x-3 gap-y-1"
+        >
+          <span className="font-bold tracking-wide text-pastel-orange">MOCK DRAFT</span>
+          <span className="text-white/75">Same room, same engine, same clock. The other seats are AI and nothing here counts.</span>
+          <Link to={mockLeague?.practiceOf ? `/league/${mockLeague.practiceOf}` : '/'} className="ml-auto underline underline-offset-2 text-pastel-cream/90 hover:text-pastel-cream">
+            {mockLeague?.practiceOf ? 'Back to your league' : 'Back home'}
+          </Link>
+        </div>
+      )}
       <DraftLobbyV2
         leagueId={leagueId}
         teams={teams}
@@ -679,6 +704,7 @@ export default function DraftRoomV2() {
       />
       <DraftRoomBody
         leagueId={leagueId}
+        mock={isMock ? { practiceOf: mockLeague?.practiceOf ?? null } : null}
         teams={teams}
         playersById={playersById}
         playersLoading={playersLoading}
@@ -1663,6 +1689,8 @@ function StickyHeader({ leagueId, leagueName, onRetryNow, clockOffsetMs, teams }
 
 interface DraftRoomBodyProps {
   leagueId: string;
+  /** THE MOCK DRAFT IS A REAL DRAFT (2026-09-14): set when this room is a practice league. */
+  mock: { practiceOf: string | null } | null;
   teams: FetchedTeam[];
   playersById: ReadonlyMap<string, Player>;
   playersLoading: boolean;
@@ -1684,6 +1712,7 @@ interface DraftRoomBodyProps {
 function DraftRoomBody({
   positionType,
   leagueId,
+  mock,
   teams,
   playersById,
   playersLoading,
@@ -1801,6 +1830,7 @@ function DraftRoomBody({
         )}
         <MainTabs
           leagueId={leagueId}
+          mock={mock}
           teams={teams}
           playersById={playersById}
           playersLoading={playersLoading}
@@ -1854,6 +1884,8 @@ function DraftRoomBody({
 
 interface MainTabsProps {
   leagueId: string;
+  /** THE MOCK DRAFT IS A REAL DRAFT (2026-09-14): set when this room is a practice league. */
+  mock: { practiceOf: string | null } | null;
   teams: FetchedTeam[];
   playersById: ReadonlyMap<string, Player>;
   playersLoading: boolean;
@@ -1875,6 +1907,7 @@ interface MainTabsProps {
 function MainTabs({
   positionType,
   leagueId,
+  mock,
   teams,
   playersById,
   playersLoading,
@@ -2560,7 +2593,9 @@ function MainTabs({
            * LeagueContext change and is written up as a proposal, not shipped
            * here.
            */
-          rosterHref={leagueId ? `/roster?league=${leagueId}` : undefined}
+          rosterHref={mock ? (mock.practiceOf ? `/league/${mock.practiceOf}` : '/') : leagueId ? `/roster?league=${leagueId}` : undefined}
+          ctaLabel={mock ? (mock.practiceOf ? 'Back to your league' : 'Back home') : undefined}
+          subline={mock ? 'That was a mock. Nothing here counts, and the seats reset next time.' : undefined}
         />
       )}
 

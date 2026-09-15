@@ -68,6 +68,21 @@ export const leagueApi = {
     return apiClient.post('/api/leagues', params);
   },
 
+  /**
+   * THE MOCK DRAFT IS A REAL DRAFT (2026-09-14): a throwaway league, one
+   * human seat, every other seat AI, drafted in the live V2 room. Returns
+   * the league to open at /draft-v2/:leagueId. Does not touch the
+   * 'leagues:' cache: practice leagues never appear in league lists.
+   */
+  createPracticeDraft(params: {
+    fromLeagueId?: string;
+    teamsCount?: number;
+    draftRounds?: number;
+    pickTimeLimitSeconds?: number;
+  }) {
+    return apiClient.post<{ leagueId: string; teamId: string; aiSeats: number }>('/api/leagues/practice', params, { retries: 0 });
+  },
+
   /** Join a league by invite code.
    *
    * CRITICAL: retries:0 because this endpoint is NOT idempotent at the

@@ -80,6 +80,13 @@ export const schemas = {
     waiver_settings: z.record(z.unknown()).optional(),
   }),
 
+  createPracticeDraft: z.object({
+    fromLeagueId: z.string().uuid().optional(),
+    teamsCount: z.number().int().min(2).max(20).optional(),
+    draftRounds: z.number().int().min(1).max(30).optional(),
+    pickTimeLimitSeconds: z.number().int().min(10).max(300).optional(),
+  }),
+
   joinLeague: z.object({
     joinCode: z.string().min(1, 'Join code is required'),
     teamName: cleanName('Team name').optional(),

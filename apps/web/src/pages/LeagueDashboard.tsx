@@ -1064,7 +1064,7 @@ const LeagueDashboard = () => {
         ? "You'll be able to participate once the commissioner starts the draft"
         : null,
       mock: FEATURE_PRACTICE_DRAFT && league.draft_status === 'not_started'
-        ? { label: 'Run a mock draft', to: '/armchair-gm?tab=mockdraft', note: 'Practice against the computer. Nothing there touches this league.' }
+        ? { label: 'Run a mock draft', to: `/mock-draft?league=${leagueId}`, note: 'The real draft room, your scoring, AI in every other seat. Nothing there touches this league.' }
         : null,
     };
   }, [league, leagueId, isCommissioner, readiness]);
@@ -2419,25 +2419,25 @@ const LeagueDashboard = () => {
                       rule 3), and only while the draft has not started. Once the
                       room is live the only thing to do here is join it.
 
-                      It goes to the client-side Mock Draft Simulator on
-                      /armchair-gm (React state only, one player read, no league
-                      writes), which is the one practice surface that exists.
-                      The T15 throwaway-league mode is design-only; see
-                      lib/featureFlags.ts for what this flag does and does not
-                      gate. The sentence under the button is load-bearing: a
-                      manager must never wonder whether a practice pick counted. */}
+                      THE MOCK DRAFT IS A REAL DRAFT (2026-09-14): it goes to
+                      /mock-draft scoped to this league, which creates a
+                      throwaway practice league with this league's scoring and
+                      opens the live V2 room with AI in every other seat. See
+                      lib/featureFlags.ts for the guardrails. The sentence under
+                      the button is load-bearing: a manager must never wonder
+                      whether a practice pick counted. */}
                   {FEATURE_PRACTICE_DRAFT && league.draft_status === 'not_started' && (
                     <div className="mt-4 pt-4 border-t border-white/10">
                       <Button
                         asChild
                         className="w-full h-10 normal-case font-sans tracking-normal text-sm bg-transparent border border-pastel-cream/25 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold rounded-xl"
                       >
-                        <Link to="/armchair-gm?tab=mockdraft">
+                        <Link to={`/mock-draft?league=${leagueId}`}>
                           <DraftIcon className="mr-1.5 h-4 w-4" strokeWidth={2} aria-hidden="true" /> Run a mock draft
                         </Link>
                       </Button>
                       <p className="text-xs text-white/55 mt-2 text-center">
-                        Practice your picks against the computer. Nothing there touches this league.
+                        The real draft room with your scoring and AI in every other seat. Nothing there touches this league.
                       </p>
                     </div>
                   )}

@@ -1,30 +1,29 @@
 /**
- * FEATURE FLAGS (2026-09-03, launch).
+ * FEATURE FLAGS.
  *
- * `FEATURE_PRACTICE_DRAFT` was written on 2026-08-09 with its consumer
- * deferred "until the Sunday walk names the button location". The walk never
- * named one, so the flag sat at `false` with nothing reading it, under a
- * comment that described a server-side practice-league mode nobody had
- * built. A flag with no reader is a claim, not a switch, and a flag whose
- * comment describes the wrong feature is worse than no flag: the next person
- * flips it expecting a throwaway league and gets nothing.
+ * `FEATURE_PRACTICE_DRAFT` was written on 2026-08-09 for a server-side
+ * practice-league mode that did not exist; on 2026-09-03 it was flipped on
+ * and pointed at the only practice surface there was, the client-side Mock
+ * Draft Simulator, with a tripwire test that failed the moment a real
+ * practice-league service landed, so the flag's contract would be re-read
+ * before the same boolean started creating league rows.
  *
- * These tests pin what the flag actually does, in both directions:
+ * THE MOCK DRAFT IS A REAL DRAFT (2026-09-14): that service landed, and the
+ * tripwire did its job. The flag now gates the real thing — the League HQ
+ * entry to /mock-draft, which creates a throwaway league (settings.practice)
+ * and opens the live V2 room with AI in every other seat — and these tests
+ * pin the guardrails the design demanded before that was allowed:
  *
- *   * it IS read, by League HQ alone, and the entry it gates goes to the one
- *     practice surface that exists: the client-side Mock Draft Simulator,
- *     which reads the player list and writes nothing;
- *   * it gates NOTHING that writes. The T15 throwaway-league service does not
- *     exist in this repo. If it ever lands, the last test fails on purpose so
- *     the flag's blast radius (zero DB writes today) is re-read before the
- *     same boolean starts creating real league rows. That is the failure
- *     mode DESIGN_T15 §7 argues against, and the argument only holds while
- *     the service is absent.
+ *   * the server path exists and is the one path (PracticeDraftService);
+ *   * practice leagues are filtered out of the user's league list;
+ *   * the deploy freeze gate and a nightly sweep know about them (the
+ *     migration exists);
+ *   * the room never claims a mock as the user's active league;
+ *   * the guest simulator remains public, for the marketing pages that
+ *     promise "no account needed", and no signed-in surface points at it.
  *
  * Same idiom as the other source-contract guards: walk the source, extract
- * the fact, fail loudly. The consumer list is pinned exactly, so adding a
- * second reader means updating the flag's own comment and this list in the
- * same diff.
+ * the fact, fail loudly.
  */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -37,7 +36,8 @@ const SRC = resolve(HERE, '../..').replace(/\\/g, '/');
 const REPO = resolve(SRC, '../../..').replace(/\\/g, '/');
 const SERVER_SRC = `${REPO}/server/src`;
 
-const MOCK_TARGET = '/armchair-gm?tab=mockdraft';
+const MOCK_TARGET = '/mock-draft?league=${leagueId}';
+const SIMULATOR = '/armchair-gm?tab=mockdraft';
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -83,13 +83,8 @@ describe('FEATURE_PRACTICE_DRAFT', () => {
     ).toEqual(['pages/LeagueDashboard.tsx']);
   });
 
-  it('gates the HQ entry to the public simulator, and nothing renders that target un-gated', () => {
+  it('gates the HQ entry to the real mock draft, scoped to the league, and nothing renders it un-gated', () => {
     const hq = read(`${SRC}/pages/LeagueDashboard.tsx`);
-    // PRESS BOX (2026-09-04): the target appears twice in the SOURCE — the
-    // desktop card's <Link> and the phone layer's `mock:` entry
-    // (LeagueHQPhone) — and a viewer only ever sees one. Each must sit
-    // inside its own gate: the nearest `FEATURE_PRACTICE_DRAFT &&` before
-    // it, within the same block.
     const targets = [...hq.matchAll(new RegExp(MOCK_TARGET.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))].map((m) => m.index!);
     expect(targets.length, 'one practice entry per screen').toBe(2);
     for (const at of targets) {
@@ -97,34 +92,41 @@ describe('FEATURE_PRACTICE_DRAFT', () => {
       expect(gateAt, 'every practice entry is gated').toBeGreaterThan(-1);
       expect(at - gateAt, 'the entry sits inside the gated block').toBeLessThan(1500);
     }
-    expect(hq).toContain(`<Link to="${MOCK_TARGET}">`);
+    expect(hq).toContain('<Link to={`' + MOCK_TARGET + '`}>');
+    expect(hq).not.toContain(SIMULATOR);
   });
 
-  it('points at a surface that cannot write: React state and one player read', () => {
+  it('no signed-in surface points at the guest simulator any more', () => {
+    for (const f of ['components/Navbar.tsx', 'components/pressbox/leagueMenuTiles.ts', 'pages/LeagueDashboard.tsx', 'components/league/LeagueHQPhone.tsx']) {
+      expect(read(`${SRC}/${f}`), f).not.toContain(SIMULATOR);
+    }
+  });
+
+  it('the guest simulator still cannot write: React state and one player read', () => {
     const sim = code(read(`${SRC}/components/armchair-gm/MockDraftSimulator.tsx`));
-    // The only data module it touches is the player read.
     const dataImports = [...sim.matchAll(/from '(@\/(?:services|api|integrations)\/[^']+)'/g)].map((m) => m[1]);
     expect(new Set(dataImports)).toEqual(new Set(['@/services/PlayerService']));
     expect(sim).toMatch(/PlayerService\.getAllPlayers\(\)/);
-    // No write verb of any client this app uses, and no client at all.
     expect(sim).not.toMatch(/\.(insert|upsert|update|delete|rpc)\(/);
     expect(sim).not.toMatch(/supabase/i);
   });
 
-  it('gates zero DB writes: the T15 server-side practice league is not in this repo', () => {
+  it('the real practice mode exists, in one place, with its guardrails', () => {
     expect(SERVER_FILES.length, 'the server walk found no files').toBeGreaterThan(50);
-    const PRACTICE_PATH = /createPracticeLeague|buildPracticeLeaguePayload|isPracticeLeagueSettings/;
-    const server = SERVER_FILES.filter((f) => PRACTICE_PATH.test(code(read(f)))).map(rel(REPO));
+    const creators = SERVER_FILES.filter((f) => /buildPracticeLeaguePayload/.test(code(read(f)))).map(rel(REPO));
+    expect(creators, 'one server path creates practice leagues').toEqual(['server/src/services/PracticeDraftService.ts']);
+    // The list filter: practice leagues never appear as one of the user's leagues.
+    expect(code(read(`${SERVER_SRC}/services/LeagueService.ts`))).toMatch(/!isPracticeLeagueSettings\(/);
+    // The freeze gate and the sweep: a migration that names both.
+    const migrations = readdirSync(`${REPO}/supabase/migrations`).filter((f) => f.endsWith('.sql'));
+    const gate = migrations.find((f) => /practice/.test(f));
+    expect(gate, 'a migration teaches the freeze gate about practice leagues').toBeTruthy();
+    const sql = read(`${REPO}/supabase/migrations/${gate}`);
+    expect(sql).toContain("settings ->> 'practice'");
+    expect(sql).toContain('draft_freeze_blockers');
+    expect(sql).toContain('sweep_practice_leagues');
+    // The client never calls the factory itself; the server owns the row.
     const web = WEB_FILES.filter((f) => /buildPracticeLeaguePayload/.test(code(read(f)))).map(rel(SRC));
-    expect(
-      [...server, ...web],
-      [
-        'a practice-league creation path now exists. Before it shares FEATURE_PRACTICE_DRAFT:',
-        'read the WHAT IT DOES NOT GATE paragraph in lib/featureFlags.ts, clear the',
-        'DESIGN_T15 §5 ratification bars, land the §3 aggregation guardrails, and give',
-        'the server mode its own flag. This boolean gates a link to a client-side',
-        'simulator, and its blast radius is zero DB writes.',
-      ].join(' '),
-    ).toEqual([]);
+    expect(web).toEqual([]);
   });
 });

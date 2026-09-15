@@ -11,6 +11,7 @@ import {
   type StandingsMatchup,
   type StandingsTeamRef,
   draftableRosterSize,
+  isPracticeLeagueSettings,
 } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { AppError } from '../lib/errors';
@@ -111,9 +112,14 @@ export class LeagueService {
     // renames the league to a "[DELETED-<timestamp>]" prefix (no dedicated
     // column exists); without this filter the league switcher listed every
     // deleted test league — 130+ junk entries labeled "SEASON ACTIVE".
+    // MOCK DRAFTS (2026-09-14): a practice league is a real league row so
+    // the V2 room can run it, but it is not one of the user's leagues. It
+    // never appears in the switcher, the home list or the active-league
+    // fallback; the room reaches it by id.
     const filtered = unique.filter((l: Record<string, unknown>) =>
       !DEMO_LEAGUE_IDS.has(l.id as string) &&
-      !String((l as { name?: unknown }).name ?? '').startsWith('[DELETED'));
+      !String((l as { name?: unknown }).name ?? '').startsWith('[DELETED') &&
+      !isPracticeLeagueSettings((l as { settings?: unknown }).settings));
 
     // SWEEP FIX (2026-08-18): deterministic order, newest first.
     //

@@ -104,6 +104,7 @@ const TradeAnalyzer = lazyWithErrorHandling(() => import("./pages/TradeAnalyzer"
 const ArmchairGM = lazyWithErrorHandling(() => import("./pages/ArmchairGM"));
 const OtherTeam = lazyWithErrorHandling(() => import("./pages/OtherTeam"));
 const CreateLeague = lazyWithErrorHandling(() => import("./pages/CreateLeague"));
+const MockDraft = lazyWithErrorHandling(() => import("./pages/MockDraft"));
 const InviteAccept = lazyWithErrorHandling(() => import("./pages/InviteAccept"));
 const OpeningNight = lazyWithErrorHandling(() => import("./pages/OpeningNight"));
 const BringYourLeague = lazyWithErrorHandling(() => import("./pages/BringYourLeague"));
@@ -282,6 +283,7 @@ const App = () => {
                 {/* Phase 4.5 chunk 11g.5b — v2 draft room (chunk-11g.4 persistent engine path). */}
                 <Route path="/draft-v2/:leagueId/:draftId?" element={<ProtectedRoute><ErrorBoundary><DraftRoomV2 /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/create-league" element={<ProtectedRoute><CreateLeague /></ProtectedRoute>} />
+                <Route path="/mock-draft" element={<ProtectedRoute><ErrorBoundary><MockDraft /></ErrorBoundary></ProtectedRoute>} />
                 {/* 2026-09-09 (#19): invite links land here and join on Accept; /join/* is a universal link. */}
                 <Route path="/join/:code" element={<ProtectedRoute><ErrorBoundary><InviteAccept /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/league/:leagueId" element={<ProtectedRoute><ErrorBoundary><LeagueDashboard /></ErrorBoundary></ProtectedRoute>} />
