@@ -47,6 +47,13 @@ function generateETag(body: string): string {
   return `"${Math.abs(hash).toString(36)}"`;
 }
 
+/** RFC 7232 weak comparison: ignore W/ prefixes, accept a comma-separated list or `*`. */
+export function etagMatches(ifNoneMatch: string, etag: string): boolean {
+  const strip = (v: string) => v.trim().replace(/^W\//i, '');
+  const want = strip(etag);
+  return ifNoneMatch.split(',').some((candidate) => candidate.trim() === '*' || strip(candidate) === want);
+}
+
 export async function cacheControlMiddleware(c: Context, next: Next) {
   // Never cache mutations
   if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
@@ -90,8 +97,13 @@ export async function cacheControlMiddleware(c: Context, next: Next) {
           // left the server and every ETag round trip carried the full body.
           // Assigning c.res replaces the finalized response (its headers,
           // including the ETag and Cache-Control just set, are carried over).
+          // WEAK COMPARISON (2026-09-14). The app-wide compress middleware
+          // rewrites the ETag to W/"..." on encoded responses, so the browser
+          // sends back W/"x" while this computes "x". RFC 7232 says
+          // If-None-Match uses weak comparison anyway; strict equality here
+          // meant no compressed response could ever revalidate to 304.
           const ifNoneMatch = c.req.header('If-None-Match');
-          if (ifNoneMatch === etag) {
+          if (ifNoneMatch && etagMatches(ifNoneMatch, etag)) {
             c.res = new Response(null, { status: 304, headers: c.res.headers });
           }
         }

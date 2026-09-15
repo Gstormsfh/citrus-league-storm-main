@@ -127,6 +127,22 @@ let playersCache: { data: NormalizedPlayer[]; timestamp: number } | null = null;
 const CACHE_TTL = 2 * 60 * 1000;
 
 /**
+ * STALE-WHILE-REVALIDATE (2026-09-14, latency pass).
+ *
+ * Measured on production: /api/players answers in ~16 ms TTFB while the
+ * cache is fresh and ~1.2 s once it has lapsed, because the caller blocks on
+ * the four paged PostgREST reads. At launch traffic the cache lapses between
+ * almost every pair of visits, so nearly every Roster / Free Agents / Matchup
+ * open paid the cold rebuild. The 2-minute TTL stays the FRESHNESS window;
+ * past it, a caller gets the last pool immediately and ONE background reload
+ * runs (single-flight, same promise the stampede guard already uses). Only a
+ * pool older than CACHE_STALE_MAX, or no pool at all, blocks the caller.
+ * Availability is merged per request from published contexts either way, so
+ * an injury flag never waits on this window.
+ */
+const CACHE_STALE_MAX = 30 * 60 * 1000;
+
+/**
  * STAMPEDE GUARD (2026-09-02 scale audit).
  *
  * `playersCache` is a plain read-through cache: check, miss, fetch. That
@@ -238,25 +254,41 @@ export class PlayerService {
 
   /** Get all players with stats, talent metrics, and goalie GSAx */
   async getAllPlayers(): Promise<{ players: NormalizedPlayer[]; error: unknown }> {
-    // Check cache
-    if (playersCache && Date.now() - playersCache.timestamp < CACHE_TTL) {
+    const age = playersCache ? Date.now() - playersCache.timestamp : Infinity;
+
+    // Fresh: serve it.
+    if (playersCache && age < CACHE_TTL) {
       return { players: await this.withAvailability(playersCache.data), error: null };
     }
 
-    // A load is already running — join it rather than starting a second.
-    // See the `playersInFlight` note above.
-    if (playersInFlight) {
-      const result = await playersInFlight;
-      return { ...result, players: await this.withAvailability(result.players) };
+    // Stale but usable: serve it now, refresh once in the background.
+    if (playersCache && age < CACHE_STALE_MAX) {
+      this.refreshAllPlayers();
+      return { players: await this.withAvailability(playersCache.data), error: null };
     }
 
-    playersInFlight = this.loadAllPlayers();
-    try {
-      const result = await playersInFlight;
-      return { ...result, players: await this.withAvailability(result.players) };
-    } finally {
-      playersInFlight = null;
+    // Cold, or too stale to trust: block on one shared load.
+    const result = await this.refreshAllPlayers();
+    return { ...result, players: await this.withAvailability(result.players) };
+  }
+
+  /**
+   * One shared load at a time (see the `playersInFlight` note). Callers that
+   * arrive while a load is running join it; a background refresh that fails
+   * leaves the previous pool in place (`loadAllPlayers` returns it on error
+   * rather than throwing) and the next request past CACHE_TTL tries again.
+   */
+  private refreshAllPlayers(): Promise<{ players: NormalizedPlayer[]; error: unknown }> {
+    if (!playersInFlight) {
+      const load = this.loadAllPlayers().finally(() => {
+        if (playersInFlight === load) playersInFlight = null;
+      });
+      playersInFlight = load;
+      // A background caller never awaits this; keep a failed load from
+      // surfacing as an unhandled rejection.
+      load.catch(() => undefined);
     }
+    return playersInFlight;
   }
 
   private async readAvailabilityContexts() {

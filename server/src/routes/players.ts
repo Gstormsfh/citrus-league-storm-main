@@ -301,6 +301,9 @@ playerRoutes.get('/directory', authMiddleware, async (c) => {
 //   search   — case-insensitive substring match on name
 // The full index repeats canonical team evidence; compress transport without
 // changing its DTO. Keep this after auth and scoped away from streaming routes.
+// (2026-09-14: app.ts now gzips every JSON response under /api as well; hono
+// skips a response that already carries Content-Encoding, so this stays as
+// the route's own contract and dashboardIndexCompression.test.ts pins it.)
 playerRoutes.get('/dashboard-index', authMiddleware, compress({ contentTypeFilter: /^application\/json/ }), async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new PlayerDashboardService(supabase);
