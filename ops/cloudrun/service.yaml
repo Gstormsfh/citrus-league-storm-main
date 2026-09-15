@@ -1,9 +1,9 @@
 # ── Citrus API — Cloud Run Service Definition ───────────────────────
 # Declarative config for `gcloud run services replace service.yaml`
-# Region: us-central1 | Registry: citrus-api in Artifact Registry
+# Region: northamerica-northeast1 (Montreal, beside Supabase ca-central-1 and the engine VM) | Registry: citrus-api in Artifact Registry (us-central1; pulled cross-region)
 #
 # Usage:
-#   gcloud run services replace ops/cloudrun/service.yaml --region=us-central1
+#   gcloud run services replace ops/cloudrun/service.yaml --region=northamerica-northeast1
 #
 # Note: Environment variables with SECRET references require the secrets
 # to be created first in Google Secret Manager. For initial setup, use
@@ -14,7 +14,7 @@ kind: Service
 metadata:
   name: citrus-api
   labels:
-    cloud.googleapis.com/location: us-central1
+    cloud.googleapis.com/location: northamerica-northeast1
   annotations:
     run.googleapis.com/ingress: all
     run.googleapis.com/launch-stage: GA
