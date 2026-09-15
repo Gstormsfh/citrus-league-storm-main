@@ -104,11 +104,19 @@ describe('PracticeDraftService.create', () => {
     expect(h.leagueInsert.insert).not.toHaveBeenCalled();
   });
 
-  it('refuses a source league with no size, and a mock of a mock', async () => {
-    const noSize = harness({ source: { league_size: null, settings: {} } });
-    await expect(noSize.service.create(USER, { fromLeagueId: SOURCE })).rejects.toMatchObject({ message: expect.stringMatching(/Set the league size/) });
-    const ofMock = harness({ source: { league_size: 12, settings: { practice: true } } });
-    await expect(ofMock.service.create(USER, { fromLeagueId: SOURCE })).rejects.toMatchObject({ message: expect.stringMatching(/another mock draft/) });
+  // One harness per test: the membership cache is module-level and keyed on
+  // (user, league), so a second harness in the same test would skip the
+  // membership read and shift the mocked `leagues` read order.
+  it('refuses a source league with no size', async () => {
+    const h = harness({ source: { league_size: null, settings: {} } });
+    await expect(h.service.create(USER, { fromLeagueId: SOURCE })).rejects.toMatchObject({ message: expect.stringMatching(/Set the league size/) });
+    expect(h.leagueInsert.insert).not.toHaveBeenCalled();
+  });
+
+  it('refuses a mock of a mock', async () => {
+    const h = harness({ source: { league_size: 12, settings: { practice: true } } });
+    await expect(h.service.create(USER, { fromLeagueId: SOURCE })).rejects.toMatchObject({ message: expect.stringMatching(/another mock draft/) });
+    expect(h.leagueInsert.insert).not.toHaveBeenCalled();
   });
 
   it('refuses sizes the engine cannot draft', async () => {
