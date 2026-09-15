@@ -211,19 +211,21 @@ it('StrictMode setup-cleanup-setup does not leave the new lifetime locked', asyn
   expect(vi.getTimerCount()).toBe(0);
 });
 
-it.each(['resolve', 'reject'] as const)('nonfatal ensure-rosters catch cannot swallow route cancellation (%s)', async outcome => {
+// PURE READ (2026-09-14). The page used to call ensure-rosters before every
+// load, and two tests here pinned how that call's catch interacted with
+// route cancellation. The call is gone (the server sweep owns roster
+// existence), so the contract is simpler: across a first load and two week
+// changes the page issues no write at all, and a gated ensure that later
+// resolves or rejects changes nothing because nothing ever awaited it.
+it('a full load and week changes issue no writes', async () => {
+  // A gated ensure is armed and never touched: if the page still called
+  // ensure-rosters the gate would hold the load and expectWeek would fail.
   ensureGate = deferred();
-  renderRoutes(); await flush(); await go(2);
-  replies.get(2)!.resolve(fixture(2)); await flush(); expectWeek(2);
-  if (outcome === 'resolve') ensureGate.resolve({}); else ensureGate.reject(new Error('old request failed'));
-  await flush(); expect(calls).toEqual([2]); expectWeek(2);
+  renderRoutes(); await flush(); replies.get(1)!.resolve(fixture(1)); await flush(); expectWeek(1);
+  await go(2); replies.get(2)!.resolve(fixture(2)); await flush(); expectWeek(2);
+  expect(writes).toEqual([]);
+  expect(calls).toEqual([1, 2]);
 });
-it('current-route ensure failure remains nonfatal', async () => {
-  ensureGate = deferred(); renderRoutes(); await flush();
-  ensureGate.reject(new Error('existing roster unavailable')); await flush();
-  expect(calls).toEqual([1]); replies.get(1)!.resolve(fixture(1)); await flush(); expectWeek(1);
-});
-
 it('diagnostics separate service/frozen completion and reject obsolete week completion', async () => {
   const view = render(<Harness key={1} week={1} />);
   await flush();

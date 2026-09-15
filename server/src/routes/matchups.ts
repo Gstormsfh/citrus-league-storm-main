@@ -6,6 +6,7 @@ import { membershipMiddleware, commissionerMiddleware } from '../middleware/memb
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient, getSupabaseAdmin } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
+import { ScheduleGenerationService } from '../services/ScheduleGenerationService';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
@@ -32,9 +33,25 @@ matchupRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
   const service = new MatchupService(supabase);
 
   const weekNumber = week ? parseInt(week, 10) : undefined;
-  const { matchups, error } = weekNumber !== undefined && Number.isFinite(weekNumber)
-    ? await service.getLeagueScoreboard(leagueId, weekNumber)
-    : await service.getLeagueMatchups(leagueId, weekNumber);
+  const read = () => weekNumber !== undefined && Number.isFinite(weekNumber)
+    ? service.getLeagueScoreboard(leagueId, weekNumber)
+    : service.getLeagueMatchups(leagueId, weekNumber);
+
+  let { matchups, error } = await read();
+
+  // SCHEDULE BOOTSTRAP (2026-09-14, the Matchup page is now a read). A
+  // completed-draft league with no schedule used to be filled in by the
+  // browser (see the generate route below). The server owns it now: the
+  // first reader of an empty schedule triggers one idempotent, admin-side
+  // generation and re-reads; every later reader just reads. Once per league
+  // lifetime, never a delete, and the hourly matchup-sweep does the same as
+  // self-heal, so the outcome does not depend on who opens the tab first.
+  if (!error && (matchups ?? []).length === 0) {
+    const ensured = await new ScheduleGenerationService().ensureLeagueSchedule(leagueId);
+    if (ensured.outcome === 'generated') {
+      ({ matchups, error } = await read());
+    }
+  }
 
   if (error) {
     return handleError(c, error, 'Failed to fetch matchups');

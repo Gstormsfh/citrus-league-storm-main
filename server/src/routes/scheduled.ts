@@ -3,10 +3,11 @@ import type { Env } from '../app';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { readAllPaged } from '../lib/pagedRead';
 import { MatchupService } from '../services/MatchupService';
+import { ScheduleGenerationService } from '../services/ScheduleGenerationService';
 import { NewsRoomService } from '../services/NewsRoomService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
-import { logger } from '@citrus/shared';
+import { logger, getTodayMST } from '@citrus/shared';
 import { generateCitrusNews } from '../services/CitrusNewsService';
 
 /**
@@ -370,8 +371,41 @@ scheduledRoutes.post('/matchup-sweep', async (c) => {
     );
     if (lErr) return fail(c, AppError.internal(lErr.message));
 
+    // SCHEDULE + ROSTER SELF-HEAL (2026-09-14, the Matchup page is a read).
+    // The page used to create a missing schedule from the browser and run
+    // ensure-rosters/backfill on every open. Both now live server-side:
+    // the first read of an empty schedule bootstraps it (routes/matchups.ts)
+    // and this sweep guarantees it hourly regardless of who opens what.
+    // ensureMatchupRosters is the same idempotent call the page made, run
+    // once per current-week matchup instead of once per viewer per open.
+    const scheduler = new ScheduleGenerationService(admin);
+    const schedules: Array<Record<string, unknown>> = [];
+    const rosters: { matchups: number; initialized: number; errors: number } = { matchups: 0, initialized: 0, errors: 0 };
+    const today = getTodayMST();
     const scored: Array<Record<string, unknown>> = [];
     for (const lg of leagues ?? []) {
+      try {
+        const ensured = await scheduler.ensureLeagueSchedule(lg.id);
+        if (ensured.outcome !== 'exists') schedules.push(ensured as unknown as Record<string, unknown>);
+      } catch (e) {
+        schedules.push({ leagueId: lg.id, outcome: 'error', reason: e instanceof Error ? e.message : String(e) });
+      }
+
+      try {
+        const { data: current } = await admin
+          .from('matchups')
+          .select('id')
+          .eq('league_id', lg.id)
+          .lte('week_start_date', today)
+          .gte('week_end_date', today)
+          .neq('status', 'completed');
+        for (const m of (current ?? []) as Array<{ id: string }>) {
+          rosters.matchups += 1;
+          const { initialized } = await new MatchupService(admin).ensureMatchupRosters(m.id);
+          rosters.initialized += initialized;
+        }
+      } catch { rosters.errors += 1; }
+
       // Post-draft waiver priority (inverse draft order) — idempotent
       // no-op for every league that already has rows. Industry behaviour
       // Yahoo/ESPN set at draft completion; the sweep is our guarantee.
@@ -419,6 +453,8 @@ scheduledRoutes.post('/matchup-sweep', async (c) => {
     );
     return ok(c, {
       leagues: (leagues ?? []).length,
+      schedules,
+      rosters,
       scored,
       completedMatchups: completedCount,
       completeError: cErr?.message ?? null,
