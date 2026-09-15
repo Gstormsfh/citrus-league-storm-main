@@ -18,9 +18,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { isNativeMock, browserOpenMock, browserCloseMock, addListenerMock, getLaunchUrlMock } =
+const { isNativeMock, browserOpenMock, browserCloseMock, addListenerMock, getLaunchUrlMock, appleSignInMock } =
   vi.hoisted(() => ({
     isNativeMock: vi.fn(() => false),
+    appleSignInMock: vi.fn(async (_opts: unknown): Promise<unknown> => ({ idToken: 'apple.jwt', givenName: 'Garrett', familyName: 'Storms', email: null })),
     browserOpenMock: vi.fn(async () => {}),
     browserCloseMock: vi.fn(async () => {}),
     addListenerMock: vi.fn(
@@ -35,6 +36,10 @@ const { isNativeMock, browserOpenMock, browserCloseMock, addListenerMock, getLau
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: { isNativePlatform: isNativeMock },
+}));
+vi.mock('@capawesome/capacitor-apple-sign-in', () => ({
+  AppleSignIn: { signIn: appleSignInMock },
+  SignInScope: { Email: 'EMAIL', FullName: 'FULL_NAME' },
 }));
 vi.mock('@capacitor/browser', () => ({
   Browser: { open: browserOpenMock, close: browserCloseMock },
@@ -51,6 +56,7 @@ import {
   authRedirectUrl,
   NATIVE_AUTH_CALLBACK,
   NATIVE_RESET_CALLBACK,
+  signInWithAppleNative,
 } from '../nativeAuth';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -59,14 +65,71 @@ function mkSupabase(oauthResult: unknown = { data: { url: 'https://sb.example/au
     auth: {
       signInWithOAuth: vi.fn(async () => oauthResult),
       exchangeCodeForSession: vi.fn(async () => ({ data: {}, error: null })),
+      signInWithIdToken: vi.fn(async () => ({ data: {}, error: null })),
+      updateUser: vi.fn(async () => ({ data: {}, error: null })),
     },
   } as unknown as SupabaseClient & {
     auth: {
       signInWithOAuth: ReturnType<typeof vi.fn>;
       exchangeCodeForSession: ReturnType<typeof vi.fn>;
+      signInWithIdToken: ReturnType<typeof vi.fn>;
+      updateUser: ReturnType<typeof vi.fn>;
     };
   };
 }
+
+/**
+ * NATIVE SIGN IN WITH APPLE (2026-09-15, App Review rejection of 1.0 (18):
+ * the browser-sheet flow rendered blank on iPad). Apple's sheet returns an
+ * identity token; Supabase verifies it against the raw nonce. The plugin
+ * passes `nonce` to Apple unchanged, so the HASH goes to Apple and the RAW
+ * value to Supabase, and the two must be related by SHA-256.
+ */
+describe('native Sign in with Apple', () => {
+  const sha256Hex = async (v: string) =>
+    Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))), (b) => b.toString(16).padStart(2, '0')).join('');
+
+  beforeEach(() => { appleSignInMock.mockClear(); });
+
+  it('sends Apple the SHA-256 of the nonce and Supabase the raw nonce with the identity token', async () => {
+    const supabase = mkSupabase();
+    const { error, cancelled } = await signInWithAppleNative(supabase);
+    expect(error).toBeNull();
+    expect(cancelled).toBeUndefined();
+
+    const sent = appleSignInMock.mock.calls[0][0] as { nonce: string; scopes: string[] };
+    expect(sent.scopes).toEqual(['EMAIL', 'FULL_NAME']);
+    const call = supabase.auth.signInWithIdToken.mock.calls[0][0] as { provider: string; token: string; nonce: string };
+    expect(call.provider).toBe('apple');
+    expect(call.token).toBe('apple.jwt');
+    expect(call.nonce).not.toBe(sent.nonce);
+    expect(await sha256Hex(call.nonce)).toBe(sent.nonce);
+    // No browser sheet is involved at all.
+    expect(browserOpenMock).not.toHaveBeenCalled();
+  });
+
+  it('records the name Apple sends on first authorization', async () => {
+    const supabase = mkSupabase();
+    await signInWithAppleNative(supabase);
+    expect(supabase.auth.updateUser).toHaveBeenCalledWith({ data: { full_name: 'Garrett Storms', first_name: 'Garrett', last_name: 'Storms' } });
+  });
+
+  it('treats a dismissed sheet as cancelled, not as an error', async () => {
+    appleSignInMock.mockRejectedValueOnce(Object.assign(new Error('Sign in was canceled.'), { code: 'SIGN_IN_CANCELED' }));
+    const supabase = mkSupabase();
+    const result = await signInWithAppleNative(supabase);
+    expect(result).toEqual({ error: null, cancelled: true });
+    expect(supabase.auth.signInWithIdToken).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a Supabase rejection of the token', async () => {
+    const supabase = mkSupabase();
+    supabase.auth.signInWithIdToken.mockResolvedValueOnce({ data: null, error: { message: 'audience mismatch' } });
+    const { error } = await signInWithAppleNative(supabase);
+    expect(error).toMatchObject({ message: 'audience mismatch' });
+    expect(supabase.auth.updateUser).not.toHaveBeenCalled();
+  });
+});
 
 beforeEach(() => {
   isNativeMock.mockReset().mockReturnValue(false);
@@ -112,7 +175,7 @@ describe('the native hand-off', () => {
     });
     expect(browserOpenMock).toHaveBeenCalledWith({
       url: 'https://sb.example/authorize?x=1',
-      presentationStyle: 'popover',
+      presentationStyle: 'fullscreen',
     });
   });
 

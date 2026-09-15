@@ -615,18 +615,24 @@ export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity
                   Your account, sign-in and teams are deleted. Shared leagues pass to another manager; leagues with no managers
                   are deleted. Your identity is removed from shared draft history. This cannot be undone.
                 </p>
-                <label className="block mt-4">
-                  <span className="font-plex font-semibold text-[9px] tracking-[0.14em] text-pressbox-text/45">
-                    TYPE <span className="text-pressbox-orange-soft">DELETE</span> TO CONFIRM
-                  </span>
+                {/* NO KEYBOARD HERE (2026-09-15, App Review 4.0 + 5.1.1(v) on
+                    iPad Air M3). This used to ask the manager to type DELETE.
+                    On iPad the keyboard rose over this bottom sheet and hid
+                    the whole confirmation, so the reviewer concluded the app
+                    offers no way to delete an account. A checkbox is the
+                    confirmation step Apple allows and it never summons a
+                    keyboard. The `deleteConfirmation` contract with the page
+                    is unchanged: checked writes 'DELETE', unchecked clears. */}
+                <label className="mt-4 flex items-start gap-3 cursor-pointer select-none" data-testid="delete-account-acknowledge">
                   <input
-                    type="text"
-                    value={settings.deleteConfirmation}
-                    onChange={(e) => settings.onDeleteConfirmation(e.target.value)}
-                    placeholder="DELETE"
-                    autoCapitalize="characters"
-                    className="focus-citrus mt-1.5 w-full h-11 rounded-[8px] bg-white/[0.04] border border-white/[0.1] px-3 font-plex text-[15px] text-pressbox-text placeholder:text-pressbox-text/30"
+                    type="checkbox"
+                    checked={settings.deleteConfirmation === 'DELETE'}
+                    onChange={(e) => settings.onDeleteConfirmation(e.target.checked ? 'DELETE' : '')}
+                    className="focus-citrus mt-0.5 h-5 w-5 shrink-0 rounded-[5px] border border-white/[0.25] bg-white/[0.04] accent-[#FF9800]"
                   />
+                  <span className="font-barlow text-[14px] leading-[1.4] text-pressbox-text/85">
+                    I understand this deletes my account and cannot be undone.
+                  </span>
                 </label>
                 <div className="mt-3 flex gap-2">
                   <button type="button" className={cn(SECONDARY, 'flex-1')} onClick={() => { setConfirmDelete(false); settings.onDeleteConfirmation(''); }}>

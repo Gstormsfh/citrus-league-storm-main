@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Mail, Lock, HelpCircle, Chrome, Apple, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, HelpCircle, Chrome, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AppleLogo } from '@/components/auth/AppleLogo';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
 import Navbar from '@/components/Navbar';
 import {
@@ -436,7 +437,7 @@ const Auth = () => {
                     leads and Apple (a web OAuth flow there) sits second. */}
                 <div className={PROVIDER_ORDER_CLASS}>
                 <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('apple')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'apple'} className="bg-white text-[#111111] ring-white/80 hover:bg-white/90 hover:text-black hover:ring-white max-lg:h-12 max-lg:rounded-[12px] max-lg:ring-0 max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.06em]">
-                  {oauthLoading !== 'apple' && <Apple className="w-4 h-4 fill-current" />}
+                  {oauthLoading !== 'apple' && <AppleLogo className="w-4 h-4" />}
                   Continue with Apple
                 </CitrusButton>
 
@@ -555,7 +556,7 @@ const Auth = () => {
                     leads and Apple (a web OAuth flow there) sits second. */}
                 <div className={PROVIDER_ORDER_CLASS}>
                 <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('apple')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'apple'} className="bg-white text-[#111111] ring-white/80 hover:bg-white/90 hover:text-black hover:ring-white max-lg:h-12 max-lg:rounded-[12px] max-lg:ring-0 max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.06em]">
-                  {oauthLoading !== 'apple' && <Apple className="w-4 h-4 fill-current" />}
+                  {oauthLoading !== 'apple' && <AppleLogo className="w-4 h-4" />}
                   Continue with Apple
                 </CitrusButton>
 

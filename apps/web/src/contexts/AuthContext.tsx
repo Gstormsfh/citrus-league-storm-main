@@ -11,6 +11,7 @@ import {
   beginNativeOAuth,
   registerNativeAuthListener,
   authRedirectUrl,
+  signInWithAppleNative,
 } from '@/lib/nativeAuth';
 import { registerForPush, unregisterDeviceToken } from '@/lib/pushNotifications';
 import { readAcquisition } from '@/lib/acquisition';
@@ -410,6 +411,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
      * code — the path below is byte-for-byte the pre-existing web flow.
      */
     if (isNativeShell()) {
+      // Apple on Apple: the system sheet, no browser (App Review 2.1a,
+      // 2026-09-15). Google keeps the browser hand-off; Google forbids
+      // embedded webviews and has no native sheet on iOS.
+      if (provider === 'apple') {
+        const result = await signInWithAppleNative(supabase);
+        return { error: result.error };
+      }
       return beginNativeOAuth(supabase, provider, opts);
     }
 
