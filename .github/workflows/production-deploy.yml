@@ -24,6 +24,20 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # API REGION (2026-09-14, latency arc step 1). The API ran in us-central1
+  # (Iowa) while the production Supabase project (ca-central-1) and the draft
+  # engine VM (northamerica-northeast1-a) both live in Montreal. Every request
+  # crossed ~2,400 km to the API and then paid a ~30 ms hop per database query
+  # on top; a route doing six sequential reads spent more time in transit than
+  # in Postgres, and pg_stat_statements confirms the queries themselves are
+  # single-digit ms. auth.ts and verifyAccessToken.ts both carry workarounds
+  # written specifically for that hop. The service now deploys beside the
+  # database. Cloud Run pulls the image cross-region from the us-central1
+  # Artifact Registry without change; Secret Manager is global; DRAFT_WS_HOST
+  # is the Montreal engine either way. firebase.json's /api/** rewrite is the
+  # cutover and is flipped separately (PR B) so the Iowa service keeps serving
+  # until the Montreal one has been measured directly by its run.app URL.
+  API_REGION: northamerica-northeast1
 
 jobs:
   # ── Gate: all checks must pass before deploy ──────────────────────────
@@ -333,7 +347,7 @@ jobs:
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: citrus-api
-          region: us-central1
+          region: ${{ env.API_REGION }}
           image: us-central1-docker.pkg.dev/citrus-fantasy-prod/citrus-api/server:${{ github.sha }}
           # ── env_vars IS A YAML LITERAL BLOCK — NO COMMENTS INSIDE IT ──
           #
@@ -484,16 +498,16 @@ jobs:
           # this step exists to catch (2026-08-24: first version of this guard
           # did precisely that and reported green over a stale revision).
           SERVING=$(gcloud run services describe citrus-api \
-            --region=us-central1 \
+            --region=$API_REGION \
             --format='value(status.traffic[0].revisionName)')
           LATEST_READY=$(gcloud run services describe citrus-api \
-            --region=us-central1 \
+            --region=$API_REGION \
             --format='value(status.latestReadyRevisionName)')
           LATEST_CREATED=$(gcloud run services describe citrus-api \
-            --region=us-central1 \
+            --region=$API_REGION \
             --format='value(status.latestCreatedRevisionName)')
           SERVING_IMAGE=$(gcloud run revisions describe "$SERVING" \
-            --region=us-central1 \
+            --region=$API_REGION \
             --format='value(spec.containers[0].image)')
 
           echo "serving revision : $SERVING"
@@ -540,7 +554,7 @@ jobs:
       - name: API health check
         if: steps.check-gcp.outputs.has_creds == 'true'
         run: |
-          API_URL=$(gcloud run services describe citrus-api --region=us-central1 --format='value(status.url)' 2>/dev/null) || true
+          API_URL=$(gcloud run services describe citrus-api --region=$API_REGION --format='value(status.url)' 2>/dev/null) || true
           if [ -n "$API_URL" ]; then
             echo "Checking $API_URL/api/health..."
             sleep 10
