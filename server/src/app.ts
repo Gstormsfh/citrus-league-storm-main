@@ -47,6 +47,7 @@ import { importRoutes, leagueHistoryRoutes } from './routes/imports';
 import { standardRateLimit, strictRateLimit, authRateLimit, aiRateLimit } from './middleware/rateLimit';
 import { requestContextMiddleware } from './middleware/requestContext';
 import { metricsMiddleware, metrics } from './middleware/metrics';
+import { compress } from 'hono/compress';
 import { cacheControlMiddleware } from './middleware/cacheControl';
 import { AppError } from './lib/errors';
 import { supabaseBreaker } from './lib/circuitBreaker';
@@ -136,6 +137,19 @@ app.use('*', cors({
 // Structured request logging + metrics collection for observability
 app.use('/api/*', requestContextMiddleware);
 app.use('/api/*', metricsMiddleware);
+// TRANSPORT COMPRESSION (2026-09-14, latency pass). Measured on production
+// from a signed-in browser: the Matchup tab moved 2.3 MB across 73 requests
+// and not one byte of it was encoded (encodedBodySize == decodedBodySize on
+// every API response). /api/players alone is 1.6 MB raw. JSON of this shape
+// gzips 6-10x, and on LTE that is the difference between ~2 s and ~0.25 s of
+// transfer. Registered BEFORE cacheControl so the ETag is computed over the
+// raw body and the 304 path still short-circuits; hono's compress skips 304s
+// (no body), HEAD, anything already encoded, no-transform, and bodies under
+// 1 KB, and it weakens the ETag to W/ on the way out (cacheControl compares
+// weakly for that reason). JSON only, so SSE and streaming routes are
+// untouched. The route-level compress on /players/dashboard-index stays as
+// that route's own contract; hono skips a response already encoded.
+app.use('/api/*', compress({ contentTypeFilter: /^application\/json/ }));
 // Cache-Control headers + ETag support for GET responses
 app.use('/api/*', cacheControlMiddleware);
 

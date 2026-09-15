@@ -293,6 +293,65 @@ describe('PlayerService', () => {
         expect(r.players).toEqual(results[0].players);
       }
     });
+
+    // ── STALE-WHILE-REVALIDATE (2026-09-14 latency pass) ─────────────
+    // Production measurement: ~16 ms with a fresh cache, ~1.2 s once the
+    // 2-minute TTL lapsed, and at launch traffic it lapsed between almost
+    // every pair of visits. Past the TTL a caller must get the last pool
+    // immediately while ONE reload runs behind it.
+    describe('stale-while-revalidate', () => {
+      const tableReads = () => mockSupabase.from.mock.calls.filter(([table]: [string]) => table !== 'canonical_published_runs').length;
+
+      it('serves a stale pool without waiting and reloads once in the background', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+          mockSupabase.from = vi.fn(() => createChain({ data: [], error: null }));
+          await service.getAllPlayers();
+          const afterFirst = tableReads();
+
+          // Past the freshness window, inside the stale window.
+          vi.advanceTimersByTime(5 * 60 * 1000);
+
+          let gateOpen: () => void = () => {};
+          const gate = new Promise<void>((resolve) => { gateOpen = resolve; });
+          const slow: Record<string, any> = {};
+          for (const m of ['select', 'eq', 'order']) slow[m] = vi.fn(() => slow);
+          slow.range = vi.fn(() => gate.then(() => ({ data: [], error: null })));
+          mockSupabase.from = vi.fn((table: string) => (table === 'player_current_directory' ? slow : createChain({ data: [], error: null })));
+
+          // The stale read must resolve while the directory read is still
+          // parked behind the gate. No wall clock: a blocking implementation
+          // never resolves here and fails on the test timeout instead.
+          const stale = await service.getAllPlayers();
+          expect(stale.error).toBeNull();
+          expect(slow.range).toHaveBeenCalledTimes(1);
+
+          // A second stale caller joins the same background reload.
+          await service.getAllPlayers();
+          expect(slow.range).toHaveBeenCalledTimes(1);
+
+          gateOpen();
+          await gate;
+          expect(afterFirst).toBe(4);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it('blocks on a reload once the pool is older than the stale window', async () => {
+        vi.useFakeTimers();
+        try {
+          mockSupabase.from = vi.fn(() => createChain({ data: [], error: null }));
+          await service.getAllPlayers();
+          vi.advanceTimersByTime(31 * 60 * 1000);
+          await service.getAllPlayers();
+          // directory + stats + talent + gsax, twice: the second call did not serve stale.
+          expect(tableReads()).toBe(8);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
   });
 
   describe('getPlayersByIds', () => {
