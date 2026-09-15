@@ -344,7 +344,7 @@ const Auth = () => {
     // after this hand-off records that version (lib/consent.ts).
     rememberSignupConsent(SIGNUP_POLICY_VERSION);
     try {
-      const { error } = await signInWithOAuth(provider);
+      const { error, completed, cancelled } = await signInWithOAuth(provider);
       // No error means "the hand-off happened", not "signed in": on native
       // the sheet is up and the session arrives by deep link, on web the tab
       // is navigating away. oauthLoading is cleared here only on failure; a
@@ -352,7 +352,33 @@ const Auth = () => {
       // Route through getBetterErrorMessage so a provider that is not yet
       // enabled in Supabase degrades to warm copy ("That sign-in method
       // isn't hooked up yet…") instead of a raw API string.
-      if (error) { setError(getBetterErrorMessage(error.message || `Couldn't reach ${providerLabel}. Try again in a moment.`)); setOauthLoading(null); }
+      if (error) { setError(getBetterErrorMessage(error.message || `Couldn't reach ${providerLabel}. Try again in a moment.`)); setOauthLoading(null); return; }
+      // The native Apple sheet was dismissed: no session, no error, and no
+      // browserFinished to clear the flag (there was no browser). Clear it.
+      if (cancelled) { setOauthLoading(null); return; }
+      // NATIVE APPLE (2026-09-15, found on device: signed in, left on this
+      // screen). The system sheet mints the session before signInWithOAuth
+      // resolves, so nothing arrives later to move the page. Finish the way
+      // handleSignIn does: confirm the session, re-set it so the listener
+      // fires, navigate. Relying on the `user` effect alone is the race that
+      // comment describes.
+      if (completed) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session) {
+          await supabase.auth.setSession({
+            access_token: sessionData.session.access_token,
+            refresh_token: sessionData.session.refresh_token,
+          });
+          setTimeout(() => {
+            const params = new URLSearchParams(window.location.search);
+            const redirect = params.get('redirect');
+            navigate(redirect && redirect.startsWith('/') ? redirect : '/', { replace: true });
+          }, 50);
+          return;
+        }
+        setError("Sign-in didn't complete. Try again, or reach out if it keeps happening.");
+        setOauthLoading(null);
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? getBetterErrorMessage(err.message) : `Couldn't reach ${providerLabel}. Try again in a moment.`;
       setError(errorMessage);

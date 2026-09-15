@@ -113,7 +113,13 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
-  signInWithOAuth: (provider: 'google' | 'apple') => Promise<{ error: AuthError | null }>;
+  /**
+   * Resolves when the hand-off happened, not when the user is signed in,
+   * except on the native Apple path: there the system sheet has already
+   * minted the session, and `completed: true` says so. `cancelled: true`
+   * is the sheet dismissed, no error to show.
+   */
+  signInWithOAuth: (provider: 'google' | 'apple') => Promise<{ error: AuthError | null; completed?: boolean; cancelled?: boolean }>;
   resendVerificationEmail: (email: string) => Promise<{ error: AuthError | null }>;
 }
 
@@ -415,8 +421,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // 2026-09-15). Google keeps the browser hand-off; Google forbids
       // embedded webviews and has no native sheet on iOS.
       if (provider === 'apple') {
-        const result = await signInWithAppleNative(supabase);
-        return { error: result.error };
+        return signInWithAppleNative(supabase);
       }
       return beginNativeOAuth(supabase, provider, opts);
     }
