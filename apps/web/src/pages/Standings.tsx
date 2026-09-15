@@ -223,30 +223,11 @@ const Standings = () => {
           // Use activeLeagueId from LeagueContext (no local selectedLeagueId state needed)
           const leagueToUse = activeLeagueId || userLeagues[0].id;
 
-          // CRITICAL: Auto-complete matchups and update scores BEFORE calculating standings
-          // We MUST wait for scores to be updated before calculating standings
-          // Otherwise standings will use old/wrong scores from the database
-          // NOTE: If auto_complete_matchups fails, we still proceed with standings calculation
-          // to ensure the page renders even if the RPC has issues
-          try {
-            // First, auto-complete matchups (this also updates scores for completed weeks)
-            const { error: autoCompleteError } = await MatchupService.autoCompleteMatchups();
-            if (autoCompleteError) {
-              // Don't block standings load if auto-complete fails - continue with score updates and standings calculation
-            }
-            
-            // CRITICAL: Update all matchup scores and WAIT for completion
-            // This uses the EXACT same calculation as the matchup tab (sum of 7 daily scores)
-            // We MUST wait for this to complete before calculating standings
-            const { error: updateScoresError, updatedCount } = await MatchupService.updateMatchupScores(leagueToUse);
-            if (updateScoresError) {
-              logger.error('[Standings] Failed to update matchup scores:', updateScoresError);
-              // Still show standings, but they may be outdated
-            }
-          } catch (error) {
-            logger.error('[Standings] Exception updating scores:', error);
-            // Still show standings, but they may be outdated
-          }
+          // PURE READ (2026-09-14). Standings awaited auto_complete_matchups
+          // and a league-wide update_all_matchup_scores before rendering,
+          // a full round trip of writes in front of every open. Both run in
+          // the hourly matchup-sweep (routes/scheduled.ts) after the stats
+          // pipeline lands; this page reads what the sweep stored.
 
           // Get league to check draft status and format
           const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueToUse, user.id);

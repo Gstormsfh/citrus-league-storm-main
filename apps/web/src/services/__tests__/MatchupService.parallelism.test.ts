@@ -59,12 +59,19 @@ describe('Matchup page — no dead wall-clock, no double load', () => {
     expect(PAGE).not.toMatch(/new Promise\(resolve => setTimeout\(resolve, \d{4,}\)\)/);
   });
 
-  it('reads back generated matchups by polling instead', () => {
-    expect(PAGE).toContain('readUntilPresent');
+  it('has no generation path left to poll behind (2026-09-14: the server owns the schedule)', () => {
+    expect(PAGE).not.toContain('readUntilPresent');
   });
 
-  it('backfills both teams in one round trip', () => {
-    expect(PAGE).toMatch(/await Promise\.all\(\[\s*backfillTeam\(currentMatchup\.team1_id/);
+  // 2026-09-14: the page no longer backfills, ensures, scores or generates
+  // at all; the server sweep owns every one of those writes. Pin the absence.
+  it('issues no roster backfill, ensure, score job or schedule write from the page', () => {
+    expect(PAGE).not.toMatch(/backfillMissingDailyRosters\(/);
+    expect(PAGE).not.toMatch(/matchupApi\.ensureRosters\(/);
+    expect(PAGE).not.toMatch(/MatchupScoreJobService/);
+    expect(PAGE).not.toMatch(/MatchupService\.updateMatchupScores\(/);
+    expect(PAGE).not.toMatch(/generateMatchupsForLeague\(/);
+    expect(PAGE).not.toMatch(/deleteAllMatchupsForLeague\(/);
   });
 
   it('records the matchup it actually loaded, not the one selected when it started', () => {

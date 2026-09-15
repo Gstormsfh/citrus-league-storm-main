@@ -15,3 +15,4 @@ export * from './standings';
 export * from './gameDay';
 export * from './contentModeration';
 export * from './profileName';
+export * from './fantasyWeeks';

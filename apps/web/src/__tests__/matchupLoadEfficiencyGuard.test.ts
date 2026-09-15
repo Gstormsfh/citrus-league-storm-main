@@ -55,15 +55,17 @@ describe('the matchup week-stats RPC stays week-bounded', () => {
 });
 
 describe('nothing blocks the matchup first paint that can land later', () => {
-  it('the league-wide score recompute is fire-and-forget on the LOAD path', () => {
+  it('the league-wide score recompute is absent from the LOAD path', () => {
     // Scope to the loader: the periodic live-refresh interval may await
     // its own recompute — that runs in the background by construction.
     const loaderStart = MATCHUP.indexOf('const loadMatchupData = async ()');
     const loaderEnd = MATCHUP.indexOf('loadMatchupData();', loaderStart);
     expect(loaderStart).toBeGreaterThan(-1);
     const loader = MATCHUP.slice(loaderStart, loaderEnd);
-    expect(loader).toMatch(/void MatchupService\.updateMatchupScores/);
-    expect(loader).not.toMatch(/await MatchupService\.updateMatchupScores/);
+    // 2026-09-14: the recompute left the page altogether (the hourly sweep
+    // scores after the pipeline lands). Neither form may reappear.
+    expect(loader).not.toMatch(/MatchupService\.updateMatchupScores/);
+    expect(MATCHUP).not.toMatch(/MatchupService\.updateMatchupScores\(/);
   });
 
   it('nothing on this page reloads the whole app to reach a matchup URL', () => {

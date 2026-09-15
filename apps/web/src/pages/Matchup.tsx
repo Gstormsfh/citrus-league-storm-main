@@ -43,7 +43,6 @@ import { getDraftCompletionDate, fantasyWeekAnchorFor, weekStartDowFor, getCurre
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { DemoMatchupCacheService, type DemoMatchupPayload } from '@/services/DemoMatchupCacheService';
 import { PB_LOADING_MIN_MS, useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
-import { MatchupScoreJobService } from '@/services/MatchupScoreJobService';
 import { DataCacheService, TTL } from '@/services/DataCacheService';
 import { calculateEligibleGamesRemaining, type PositionType } from '@/utils/rosterUtils';
 import { collectRemainingGames, computeWinProbability, enumerateWeekDates } from '@/utils/winProbability';
@@ -52,7 +51,6 @@ import { aggregateEarnedStats, elapsedStatDates, finiteEarnedTotal, scopedEarned
 import { DEFAULT_SCORING } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
 import { useLoadCeiling } from '@/hooks/useLoadCeiling';
-import { readUntilPresent } from '@/utils/readUntilPresent';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { usePlayoffChampion } from '@/hooks/usePlayoffChampion';
 import { useSeasonStatus } from '@/hooks/useSeasonStatus';
@@ -371,101 +369,14 @@ const Matchup = () => {
   const [opponentTeamRecord, setOpponentTeamRecord] = useState<{ wins: number; losses: number }>({ wins: 0, losses: 0 });
   const [currentMatchup, setCurrentMatchup] = useState<MatchupType | null>(null);
 
-  // Trigger background job to calculate and cache matchup scores
-  // Also backfills any missing daily roster records
-  // After job completes, refresh matchup to get updated scores
-  useEffect(() => {
-    if (!currentMatchup) {
-      return;
-    }
-
-    const runBackfillAndCalculate = async () => {
-      log(' Starting data integrity check for matchup:', currentMatchup.id);
-
-      // Skip backfill for demo league - guests can't write, and data should already exist from migration
-      const isDemoLeague = currentMatchup.league_id === DEMO_LEAGUE_ID_FOR_GUESTS;
-
-      // Step 0: Ensure both teams have team_lineups + fantasy_daily_rosters via server
-      // This handles AI teams (owner_id = NULL) that can't be saved via frontend RLS
-      if (!isDemoLeague) {
-        try {
-          log(' Ensuring rosters exist for matchup:', currentMatchup.id);
-          await matchupApi.ensureRosters(currentMatchup.id);
-        } catch (err) {
-          logger.error('[Matchup] ensure-rosters failed:', err);
-        }
-      }
-
-      // Step 1: Backfill missing daily roster records for both teams.
-      //
-      // team1 and team2 are independent writes against different team ids —
-      // they were awaited one after the other, so this cost two round trips
-      // where it needs one. On the ~350ms median this page sees, that is a
-      // third of a second on a path that runs before the score refresh below.
-      const backfillTeam = async (teamId: string | null | undefined, label: string) => {
-        if (isDemoLeague || !teamId) return;
-        try {
-          log(` Running backfill for ${label}:`, teamId);
-          const result = await LeagueService.backfillMissingDailyRosters(
-            teamId,
-            currentMatchup.league_id,
-            currentMatchup.id
-          );
-          if (result.backfilledCount > 0) {
-            log(' Backfilled', result.backfilledCount, `records for ${label}`);
-          } else if (result.error) {
-            logger.error(`[Matchup] Backfill error for ${label}:`, result.error);
-          } else {
-            log(` No records to backfill for ${label} (all exist)`);
-          }
-        } catch (err) {
-          logger.error(`[Matchup] ${label} backfill exception:`, err);
-        }
-      };
-
-      await Promise.all([
-        backfillTeam(currentMatchup.team1_id, 'team1'),
-        backfillTeam(currentMatchup.team2_id, 'team2'),
-      ]);
-
-      // Step 2: Calculate and store matchup scores
-      // SKIP for demo league - guests have no auth token, and score jobs are server-side
-      if (!isDemoLeague && (currentMatchup.status === 'in_progress' || currentMatchup.status === 'scheduled')) {
-        log(' Triggering background score calculation job for league:', currentMatchup.league_id);
-        try {
-          const result = await MatchupScoreJobService.runJob(currentMatchup.league_id);
-          log(' Background job completed:', result);
-          
-          // Step 3: Refresh matchup data to get updated scores from DB
-          if (result.updatedCount > 0) {
-            log(' Refreshing matchup data after score update...');
-            const matchupResp = await matchupApi.getMatchupScores(currentMatchup.id);
-            const refreshedMatchup = matchupResp.data;
-
-            if (refreshedMatchup) {
-              const scores = refreshedMatchup as { team1_score: number; team2_score: number };
-              // Update currentMatchup with new scores (this triggers re-render)
-              setCurrentMatchup(prev => prev ? {
-                ...prev,
-                team1_score: scores.team1_score,
-                team2_score: scores.team2_score
-              } : null);
-              log(' Matchup scores refreshed:', scores);
-            }
-          }
-        } catch (err) {
-          logger.error('[Matchup] Background job failed (non-blocking):', err);
-        }
-      }
-    };
-    
-    // Fire-and-forget
-    runBackfillAndCalculate();
-  // Intentionally depends only on currentMatchup?.id to run once per matchup.
-  // The effect reads currentMatchup properties (league_id, team1_id, etc.) but should NOT re-run when
-  // scores or other matchup fields update (which would cause infinite loops since this effect updates scores).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMatchup?.id]);
+  // WRITES REMOVED (2026-09-14). An effect here ran ensure-rosters, a
+  // daily-roster backfill for both teams, lock-completed-days and
+  // update-scores for the whole league on every open, then refetched.
+  // Scores change only when the stats pipeline lands (6 to 12 hour SLA)
+  // and the hourly matchup-sweep scores every league after that, so the
+  // on-open recompute never produced fresher numbers than the sweep; it
+  // only cost the viewer round trips and cost the database writes. The
+  // page reads stored scores. See routes/scheduled.ts matchup-sweep.
 
   // Fetch and cache daily scores for past days (Yahoo/Sleeper frozen scoring)
   // OPTIMIZED: Uses DataCacheService to prevent redundant fetches + single batched query
@@ -3585,21 +3496,9 @@ const Matchup = () => {
           return;
         }
 
-        // Recompute league matchup scores in the BACKGROUND (2026-09-01
-        // efficiency pass). This was awaited before anything rendered — a
-        // full network round trip plus, in season, a per-started-week score
-        // loop, spent before the user saw a single pixel. Yahoo/ESPN render
-        // the stored score immediately and let recomputes land quietly;
-        // stored scores here are at most one page-view stale for AI teams
-        // (user-team scores are also refreshed by the daily-stats path).
-        // Fire it, don't wait for it.
-        void MatchupService.updateMatchupScores(currentLeague.id).then(({ error: updateScoresError }) => {
-          if (updateScoresError) {
-            log('WARN: Background matchup score update failed:', updateScoresError);
-          }
-        }).catch((error) => {
-          log('WARN: Background matchup score update threw:', error);
-        });
+        // The background league-wide score recompute that used to fire here
+        // is gone (2026-09-14): scoring runs in the hourly matchup-sweep
+        // after the stats pipeline lands, and this page reads stored scores.
 
         log(' Getting user team for league:', currentLeague.id);
         // Get user's team — request started above, alongside the leagues read.
@@ -3722,224 +3621,19 @@ const Matchup = () => {
           } : null
         });
         
-        if (!existingMatchup) {
-          // No matchup found for this week - generate all missing weeks
-          log(' No matchup found for week', weekToShow, '- generating matchups...');
-          if (!cachedLeagueTeams) {
-            const { teams } = await awaitCurrentRoute(LeagueService.getLeagueTeams(currentLeague.id));
-            cachedLeagueTeams = teams;
-          }
-          const leagueTeams = cachedLeagueTeams;
-
-          // Check if ANY matchups exist for this league (via API)
-          const anyMatchupsRes = await awaitCurrentRoute(matchupApi.getLeagueMatchups(currentLeague.id));
-          const anyMatchups = (anyMatchupsRes?.data || []) as any[];
-          const hasAnyMatchups = anyMatchups.length > 0;
-
-          // If no matchups exist at all, force regenerate ALL weeks
-          // Otherwise, generate only missing weeks (which will include this one)
-          const forceRegenerate = !hasAnyMatchups;
-          
-          log(' Generating matchups with forceRegenerate:', forceRegenerate, 'for week:', weekToShow);
-          log(' Generation parameters:', {
-            leagueId: currentLeague.id,
-            teamCount: leagueTeams.length,
-            teams: leagueTeams.map(t => ({ id: t.id, name: t.team_name || t.id })),
-            firstWeekStart: firstWeek.toISOString(),
-            forceRegenerate,
-            requestedWeek: weekToShow,
-            requestedWeekType: typeof weekToShow
-          });
-          
-          const { error: genError } = await awaitCurrentRoute(MatchupService.generateMatchupsForLeague(
-            currentLeague.id, 
-            leagueTeams, 
-            firstWeek,
-            forceRegenerate
-          ));
-          
-          if (genError) {
-            const isDuplicateKey = genError.message?.includes('duplicate key');
-            if (isDuplicateKey && hasAnyMatchups) {
-              // Matchups already exist — duplicate key is expected.
-              // Force regenerate to ensure all current teams are included.
-              log(' Duplicate key during generation, force regenerating with current teams...');
-
-              const { error: regenError } = await awaitCurrentRoute(MatchupService.generateMatchupsForLeague(
-                currentLeague.id,
-                leagueTeams,
-                firstWeek,
-                true // Force regenerate - deletes and recreates all matchups
-              ));
-
-              if (regenError) {
-                logger.error('[Matchup] Error during forced regeneration:', regenError);
-                setError(`Failed to regenerate matchups: ${regenError.message || 'Unknown error'}`);
-                setLoading(false);
-                return;
-              }
-            } else {
-              logger.error('[Matchup] Error generating matchups:', genError);
-              setError(`Failed to generate matchups: ${genError.message || 'Unknown error'}`);
-              setLoading(false);
-              return;
-            }
-          }
-          
-          log(' Matchup generation completed successfully');
-          
-          // Read back what generation produced. Retries rather than sleeps —
-          // see utils/readUntilPresent.
-          const weekMatchupsRes = await awaitCurrentRoute(readUntilPresent(
-            async () => {
-              assertCurrentRoute();
-              matchupApi.invalidate(`matchups:league:${currentLeague.id}`);
-              return matchupApi.getLeagueMatchups(currentLeague.id, weekToShow);
-            },
-            (res) => ((res?.data as unknown[]) || []).length > 0,
-          ));
-          const allMatchups = (weekMatchupsRes?.data || []) as any[];
-          log(' Debug - All matchups for week', weekToShow, ':', allMatchups);
-
-          // Also check ALL weeks via API
-          const allWeeksRes = await awaitCurrentRoute(matchupApi.getLeagueMatchups(currentLeague.id));
-          const allWeeksMatchups = allWeeksRes?.data || [];
-          const uniqueWeeks = new Set((allWeeksMatchups as any[])?.map((m: any) => m.week_number) || []);
-          log(' Debug - All week numbers in database:', Array.from(uniqueWeeks).sort((a, b) => a - b));
-          log(' Debug - Requested week', weekToShow, 'exists in database?', uniqueWeeks.has(weekToShow));
-
-          // Also check user's team via API
-          const teamsRes = await awaitCurrentRoute(leagueApi.getTeams(currentLeague.id));
-          const allTeamsData = (teamsRes?.data || []) as any[];
-          const userTeamData = allTeamsData.find((t: any) => t.owner_id === user.id) || null;
-          
-          log(' Debug - User team:', userTeamData);
-          
-          if (allMatchups && allMatchups.length > 0) {
-            const matchupsData = allMatchups as any[];
-            log(' Debug - Matchups exist but user team not found. User team ID:', (userTeamData as any)?.id);
-            log(' Debug - Matchups in week:', matchupsData.map((m: any) => ({
-              team1: m.team1_id,
-              team2: m.team2_id
-            })));
-            
-            // Check if user's team is in any of these matchups
-            const userTeamInMatchups = matchupsData.some((m: any) => 
-              m.team1_id === (userTeamData as any)?.id || m.team2_id === (userTeamData as any)?.id
-            );
-            log(' Debug - User team in matchups?', userTeamInMatchups);
-          }
-          
-          // Verify the matchup was created
-          const { matchup: verifyMatchup } = await awaitCurrentRoute(MatchupService.getUserMatchup(
-            currentLeague.id,
-            user.id,
-            weekToShow
-          ));
-          
-          if (!verifyMatchup) {
-            logger.error('[Matchup] Matchup still not found after generation for week', weekToShow);
-            
-            // If matchups exist but user's team isn't in them, this is a serious issue - FORCE REGENERATE
-            if (allMatchups && allMatchups.length > 0 && userTeamData) {
-              const matchupsArr = allMatchups as any[];
-              const teamData = userTeamData as any;
-              const userTeamInMatchups = matchupsArr.some((m: any) => 
-                m.team1_id === teamData.id || m.team2_id === teamData.id
-              );
-              
-              if (!userTeamInMatchups) {
-                logger.error('[Matchup] CRITICAL: Week', weekToShow, 'has matchups but user team', teamData.id, 'is not in any of them!');
-                logger.error('[Matchup] FORCING FULL REGENERATION of all matchups...');
-                
-                // Force delete ALL matchups and regenerate
-                await awaitCurrentRoute(MatchupService.deleteAllMatchupsForLeague(currentLeague.id));
-                
-                // Get all teams again to ensure we have the complete list
-                if (!cachedLeagueTeams) {
-                  const { teams } = await awaitCurrentRoute(LeagueService.getLeagueTeams(currentLeague.id));
-                  cachedLeagueTeams = teams;
-                }
-                const allLeagueTeams = cachedLeagueTeams;
-                
-                // Verify user's team is in the list
-                const userTeamInList = allLeagueTeams.some(t => t.id === teamData.id);
-                if (!userTeamInList) {
-                  logger.error('[Matchup] CRITICAL: User team is not in the league teams list!');
-                  setError(`Your team (${teamData.id}) is not found in the league teams. This is a data integrity issue.`);
-                  setLoading(false);
-                  return;
-                }
-                
-                log(' Regenerating ALL matchups with complete team list...');
-                const { error: regenError } = await awaitCurrentRoute(MatchupService.generateMatchupsForLeague(
-                  currentLeague.id,
-                  allLeagueTeams,
-                  firstWeek,
-                  true // Force regenerate
-                ));
-                
-                if (regenError) {
-                  logger.error('[Matchup] Error during forced regeneration:', regenError);
-                  setError(`Failed to regenerate matchups: ${regenError.message || 'Unknown error'}`);
-                  setLoading(false);
-                  return;
-                }
-                
-                // Verify again — retrying rather than sleeping.
-                const { matchup: finalMatchup } = await awaitCurrentRoute(readUntilPresent(
-                  () => {
-                    assertCurrentRoute();
-                    return MatchupService.getUserMatchup(currentLeague.id, user.id, weekToShow);
-                  },
-                  (res) => Boolean(res?.matchup),
-                ));
-                
-                if (!finalMatchup) {
-                  logger.error('[Matchup] Still no matchup after forced regeneration!');
-                  setError(`Failed to generate matchup for week ${weekToShow} after forced regeneration. Please refresh and try again.`);
-                  setLoading(false);
-                  return;
-                }
-                
-                log(' Successfully regenerated and verified matchup exists');
-                // Matchup now exists, continue with normal flow below
-              } else {
-                // COPY FIX (2026-08-22): generation usually SUCCEEDED by this point
-                // (the historical miss was a stale client cache, fixed in
-                // MatchupService.generateMatchupsForLeague). Don't tell the user
-                // generation "failed" — a refresh resolves it.
-                setError(`Your week ${weekToShow} matchup isn't loading yet. Refresh the page to try again.`);
-                setLoading(false);
-                return;
-              }
-            } else {
-              setError(`Your week ${weekToShow} matchup isn't loading yet. Refresh the page to try again.`);
-              setLoading(false);
-              return;
-            }
-            
-            // If we got here after forced regeneration, the matchup should exist now
-            // Re-fetch it to continue with normal flow
-            const { matchup: regeneratedMatchup } = await awaitCurrentRoute(MatchupService.getUserMatchup(
-              currentLeague.id,
-              user.id,
-              weekToShow
-            ));
-            
-            if (!regeneratedMatchup) {
-              logger.error('[Matchup] Matchup still not found after forced regeneration!');
-              setError(`Failed to generate matchup for week ${weekToShow} after forced regeneration. Please refresh and try again.`);
-              setLoading(false);
-              return;
-            }
-            
-            log(' Verified matchup exists after forced regeneration');
-          }
-          
-          log(' Verified matchup exists for week', weekToShow);
-        } else {
-          log(' Matchup already exists for week', weekToShow, '- skipping generation');
+        // PURE READ (2026-09-14). This page used to build the league's
+        // schedule from the browser when it found no matchup for the week,
+        // and in one branch it deleted every matchup in the league and
+        // regenerated. The server owns the schedule now: the first read of
+        // an empty schedule bootstraps it (GET /api/matchups/league/:id),
+        // the engine's completion event and the hourly sweep guarantee it,
+        // and this page never writes. A missing matchup here is a state to
+        // show, not a void to fill.
+        if (!existingMatchup && !selectedMatchupId) {
+          if (!lifetime.active) return;
+          setError(`Your week ${weekToShow} matchup isn't ready yet. Check back in a minute.`);
+          setLoading(false);
+          return;
         }
 
         // Load matchup data using unified method
@@ -3947,23 +3641,10 @@ const Matchup = () => {
         // Otherwise, use the user's matchup
         const userTimezone = (profile as any)?.timezone || 'America/Denver';
 
-        // CRITICAL: Ensure both teams have team_lineups + fantasy_daily_rosters BEFORE loading roster data
-        // This handles AI teams (owner_id = NULL) whose lineups can't be saved via frontend RLS.
-        // Must run before getMatchupData/getMatchupDataById which reads from these tables.
-        const matchupIdForEnsure = selectedMatchupId || existingMatchup?.id;
-        if (matchupIdForEnsure && currentLeague?.id !== DEMO_LEAGUE_ID_FOR_GUESTS) {
-          try {
-            markTiming('ensureStarted');
-            await awaitCurrentRoute(matchupApi.ensureRosters(matchupIdForEnsure));
-            markTiming('ensureFinished');
-          } catch (err) {
-            if (!lifetime.active) return;
-            // Non-fatal — roster data may already exist
-            markTiming('ensureFailed');
-            logger.error('[Matchup] ensure-rosters pre-load failed:', err);
-          }
-        }
-
+        // Roster existence for AI teams is guaranteed server-side (the
+        // hourly sweep runs ensureMatchupRosters for every current-week
+        // matchup; the daily-scores calculator backfills daily rosters).
+        // The blocking ensure-rosters call that used to sit here is gone.
         markTiming('serviceStarted');
         let matchupDataPromise: Promise<{ data: any; error: any }>;
 
@@ -4773,14 +4454,12 @@ const Matchup = () => {
     
     log(' Today is within matchup week, starting consolidated refresh...');
     
-    // Function to update matchup scores in database
+    // Re-read the week's stored scores on the live cadence. The league-wide
+    // recompute that used to run here every two minutes is gone (2026-09-14):
+    // the sweep writes scores once the pipeline lands; this only reads.
     const updateMatchupScores = async () => {
       if (currentMatchup.status !== 'in_progress') return;
       try {
-        await MatchupService.updateMatchupScores(league.id);
-        // The recompute wrote every matchup's score; re-read the week so the
-        // scoreboard strip ticks with the page (one small request, only
-        // while the week is in progress, only on this cadence).
         await loadWeekMatchups();
       } catch (error) {
         // Non-blocking - don't stop refresh cycle
