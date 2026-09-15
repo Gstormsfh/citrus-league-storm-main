@@ -158,6 +158,6 @@ export function leagueMenuTiles(input: LeagueMenuInput): LeagueMenuTile[] {
   // A manager inside a league can reach the simulator (2026-09-04): the
   // old hamburger menu carried this link and is gone; the tile keeps the
   // way in. /armchair-gm is public and ungated (leagueSwitchAndMockDraftReach).
-  tiles.push({ key: 'mockdraft', title: 'Mock draft', to: '/armchair-gm?tab=mockdraft', Icon: Shuffle });
+  tiles.push({ key: 'mockdraft', title: 'Mock draft', to: `/mock-draft?league=${leagueId}`, Icon: Shuffle });
   return tiles;
 }

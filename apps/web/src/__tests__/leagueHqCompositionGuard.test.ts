@@ -119,8 +119,8 @@ describe('League HQ composition', () => {
  * is. Three things about it must survive every future HQ pass:
  *
  *   1. It is IN the Draft Room card, under the real button, and it goes to
- *      the public client-side simulator (the target mockDraftNavGuard pins
- *      for every other mock-draft affordance). No new surface, no writes.
+ *      the real mock draft (2026-09-14): /mock-draft scoped to this league,
+ *      which opens the live V2 room with AI in every other seat.
  *   2. It is a ghost. DESIGN_DIRECTION.md rule 3: one #FF6B1A verb per
  *      screen. The Draft Room CTA owns the orange; the practice entry may
  *      never take a hot fill, and the action grid keeps exactly one.
@@ -133,13 +133,13 @@ describe('League HQ composition', () => {
  * leave a manager wondering whether it counted.
  */
 describe('League HQ practice entry', () => {
-  const MOCK_TARGET = '/armchair-gm?tab=mockdraft';
-  const LINK = `<Link to="${MOCK_TARGET}">`;
+  const MOCK_TARGET = '/mock-draft?league=${leagueId}';
+  const LINK = '<Link to={`' + MOCK_TARGET + '`}>';
   const cardStart = SOURCE.indexOf('{/* Draft Room - visible to ALL');
   const cardEnd = SOURCE.indexOf('✦ Your Squad');
   const DRAFT_CARD = SOURCE.slice(cardStart, cardEnd);
 
-  it('lives inside the Draft Room card and points at the public simulator', () => {
+  it('lives inside the Draft Room card and points at the real mock draft for this league', () => {
     expect(cardStart, 'Draft Room card comment anchor').toBeGreaterThan(-1);
     expect(cardEnd, 'squad card kicker anchor').toBeGreaterThan(cardStart);
     expect(DRAFT_CARD).toContain(LINK);

@@ -371,6 +371,28 @@ export const LeagueService = {
   },
 
   /**
+   * THE MOCK DRAFT IS A REAL DRAFT (2026-09-14). One call, one league, every
+   * seat but the caller's filled with AI, ready for the V2 room. From a
+   * league it inherits that league's size, rounds, roster slots and scoring.
+   */
+  async createPracticeDraft(params: {
+    fromLeagueId?: string;
+    teamsCount?: number;
+    draftRounds?: number;
+    pickTimeLimitSeconds?: number;
+  }): Promise<{ leagueId: string | null; aiSeats: number; error: unknown }> {
+    try {
+      const response = await leagueApi.createPracticeDraft(params);
+      const data = response.data as { leagueId?: string; aiSeats?: number } | undefined;
+      if (!data?.leagueId) return { leagueId: null, aiSeats: 0, error: new Error('The mock draft came back without a league') };
+      return { leagueId: data.leagueId, aiSeats: data.aiSeats ?? 0, error: null };
+    } catch (error) {
+      logger.error('Exception in createPracticeDraft:', error);
+      return { leagueId: null, aiSeats: 0, error };
+    }
+  },
+
+  /**
    * Create a new league and automatically create the commissioner's team
    */
   async createLeague(

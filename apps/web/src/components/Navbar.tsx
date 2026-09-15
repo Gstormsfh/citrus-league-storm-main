@@ -174,7 +174,9 @@ const Navbar = () => {
           // On the native shell that left NO path to it at all: the homepage,
           // which is where the other mock-draft entry points live, redirects
           // straight into your league (Index.tsx).
-          { label: 'Mock Draft', path: '/armchair-gm?tab=mockdraft', icon: ClipboardList },
+          // THE MOCK DRAFT IS A REAL DRAFT (2026-09-14): signed-in managers get
+          // the live V2 room with AI seats, scored like their league.
+          { label: 'Mock Draft', path: `/mock-draft?league=${activeLeagueId}`, icon: ClipboardList },
         ]
       : [
           { label: 'Create League', path: '/create-league', icon: Sparkles },

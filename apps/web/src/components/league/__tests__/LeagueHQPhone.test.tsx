@@ -80,14 +80,14 @@ describe('LeagueHQPhone', () => {
           hot: true,
           description: 'The draft is live.',
           to: '/draft-v2/L1',
-          mock: { label: 'Run a mock draft', to: '/armchair-gm?tab=mockdraft', note: 'Nothing there touches this league.' },
+          mock: { label: 'Run a mock draft', to: '/mock-draft?league=lg-1', note: 'Nothing there touches this league.' },
         }}
       />,
     );
     const cta = screen.getByRole('link', { name: 'Join draft room' });
     expect(cta).toHaveAttribute('href', '/draft-v2/L1');
     expect(cta.className).toContain('bg-pressbox-orange');
-    expect(screen.getByRole('link', { name: 'Run a mock draft' })).toHaveAttribute('href', '/armchair-gm?tab=mockdraft');
+    expect(screen.getByRole('link', { name: 'Run a mock draft' })).toHaveAttribute('href', '/mock-draft?league=lg-1');
     // The draft card precedes the matchups head in the document.
     const card = screen.getByTestId('league-hq-draft');
     const head = screen.getByRole('heading', { level: 2, name: /Matchups/ });

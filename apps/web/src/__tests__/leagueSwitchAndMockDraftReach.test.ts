@@ -69,7 +69,11 @@ const TAB_SETS: Array<[string, string]> = [['Navbar', NAVBAR], ['MobileBottomNav
 
 const FANTASY = 'lg-fantasy';
 const POOL = 'lg-pool';
-const MOCK_DRAFT = '/armchair-gm?tab=mockdraft';
+// THE MOCK DRAFT IS A REAL DRAFT (2026-09-14): a signed-in manager's mock
+// draft is the live V2 room with AI seats, opened from /mock-draft and
+// scored like the league it was opened from. The public simulator stays
+// where the marketing pages promise "no account needed".
+const MOCK_DRAFT = '/mock-draft?league=${';
 
 describe('switching leagues out of the playoff section', () => {
   it('does not pin a fantasy league to the playoffs page it was picked from', () => {
@@ -158,15 +162,24 @@ describe('a manager inside a league can still reach a mock draft', () => {
     return src.slice(at, src.indexOf(']', at));
   };
 
-  it.each(SWITCHERS)('%s links the simulator from inside a fantasy league', (_name, src) => {
-    expect(fantasyTabs(src)).toContain(MOCK_DRAFT);
+  it.each(SWITCHERS)('%s links the real mock draft, scoped to the league, from inside a fantasy league', (_name, src) => {
+    expect(fantasyTabs(src)).toContain(`\`${MOCK_DRAFT}activeLeagueId}\``);
+    expect(fantasyTabs(src)).not.toContain('/armchair-gm?tab=mockdraft');
   });
 
-  it('the league menu carries the simulator tile on a phone', () => {
-    expect(MENU_TILES).toContain(`to: '${MOCK_DRAFT}'`);
+  it('the league menu carries the real mock draft tile on a phone', () => {
+    expect(MENU_TILES).toContain(`to: \`${MOCK_DRAFT}leagueId}\``);
   });
 
-  it('the simulator route is still public and still ungated', () => {
+  it('the mock draft route is signed-in only, and the room refuses to claim a mock as the active league', () => {
+    const app = read('../App.tsx');
+    const line = app.split('\n').find((l) => l.includes('"/mock-draft"')) ?? '';
+    expect(line).toContain('ProtectedRoute');
+    const room = read('../pages/DraftRoomV2.tsx');
+    expect(room).toMatch(/if \(!leagueId \|\| leaguesLoading \|\| isMock\) return;/);
+  });
+
+  it('the guest simulator route is still public and still ungated', () => {
     // If this ever grows an auth or league gate, the links above become the
     // dead end they were written to remove.
     const app = read('../App.tsx');

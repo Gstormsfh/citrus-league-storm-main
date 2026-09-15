@@ -34,7 +34,7 @@ describe('the v2 draft room always carries its own way out', () => {
   });
 
   it('uses a client-side Link, not a full page reload', () => {
-    expect(SOURCE).toMatch(/import \{ Link, useParams \} from 'react-router-dom'/);
+    expect(SOURCE).toMatch(/import \{ Link, useParams(?:, \w+)* \} from 'react-router-dom'/);
   });
 
   it('keeps the global nav hidden on draft routes — the exit is the escape, not the nav coming back', () => {

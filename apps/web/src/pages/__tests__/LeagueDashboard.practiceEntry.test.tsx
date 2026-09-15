@@ -123,9 +123,11 @@ vi.mock('@/hooks/useSeasonStatus', () => ({
 
 import LeagueDashboard from '../LeagueDashboard';
 
-const MOCK_TARGET = '/armchair-gm?tab=mockdraft';
+// THE MOCK DRAFT IS A REAL DRAFT (2026-09-14): the entry opens the live V2
+// room with AI seats, scored like this league.
+const MOCK_TARGET = '/mock-draft?league=league-1';
 const ENTRY = 'Run a mock draft';
-const DISCLAIMER = 'Practice your picks against the computer. Nothing there touches this league.';
+const DISCLAIMER = 'The real draft room with your scoring and AI in every other seat. Nothing there touches this league.';
 
 /**
  * The page reads its HQ matchups and transactions through react-query
@@ -166,7 +168,7 @@ describe('LeagueDashboard practice entry, before the draft', () => {
     league = { ...BASE_LEAGUE, draft_status: 'not_started' };
   });
 
-  it('renders the entry under the real Draft Room action, pointed at the simulator', async () => {
+  it('renders the entry under the real Draft Room action, pointed at the real mock draft for this league', async () => {
     mount();
     await loaded();
 

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient, getSupabaseAdmin } from '../lib/supabase';
 import { LeagueService } from '../services/LeagueService';
+import { PracticeDraftService } from '../services/PracticeDraftService';
 import { SeasonStateService } from '../services/SeasonStateService';
 import { TeamAnalyticsService } from '../services/TeamAnalyticsService';
 import { AuditService } from '../services/AuditService';
@@ -148,6 +149,24 @@ leagueRoutes.post('/', validateBody(schemas.createLeague), async (c) => {
   audit.logLeagueEvent('LEAGUE_CREATE', league.id, { name: body.name });
 
   return created(c, { league, team });
+});
+
+// POST /api/leagues/practice — a mock draft: a throwaway league, one human
+// seat, every other seat AI, drafted in the real V2 room on the real
+// engine. See PracticeDraftService for why this is the whole feature.
+leagueRoutes.post('/practice', validateBody(schemas.createPracticeDraft), async (c) => {
+  const userId = c.get('userId');
+  const body = getValidatedBody<z.infer<typeof schemas.createPracticeDraft>>(c);
+  const supabase = createUserClient(c.get('userToken'));
+  try {
+    const service = new PracticeDraftService(supabase, getSupabaseAdmin());
+    const result = await service.create(userId, body);
+    const audit = new AuditService(supabase);
+    audit.logLeagueEvent('LEAGUE_CREATE', result.leagueId, { practice: true, fromLeagueId: body.fromLeagueId ?? null, aiSeats: result.aiSeats });
+    return created(c, result);
+  } catch (err) {
+    return handleError(c, err, 'Could not create the mock draft');
+  }
 });
 
 // POST /api/leagues/join — Join a league by invite code

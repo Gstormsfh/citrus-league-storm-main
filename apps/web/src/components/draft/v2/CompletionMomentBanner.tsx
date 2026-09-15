@@ -46,6 +46,10 @@ export interface CompletionMomentBannerProps {
    * passes the resolved link.
    */
   rosterHref?: string;
+  /** Label for the button. Defaults to "View your roster"; a mock draft says where it is really going. */
+  ctaLabel?: string;
+  /** Replaces the "screenshot the board" line. A mock draft says nothing counted. */
+  subline?: string;
   /**
    * Skip animation regardless of prefers-reduced-motion. Test helper.
    */
@@ -73,6 +77,8 @@ export function CompletionMomentBanner({
   topPickTeamName,
   topPickPlayerName,
   rosterHref = DEFAULT_ROSTER_HREF,
+  ctaLabel = 'View your roster',
+  subline,
   skipAnimationForTests = false,
 }: CompletionMomentBannerProps) {
   // One-time fade-in + rise. Starts at `hidden` opacity/translate,
@@ -131,7 +137,7 @@ export function CompletionMomentBanner({
               : 'Rosters are set'}
           </h2>
           <p className="mt-2 text-sm text-white/70">
-            All {totalPicks} picks are in. Screenshot the board. It's your league's opening-day photo.
+            {subline ?? `All ${totalPicks} picks are in. Screenshot the board. It's your league's opening-day photo.`}
           </p>
 
           <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-3">
@@ -140,7 +146,7 @@ export function CompletionMomentBanner({
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-cream font-bold text-sm hover:bg-pastel-orange/30 transition-colors"
               data-testid="completion-roster-cta"
             >
-              View your roster
+              {ctaLabel}
             </a>
           </div>
         </div>
