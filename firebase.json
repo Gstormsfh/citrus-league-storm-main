@@ -46,7 +46,7 @@
         "source": "/api/**",
         "run": {
           "serviceId": "citrus-api",
-          "region": "us-central1"
+          "region": "northamerica-northeast1"
         }
       },
       {
