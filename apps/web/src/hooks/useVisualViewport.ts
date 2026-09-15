@@ -8,9 +8,18 @@
  * the keyboard opens" (QA pass 1, 2026-09-09).
  *
  * This hook reports the visual viewport's height and offset so a layer can
- * size itself to what is visible. It also pins the page scroll back to the
- * top while the keyboard is open, because a fixed layer that already fits
- * the visible area must not be pushed around by the web view's own scroll.
+ * size itself to what is visible. With `pinPageWhileKeyboardOpen` it also
+ * pins the page scroll back to the top while the keyboard is open, because
+ * a fixed layer that already fits the visible area must not be pushed
+ * around by the web view's own scroll.
+ *
+ * THE PIN IS OPT-IN (2026-09-15, found on device, App Review resubmission).
+ * It defaulted to true and StormyChatBubble calls this hook on every route,
+ * so every text field in the app fought WebKit: the web view scrolled the
+ * focused field above the keyboard, the pin scrolled the page back to the
+ * top and put the field under the keyboard, and the sign-up form jumped
+ * between the two on every keystroke. Only a layer that is actually on
+ * screen and sized to the visible viewport may pin the page.
  */
 import { useEffect, useState } from 'react';
 
@@ -32,7 +41,7 @@ function read(): VisualViewportState {
   return { height: vv.height, offsetTop: vv.offsetTop, keyboardOpen };
 }
 
-export function useVisualViewport(pinPageWhileKeyboardOpen = true): VisualViewportState {
+export function useVisualViewport(pinPageWhileKeyboardOpen = false): VisualViewportState {
   const [state, setState] = useState<VisualViewportState>(read);
 
   useEffect(() => {
