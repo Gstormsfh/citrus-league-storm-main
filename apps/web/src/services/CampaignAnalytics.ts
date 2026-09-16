@@ -15,8 +15,10 @@ interface Dependencies {
 }
 const label = (v: unknown, limit = 64) => typeof v === 'string' && /^[a-z0-9][a-z0-9_.-]*$/i.test(v.trim()) ? v.trim().toLowerCase().slice(0, limit) : '';
 function sourceFields(source: Acquisition) {
-  return { campaign_source: label(source.source), campaign_name: label(source.campaign),
-    campaign_medium: label(source.medium, 32), attribution_model: 'first_touch' };
+  // gtag consumes campaign_source/name/medium as built-in traffic attribution.
+  // Namespace our event fields so GA4 custom dimensions receive ep.citrus_*.
+  return { citrus_campaign_source: label(source.source), citrus_campaign_name: label(source.campaign),
+    citrus_campaign_medium: label(source.medium, 32), attribution_model: 'first_touch' };
 }
 
 /** Optional, consented browser metrics. Not a backend account ledger or billing attribution. */

@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/services/AnalyticsService', () => ({ analyticsService: { logEvent: vi.fn() } }));
 vi.mock('@/integrations/firebase/config', () => ({ ANALYTICS_READY_EVENT: 'ready', ANALYTICS_CONSENT_EVENT: 'consent' }));
 import { CampaignTracker } from '../CampaignAnalytics';
+import type { Acquisition } from '@/lib/acquisition';
 const userId = '11111111-2222-4333-8444-555555555555';
 const arrival = { source: 'sdpn', campaign: 'hockey', landing: '/', at: '2026-09-16T00:00:00Z' };
 let now: number;
 const emit = vi.fn((_name: string, _params: Record<string, string | number | boolean>): boolean => true);
-function tracker(source = arrival) { return new CampaignTracker({ local: localStorage, session: sessionStorage,
+function tracker(source: Acquisition = arrival) { return new CampaignTracker({ local: localStorage, session: sessionStorage,
   now: () => now, source: () => source, emit }); }
 beforeEach(() => { localStorage.clear(); sessionStorage.clear(); now = Date.parse(arrival.at); emit.mockReset(); emit.mockReturnValue(true); });
 describe('consented campaign reporting', () => {
@@ -25,14 +26,25 @@ describe('consented campaign reporting', () => {
   it('distinguishes the latest tagged arrival from first-touch signup attribution', () => {
     localStorage.setItem('citrus_analytics_consent', 'granted'); const t = tracker({ ...arrival, source: 'original-podcast' });
     t.visit('?ref=sdpn'); t.beginAuth('email'); t.confirmedSignup(userId);
-    expect(emit).toHaveBeenNthCalledWith(1, 'campaign_visit', expect.objectContaining({ campaign_source: 'sdpn', first_touch_source: 'original-podcast' }));
-    expect(emit).toHaveBeenNthCalledWith(2, 'sign_up', expect.objectContaining({ campaign_source: 'original-podcast', method: 'email' }));
+    expect(emit).toHaveBeenNthCalledWith(1, 'campaign_visit', expect.objectContaining({ citrus_campaign_source: 'sdpn', first_touch_source: 'original-podcast' }));
+    expect(emit).toHaveBeenNthCalledWith(2, 'sign_up', expect.objectContaining({ citrus_campaign_source: 'original-podcast', method: 'email' }));
+  });
+  it('uses custom event fields instead of gtag reserved campaign configuration for visits and signups', () => {
+    localStorage.setItem('citrus_analytics_consent', 'granted');
+    const t = tracker({ ...arrival, medium: 'podcast' });
+    t.visit('?ref=sdpn&utm_campaign=hockey&utm_medium=podcast');
+    t.beginAuth('email'); t.confirmedSignup(userId);
+    expect(emit).toHaveBeenCalledTimes(2);
+    for (const [, params] of emit.mock.calls) {
+      expect(params).toMatchObject({ citrus_campaign_source: 'sdpn', citrus_campaign_name: 'hockey', citrus_campaign_medium: 'podcast' });
+      for (const reserved of ['campaign_source', 'campaign_name', 'campaign_medium']) expect(params).not.toHaveProperty(reserved);
+    }
   });
   it('carries attribution through a fresh instance after OAuth, but never counts an older account', () => {
     localStorage.setItem('citrus_analytics_consent', 'granted'); tracker().beginAuth('google');
     now += 5000;
     tracker().authenticated({ id: userId, created_at: new Date(now - 1000).toISOString(), app_metadata: { provider: 'google' } });
-    expect(emit).toHaveBeenCalledWith('sign_up', expect.objectContaining({ campaign_source: 'sdpn', method: 'google' }));
+    expect(emit).toHaveBeenCalledWith('sign_up', expect.objectContaining({ citrus_campaign_source: 'sdpn', method: 'google' }));
     emit.mockClear(); tracker().beginAuth('google');
     tracker().authenticated({ id: userId, created_at: '2025-01-01T00:00:00Z', app_metadata: { provider: 'google' } });
     expect(emit).not.toHaveBeenCalled();
