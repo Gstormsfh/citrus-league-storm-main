@@ -10,6 +10,13 @@ beforeEach(() => {
   mocks.supported.mockResolvedValue(true); mocks.get.mockReturnValue({ name: 'analytics' });
 });
 describe('optional analytics consent', () => {
+  it('announces readiness only after async initialization has completed', async () => {
+    const config = await import('../config'); const ready = vi.fn();
+    window.addEventListener(config.ANALYTICS_READY_EVENT, ready);
+    config.grantAnalyticsConsent(); expect(ready).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(ready).toHaveBeenCalledTimes(1));
+    window.removeEventListener(config.ANALYTICS_READY_EVENT, ready);
+  });
   it('does not initialize before acceptance and stops after withdrawal', async () => {
     const config = await import('../config');
     expect(mocks.get).not.toHaveBeenCalled();

@@ -40,6 +40,7 @@ if (hasValidConfig) {
 // Cookie consent key used by the consent banner
 const CONSENT_KEY = 'citrus_analytics_consent';
 export const ANALYTICS_CONSENT_EVENT = 'citrus:analytics-consent';
+export const ANALYTICS_READY_EVENT = 'citrus:analytics-ready';
 
 function hasAnalyticsConsent(): boolean {
   try {
@@ -65,6 +66,7 @@ function initAnalytics() {
             allow_ad_personalization_signals: false,
           } });
           setAnalyticsCollectionEnabled(analytics, true);
+          window.dispatchEvent(new Event(ANALYTICS_READY_EVENT));
         } catch {
           // Silently fail
         }
