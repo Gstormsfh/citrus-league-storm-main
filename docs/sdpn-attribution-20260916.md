@@ -1,6 +1,6 @@
 # SDPN attribution: evidence, repair and release gate
 
-Status: local code and fixture tests only. Not deployed, no production signup created, no real campaign conversion generated. Work started from refreshed `origin/master` at `822a83db`.
+Status: PR 516 deployed successfully in production run 35122319183. A labelled QA campaign visit reached the collector (HTTP 204) and appeared in GA4 Realtime. No production signup created or tested. A follow-up custom-parameter correction is required for the source-filtered report; see the live verification section below. Original work started from refreshed `origin/master` at `822a83db`.
 
 ## Production evidence on September 16, 2026
 
@@ -9,7 +9,7 @@ Status: local code and fixture tests only. Not deployed, no production signup cr
 - The same deployed bundle has its analytics instance fixed at `null`, with no initialization branch. Consent changes persist the preference but cannot initialize the missing app. AnalyticsService therefore discards page/event calls.
 - `.github/workflows/production-deploy.yml` passes Firebase API key, app ID and measurement ID but omits project ID. `config.ts` requires project ID before initialization. The repository's `VITE_FIREBASE_PROJECT_ID` secret exists; only secret names were inspected, never values.
 - The current account-create route does not persist campaign attribution, and the existing admin stats route does not provide a campaign visit/signup report. A user property set on ordinary sign-in is not a signup-conversion counter.
-- Read-only `firebase apps:list WEB --project citrus-fantasy-prod --json` failed due to the CLI authentication state. The linked GA4 property, custom dimensions, report ownership and user's report access have NOT been verified. No Google account or Analytics property was created or changed.
+- Read-only `firebase apps:list WEB --project citrus-fantasy-prod --json` failed due to the CLI authentication state. Browser access was subsequently verified; see live verification below. No Google account or Analytics property was created.
 
 ## Narrow implementation
 
@@ -26,10 +26,10 @@ Status: local code and fixture tests only. Not deployed, no production signup cr
 This PR does not add a report to Citrus Admin. The report is in the existing Firebase/GA4 product after access and release are verified:
 
 1. Sign in to the **Citrus production Firebase project**. Open Analytics and its linked Google Analytics property. Confirm that the web stream's measurement ID is the one configured for the production build; do not infer this from the Hosting project name alone.
-2. In the linked GA4 property's **Admin > Custom definitions**, register event-scoped dimensions for `campaign_source`, `first_touch_source` and `attribution_model`. Optionally add `campaign_name` and `campaign_medium`.
-3. Create and save an Exploration called **SDPN campaign: visits and signups**. Use Event name as rows, Event count as the value, and filter `campaign_source` to `sdpn`. Keep `campaign_visit` and `sign_up` on separate rows. Label this **consented browser events**, not all visitors or all database accounts.
+2. In the linked GA4 property's **Admin > Custom definitions**, register event-scoped dimensions for `citrus_campaign_source`, `first_touch_source` and `attribution_model`. Optionally add `citrus_campaign_name` and `citrus_campaign_medium`. Do not register the reserved Google campaign configuration names as custom event parameters.
+3. Create and save an Exploration called **SDPN visits and signups | Consented browser events**. Use Event name and attribution model as rows, Event count as the value, and filter `citrus_campaign_source` to `sdpn`. Keep `campaign_visit` and `sign_up` on separate rows. These are **consented browser events**, not all visitors or all database accounts.
 4. A second view can filter `first_touch_source=sdpn` for arrivals previously attributed to SDPN. Do not divide unlike tagged-arrival and first-touch-signup populations into a supposedly exact conversion rate.
-5. Confirm the user can open the saved report. To share with the sponsor, export aggregate counts instead of granting broad access to unrelated analytics. No report has been created or shared by this task.
+5. Confirm the user can open the saved report. To share with the sponsor, export aggregate counts instead of granting broad access to unrelated analytics. The exploration is saved privately under Garrett Storms; no external sharing was performed.
 
 Firebase Analytics event documentation: https://firebase.google.com/docs/analytics/web/events
 Recommended signup event: https://developers.google.com/analytics/devguides/collection/ga4/reference/events#sign_up
@@ -42,14 +42,20 @@ Recommended signup event: https://developers.google.com/analytics/devguides/coll
 - Email confirmation does not count until an authenticated session is observed in the same browser. No fabricated conversion is sent from a confirmation-required or obfuscated signup response.
 - No historical missing campaign metrics can be reconstructed from this change. Database signup totals and these browser-consented conversions are different measures.
 
-## Release acceptance, still outstanding
+## Live verification and remaining release acceptance
 
-- Review/merge the narrow PR and run the normal approved web deployment. Do not deploy from the old root checkout or rebuild native packages.
-- Reauthenticate the Firebase/GA4 operator and verify project/stream/report access.
+- Production property `533091097`, web stream `citrus-web-prod` / `14371443479`, measurement `G-3N0X9GY1H0` verified in the signed-in browser. The released `/assets/index-D76OvPqw.js` uses that same measurement ID and includes the working Firebase initialization and campaign events.
+- `/go/sdpn` still returns HTTP 302 to `/?ref=sdpn`.
+- Saved exploration: https://analytics.google.com/analytics/web/?authuser=0&hl=en-US#/analysis/a391422729p533091097/edit/2iZBRWrZTYO_D6hkH-OZmg . Persistence and ownership verified by leaving and reopening it.
+- QA source `citrus_qa_20260916` was used instead of `sdpn`, with consent granted through the visible banner. Supported browser network capture showed `gtag/js` HTTP 200 and `campaign_visit` collector HTTP 204; GA4 Realtime subsequently showed one campaign visit. No synthetic signup was sent.
+- Capture exposed a reporting mismatch: gtag rewrites `campaign_source`, `campaign_name`, and `campaign_medium` to its built-in `cs`, `cn`, and `cm` protocol fields. They do not arrive as `ep.campaign_source` custom parameters. The follow-up namespaces these as `citrus_campaign_*` for both visits and signups. Google documents the built-in names at https://developers.google.com/analytics/devguides/collection/ga4/reference/config .
+- The initial `campaign_source` custom definition is obsolete. Keep it intact until the corrected definition and existing exploration filter are verified; do not delete unrelated definitions.
+
+- Review/merge/deploy the follow-up parameter correction, then confirm `ep.citrus_campaign_source` on an actual collector request and the matching source parameter in GA4. Do not deploy from the old root checkout or rebuild native packages.
 - In the deployed application, verify consent-denied produces no campaign event; then with an approved test browser and explicit consent, observe a tagged test arrival in DebugView and inspect the collector request. Keep test traffic out of the production campaign's final report.
 - Use an explicitly approved test account/fixture to verify new email signup, email confirmation, Google/Apple callback, return navigation, failed signup, reload and existing-account login. Do not manufacture customer accounts. Confirm one signup event only for the new account.
 - Verify the two report rows populate and the user can open the saved report. Until these steps pass, report the status as **code tested, live reporting not yet validated**.
 
 ## Local verification
 
-Focused tests cover consent, asynchronous initialization, acquisition persistence, visit deduplication, auth round trips, older-account exclusion, failed signup, signup deduplication, malformed labels, unavailable storage and existing auth UI behavior. The build-config regression test catches the missing project-ID input. Live reads did not create production events or signups.
+Focused tests cover consent, asynchronous initialization, acquisition persistence, visit deduplication, auth round trips, older-account exclusion, failed signup, signup deduplication, malformed labels, unavailable storage and existing auth UI behavior. The build-config regression test catches the missing project-ID input. The reserved-parameter regression asserts namespaced fields on both visit and signup events. Live verification created labelled QA visit events only, never production signups.
