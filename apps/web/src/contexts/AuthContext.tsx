@@ -15,6 +15,7 @@ import {
 } from '@/lib/nativeAuth';
 import { registerForPush, unregisterDeviceToken } from '@/lib/pushNotifications';
 import { readAcquisition } from '@/lib/acquisition';
+import { campaignTracker } from '@/services/CampaignAnalytics';
 
 // Campaign attribution (2026-09-09): the source this browser first arrived
 // from (e.g. steve-dangle) becomes an Analytics user property at sign-in, so
@@ -185,6 +186,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearTimeout(timeout);
           analyticsService.setUserId(session.user.id);
           attributeAcquisition();
+          if (!isNativeShell()) campaignTracker.authenticated(session.user);
           setSentryUser({ id: session.user.id, email: session.user.email });
           queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
           // PUSH (2026-08-18) — register this device for draft-turn alerts.
@@ -206,6 +208,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearTimeout(timeout);
           analyticsService.setUserId(session.user.id);
           attributeAcquisition();
+          if (!isNativeShell()) campaignTracker.authenticated(session.user);
           setSentryUser({ id: session.user.id, email: session.user.email });
           queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
           if (mounted) setLoading(false);
@@ -286,6 +289,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string): Promise<AuthResponse> => {
+    if (!isNativeShell()) campaignTracker.beginAuth('email');
     // Server-side signup: creates user + signs in via admin API (bypasses
     // Supabase's IP-level rate limiter that was blocking users).
     const apiBase = import.meta.env.VITE_API_URL || '';
@@ -315,10 +319,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       const json = await res.json();
       if (!res.ok) {
+        if (!isNativeShell()) campaignTracker.cancelAuth();
         const msg = json?.error?.message || 'Signup failed';
         return { data: { user: null, session: null }, error: new AuthError(msg) };
       }
       // Server returns session tokens — set them directly, no client-side signIn call
+      if (!isNativeShell()) campaignTracker.confirmedSignup(json?.data?.user?.id);
       const serverSession = json?.data?.session;
       if (serverSession?.access_token && serverSession?.refresh_token) {
         const { data, error } = await supabase.auth.setSession({
@@ -426,6 +432,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return beginNativeOAuth(supabase, provider, opts);
     }
 
+    campaignTracker.beginAuth(provider);
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
@@ -434,6 +441,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         queryParams: opts.queryParams,
       },
     });
+    if (error) campaignTracker.cancelAuth();
     return { error };
   };
 

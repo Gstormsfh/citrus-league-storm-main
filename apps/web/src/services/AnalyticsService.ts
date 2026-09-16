@@ -21,15 +21,17 @@ class AnalyticsService {
   /**
    * Log a custom event
    */
-  logEvent(eventName: string, parameters?: Record<string, string | number | boolean>): void {
+  logEvent(eventName: string, parameters?: Record<string, string | number | boolean>): boolean {
     const analytics = this.getAnalytics();
-    if (!analytics || !this.isEnabled()) return;
+    if (!analytics || !this.isEnabled()) return false;
 
     try {
       logEvent(analytics, eventName, parameters);
+      return true; // Accepted by the SDK, not a guarantee of network delivery.
     } catch (error) {
       // Silently fail - analytics should never break the app
       logger.error('Analytics error:', error);
+      return false;
     }
   }
 
