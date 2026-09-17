@@ -148,6 +148,8 @@ Single source of truth for "where does data live?" — see [`DATA_INVENTORY.md`]
 
 **Update protocol:** When adding any new data artifact (table, file, model, script), update `DATA_INVENTORY.md` in the same PR. Full audit + categorization + reorganization plan lives at [`apps/web/docs/DATA_ORGANIZATION_AUDIT.md`](./apps/web/docs/DATA_ORGANIZATION_AUDIT.md).
 
+**Player availability (injury / DTD / IR) has ONE live source.** The `availability` block in the canonical publication payload (`canonical_published_players.payload->'availability'`, reviewed reports and owner-adopted baselines), resolved by `resolvePlayerAvailability` in `packages/shared/src/playerAvailability.ts` and rendered by `PlayerAvailabilityBadge`. That is what Free Agents, the player card and the draft pool show. `player_talent_metrics.roster_status` plus `fetch_injury_status.py` and `injury-status-sync.yml` (ESPN feed) is a SECOND path that is built but dormant: the workflow schedule is off and the column is NULL for every row. It is kept on purpose (owner decision 2026-09-14) in case it is wanted later. Do not read those zeros as "no player has a status", and do not enable the schedule without an explicit ask.
+
 ## Monorepo Structure
 
 ```
