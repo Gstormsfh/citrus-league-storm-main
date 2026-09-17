@@ -9,7 +9,7 @@
     {
       "displayName": "citrus-startup-failed log entry received",
       "conditionMatchedLog": {
-        "filter": "logName=\"projects/${PROJECT_ID}/logs/citrus-startup-failed\" AND severity>=ERROR",
+        "filter": "resource.type=\"gce_instance\" AND logName=\"projects/${PROJECT_ID}/logs/citrus-startup-failed\" AND severity>=ERROR",
         "labelExtractors": {
           "vm": "EXTRACT(jsonPayload.vm)",
           "line": "EXTRACT(jsonPayload.line)",
