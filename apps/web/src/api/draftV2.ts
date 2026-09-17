@@ -62,4 +62,16 @@ export const draftV2Api = {
       { idempotency_key: idempotencyKey },
     );
   },
+
+  /**
+   * AUTODRAFT THAT SURVIVES A CLOSED TAB (2026-09-14). The flag lives on
+   * the team row; the engine arms the instant-autopick window for a
+   * flagged seat. Owner only, server-verified.
+   */
+  getAutodraft(leagueId: string, teamId: string) {
+    return apiClient.get<{ enabled: boolean }>(`/api/draft/v2/league/${leagueId}/teams/${teamId}/autodraft`);
+  },
+  setAutodraft(leagueId: string, teamId: string, enabled: boolean) {
+    return apiClient.put<{ enabled: boolean }>(`/api/draft/v2/league/${leagueId}/teams/${teamId}/autodraft`, { enabled });
+  },
 };

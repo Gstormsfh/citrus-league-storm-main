@@ -38,6 +38,8 @@ export interface V1DraftPick {
   pick: number;
   timestamp: number;
   playerTeam?: string;
+  /** The NHL headshot, for the desktop board's face (2026-09-14). */
+  headshotUrl?: string | null;
 }
 
 export interface V1Team {
@@ -95,7 +97,7 @@ function pickTeamColor(teamIndex: number): string {
 export function resolvePlayerDisplay(
   playerId: number,
   playersById: ReadonlyMap<string, Player>,
-): { playerName: string; position: string; playerTeam?: string } {
+): { playerName: string; position: string; playerTeam?: string; headshotUrl?: string | null } {
   const idStr = String(playerId);
   const p = playersById.get(idStr);
   if (p === undefined) {
@@ -105,6 +107,7 @@ export function resolvePlayerDisplay(
     playerName: p.full_name || `#${idStr}`,
     position: p.position || '?',
     playerTeam: p.team ?? undefined,
+    headshotUrl: p.headshot_url ?? null,
   };
 }
 
@@ -138,6 +141,9 @@ export function rosterEntryToDraftPick(
     timestamp: entry.seq * 1000,
     ...(display.playerTeam !== undefined
       ? { playerTeam: display.playerTeam }
+      : {}),
+    ...(display.headshotUrl !== undefined
+      ? { headshotUrl: display.headshotUrl }
       : {}),
   };
 }

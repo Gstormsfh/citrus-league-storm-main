@@ -551,6 +551,17 @@ export class LobbyManager {
   private readonly teamOwners = new Map<string, string | null>();
 
   /**
+   * AUTODRAFT (2026-09-14). Per-team `teams.autodraft_enabled`, loaded
+   * beside the owner cache at init() and refreshed from the row each
+   * time a seat comes on the clock (the owner may flip it from any
+   * device, mid-draft, and this process must not need to be told).
+   * An enabled seat is armed exactly like an ownerless one: the
+   * instant-autopick window instead of the full pick clock. Keyed by
+   * teamId; absent means unknown, which fails open to the full clock.
+   */
+  private readonly teamAutodraft = new Map<string, boolean>();
+
+  /**
    * Pre-flattened draft order — one slot per pick of the entire
    * draft. Source: `public.draft_order` rows loaded by
    * `lobbyConfigLookup` (Path B). For auction lobbies this is the
@@ -1041,15 +1052,16 @@ export class LobbyManager {
       try {
         const { data: teamRows, error: teamErr } = await this.supabase
           .from('teams')
-          .select('id, owner_id')
+          .select('id, owner_id, autodraft_enabled')
           .eq('league_id', this.leagueId);
         if (teamErr) {
           structuredLogger.warn(
             `[lobby] team_owner_cache_query_failed lobbyId=${this.lobbyId} error=${teamErr.message}`,
           );
         } else if (Array.isArray(teamRows)) {
-          for (const row of teamRows as Array<{ id: string; owner_id: string | null }>) {
+          for (const row of teamRows as Array<{ id: string; owner_id: string | null; autodraft_enabled?: boolean | null }>) {
             this.teamOwners.set(row.id, row.owner_id ?? null);
+            this.teamAutodraft.set(row.id, row.autodraft_enabled === true);
           }
           const nullCount = Array.from(this.teamOwners.values()).filter(
             (v) => v === null,
@@ -4533,9 +4545,13 @@ export class LobbyManager {
     }
     const owner = this.teamOwners.get(onClockTeamId);
     if (owner !== null) {
-      return rpcDeadline;
+      // AUTODRAFT (2026-09-14): an owner who asked the engine to pick for
+      // them is treated like an ownerless seat for the arm window only.
+      if (this.teamAutodraft.get(onClockTeamId) !== true) {
+        return rpcDeadline;
+      }
     }
-    // Ownerless seat → instant-autopick.
+    // Ownerless seat, or an owner who asked for autodraft → instant-autopick.
     const instantDeadline = new Date(Date.now() + INSTANT_AUTOPICK_ARM_MS);
     // If the RPC deadline is ALREADY earlier than the instant window
     // (e.g., the timer fires immediately on a caught-up event), respect
@@ -4613,6 +4629,71 @@ export class LobbyManager {
     );
     this.notifyOnClockDevice(rpcDeadline);
     this.maybeSubmitKeeperPick();
+    void this.refreshAutodraftForOnClockTeam(rpcDeadline);
+  }
+
+  /**
+   * AUTODRAFT (2026-09-14): the owner can flip `teams.autodraft_enabled`
+   * from any device at any time, so the cached value read at init() is
+   * only a starting point. On every arm, re-read the on-clock team's row;
+   * if it now says enabled and the clock is still on the same pick, pull
+   * the deadline in to the instant window. Never lengthens a clock, never
+   * touches a timer that has already moved on (the pick number is checked
+   * again after the read), and a read failure keeps whatever is armed.
+   */
+  private async refreshAutodraftForOnClockTeam(rpcDeadline: Date): Promise<void> {
+    if (this.format !== 'snake' && this.format !== 'linear') return;
+    if (this.picksMade >= this.draftOrder.length) return;
+    const slot = this.draftOrder[this.picksMade];
+    const owner = this.teamOwners.get(slot.teamId);
+    if (owner === null) return; // ownerless seats are already instant
+    let enabled: boolean;
+    try {
+      const { data, error } = await this.supabase
+        .from('teams')
+        .select('autodraft_enabled')
+        .eq('id', slot.teamId)
+        .maybeSingle();
+      if (error || !data) return;
+      enabled = (data as { autodraft_enabled?: boolean | null }).autodraft_enabled === true;
+    } catch {
+      return;
+    }
+    const before = this.teamAutodraft.get(slot.teamId) === true;
+    this.teamAutodraft.set(slot.teamId, enabled);
+    if (!enabled || before || this.shutDown) return;
+    // Still the same pick on the clock, still a running snake/linear draft?
+    if (this.picksMade >= this.draftOrder.length || this.draftOrder[this.picksMade].pickNumber !== slot.pickNumber) return;
+    if (this.draftStatus !== 'in_progress' || this.pauseState !== null) return;
+    if (this.currentTimerKind !== 'pick') return;
+    const instant = this.computeArmDeadlineForOnClockTeam(rpcDeadline);
+    if (this.currentTimerDeadline && instant.getTime() >= this.currentTimerDeadline.getTime()) return;
+    structuredLogger.info(
+      `[lobby] autodraft_rearm lobbyId=${this.lobbyId} teamId=${slot.teamId} pick=${slot.pickNumber} deadline=${instant.toISOString()}`,
+    );
+    // E113 EXEMPT: not a fresh on-clock arm and never an extension. The
+    // wrapper already armed this pick; this only SHORTENS that clock to the
+    // instant window after the flag was read from the row.
+    this.setPickDeadline(instant, 'pick');
+  }
+
+  /**
+   * Same-process fast path for the autodraft flag (the REST route calls
+   * it when the lobby is loaded here). Re-arms the current pick if the
+   * flagged team is on the clock right now.
+   */
+  setTeamAutodraft(teamId: string, enabled: boolean): void {
+    this.teamAutodraft.set(teamId, enabled);
+    if (!enabled || this.format === 'auction' || this.shutDown) return;
+    if (this.picksMade >= this.draftOrder.length) return;
+    const slot = this.draftOrder[this.picksMade];
+    if (slot.teamId !== teamId || this.draftStatus !== 'in_progress' || this.pauseState !== null) return;
+    if (this.currentTimerKind !== 'pick' || !this.currentTimerDeadline) return;
+    const instant = this.computeArmDeadlineForOnClockTeam(this.currentTimerDeadline);
+    if (instant.getTime() >= this.currentTimerDeadline.getTime()) return;
+    // E113 EXEMPT: same as refreshAutodraftForOnClockTeam — a shortening of
+    // the clock the wrapper armed, never a fresh arm and never an extension.
+    this.setPickDeadline(instant, 'pick');
   }
 
   /**

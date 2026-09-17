@@ -19,6 +19,7 @@ npx vite --config harness/vite.config.ts
 | `/harness/page.html?p=contact` | Contact |
 | `/harness/cards.html` | HockeyPlayerCard gallery + MobileRosterList |
 | `/harness/draft.html` | DraftRoomV2, live clock, scripted picks |
+| `/harness/pool.html` | The desktop draft pool (`PlayerPool`) on its own with 20 fixture rows and projections, at the room's real column width; `?w=NNN` sets it (default 1040). Added 2026-09-14 to look at the sticky column seams and the header sort |
 | `/harness/tabs.html` | Roster tab bars |
 | `/harness/scores.html` | Scores page, real components, fixture days |
 | `/harness/slot.html` | MobileRosterList + Line Change sheet, page-shaped wiring |

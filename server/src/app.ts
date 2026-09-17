@@ -44,6 +44,7 @@ import { playoffPoolRoutes } from './routes/playoff-pools';
 import { authRoutes } from './routes/auth';
 import { scheduledRoutes } from './routes/scheduled';
 import { importRoutes, leagueHistoryRoutes } from './routes/imports';
+import { draftV2AutodraftRoutes } from './routes/draftV2Autodraft';
 import { standardRateLimit, strictRateLimit, authRateLimit, aiRateLimit } from './middleware/rateLimit';
 import { requestContextMiddleware } from './middleware/requestContext';
 import { metricsMiddleware, metrics } from './middleware/metrics';
@@ -403,6 +404,7 @@ app.route('/api/auth', authRoutes);
 // Scheduled/cron endpoints — auth is X-Scheduled-Secret shared-secret
 // header, not user JWT. Mounted last so no other router shadows it.
 app.route('/api/scheduled', scheduledRoutes);
+app.route('/api/draft/v2', draftV2AutodraftRoutes); // GET/PUT /league/:id/teams/:id/autodraft
 
 // ── 404 handler ──────────────────────────────────────────────────────
 app.notFound((c) => {

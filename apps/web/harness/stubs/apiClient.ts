@@ -1,6 +1,7 @@
 /** Stand-in for @/api/client. Routes the three GETs the draft room makes. */
 import { TEAMS, MY_TEAM_ID, ROUNDS, TEAM_COUNT, DASHBOARD_INDEX } from './draftFixtures';
 import { DASHBOARD_PLAYER_INDEX, playerDashboardFixture } from '../dashboardFixtures';
+import { DEFAULT_SCORING } from '@citrus/shared';
 
 const LEAGUE = {
   id: 'harness-league',
@@ -13,7 +14,9 @@ const LEAGUE = {
     draftType: 'snake',
     rosterSlots: { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1, BENCH: 4, IR: 2 },
   },
-  scoring_settings: null,
+  // The shared default scoring so the pool ranks (a null here renders the
+  // pool's 'League scoring is unavailable' notice and hides the whole list).
+  scoring_settings: DEFAULT_SCORING,
 };
 
 async function get<T>(path: string): Promise<{ data: T }> {

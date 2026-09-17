@@ -664,8 +664,12 @@ export default function DraftRoomV2() {
        full-bleed with each block owning its own 14px gutter — the pool's
        selected row needs its rail to reach the screen edge — so the room
        stops padding the phone and lets its children do it. The desktop pool
-       card takes over at md, and the gutter comes back with it. */
-    <div className={`${PB_TYPE} container mx-auto px-0 py-4 md:px-4 pb-40 lg:pb-4`} data-testid="draft-room-v2">
+       card takes over at md, and the gutter comes back with it.
+       THE WIDE ROOM (2026-09-14, Garrett: "everything on desktop looks too
+       small, scale it up"): the shared container stops at 1400px, which on a
+       1920 monitor left the twelve board columns at 80px each inside 500px
+       of dead margin. The draft room alone runs out to 1800px. */
+    <div className={`${PB_TYPE} container mx-auto px-0 py-4 md:px-4 pb-40 lg:pb-4 2xl:max-w-[1800px]`} data-testid="draft-room-v2">
       {/*
         * NATIVE ESCAPE HATCH (2026-08-31, moved into the sticky header
         * 2026-09-01) — reported from the iOS simulator as "I'm stuck, the
@@ -1935,6 +1939,18 @@ function MainTabs({
   const pickTimeLimitSec = usePickTimeLimitSec();
   const pendingActions = usePendingActions();
   const [tab, setTab] = useState<'players' | 'queue' | 'board' | 'myteam' | 'history'>('players');
+  // THE PLAYER DRAWER (2026-09-14, Garrett): on desktop the pool lives in a
+  // drawer directly under the five-round board window. Open by default;
+  // a manager who folds it gets it back folded next time, per league.
+  const [drawerOpen, setDrawerOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem(`citrus:draft:drawer:${leagueId}`) !== '0'; } catch { return true; }
+  });
+  const toggleDrawer = useCallback(() => {
+    setDrawerOpen((v) => {
+      try { localStorage.setItem(`citrus:draft:drawer:${leagueId}`, v ? '0' : '1'); } catch { /* storage unavailable */ }
+      return !v;
+    });
+  }, [leagueId]);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   // V2-PARITY (2026-08-17) — tap-for-player-card. Garrett's #1 feedback
   // from Citrus Draft Night: rows only highlighted; no card ever opened.
@@ -1943,11 +1959,31 @@ function MainTabs({
   // exist" — same feedback list). When ON and it's my turn, the client
   // submits automatically after a short beat: top of my queue first,
   // best season-FPTS available otherwise (the pool's own #1 ranking).
-  // Persisted per league so a reload mid-draft keeps the setting.
+  // PERSISTED ON THE TEAM ROW (2026-09-14, Garrett: "autodraft isn't
+  // persistent between/across sessions"). This used to be localStorage
+  // only, so a closed tab or a second device forgot it and, worse, the
+  // engine never knew: the seat sat on the full clock until the deadline
+  // autopick. The flag is now `teams.autodraft_enabled`; the engine arms
+  // the instant-autopick window for a flagged seat on its own, and this
+  // client loop is the same-tab fast path. localStorage stays as the
+  // first paint while the server value loads.
   const [autodraftOn, setAutodraftOn] = useState<boolean>(() => {
     try { return localStorage.getItem(`citrus:autodraft:${leagueId}`) === '1'; } catch { return false; }
   });
   const lastAutoPickForRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!leagueId || !myTeamId) return;
+    let cancelled = false;
+    import('@/api/draftV2')
+      .then(({ draftV2Api }) => draftV2Api.getAutodraft(leagueId, myTeamId))
+      .then((res) => {
+        if (cancelled || typeof res.data?.enabled !== 'boolean') return;
+        setAutodraftOn(res.data.enabled);
+        try { localStorage.setItem(`citrus:autodraft:${leagueId}`, res.data.enabled ? '1' : '0'); } catch { /* storage unavailable */ }
+      })
+      .catch((err) => logger.warn('[DraftRoomV2] autodraft flag read failed; using local value', err));
+    return () => { cancelled = true; };
+  }, [leagueId, myTeamId]);
 
   // CLIENT-AUTODRAFT SHAPE GUARD (2026-08-23, found live on prod during
   // launch QA): this loop picked pure best-season-FPTS with zero roster
@@ -2385,12 +2421,23 @@ function MainTabs({
 
   // V2-PARITY (2026-08-17) — autodraft machinery.
   const toggleAutodraft = useCallback(() => {
-    setAutodraftOn(v => {
-      const next = !v;
-      try { localStorage.setItem(`citrus:autodraft:${leagueId}`, next ? '1' : '0'); } catch { /* storage unavailable */ }
-      return next;
-    });
-  }, [leagueId]);
+    const next = !autodraftOn;
+    setAutodraftOn(next);
+    try { localStorage.setItem(`citrus:autodraft:${leagueId}`, next ? '1' : '0'); } catch { /* storage unavailable */ }
+    if (!leagueId || !myTeamId) return;
+    import('@/api/draftV2')
+      .then(({ draftV2Api }) => draftV2Api.setAutodraft(leagueId, myTeamId, next))
+      .then((res) => {
+        if (typeof res.data?.enabled === 'boolean' && res.data.enabled !== next) setAutodraftOn(res.data.enabled);
+      })
+      .catch((err) => {
+        // The server is the source of truth: put the toggle back and say so.
+        logger.warn('[DraftRoomV2] autodraft flag write failed', err);
+        setAutodraftOn(!next);
+        try { localStorage.setItem(`citrus:autodraft:${leagueId}`, !next ? '1' : '0'); } catch { /* storage unavailable */ }
+        toast.error('Autodraft not saved', { description: 'Could not reach the server. Try again.' });
+      });
+  }, [autodraftOn, leagueId, myTeamId]);
 
   // KEEPERS (2026-09-05): a keeper slot is the engine's pick, not ours.
   // `derived.keepers` is carried through every fold by reference, so this
@@ -2555,6 +2602,9 @@ function MainTabs({
             }
             draftType="snake"
             keeperSlots={keeperSlotNames}
+            /* THE BOARD AS A WINDOW (2026-09-14): five rounds on desktop, the
+               rest scroll inside the board, and the pool sits right under it. */
+            viewportRows={isMobile ? undefined : 5}
             /* PRESS BOX (2026-09-04): the outlined column and the card on tap. */
             userTeamId={myTeamId}
             onPlayerClick={(playerId) => {
@@ -2730,6 +2780,28 @@ function MainTabs({
         </section>
       )}
 
+      {/* Desktop: the drawer handle. The strip and panes below fold under it. */}
+      {!isMobile && (
+        <button
+          type="button"
+          onClick={toggleDrawer}
+          aria-expanded={drawerOpen}
+          aria-controls="draft-player-drawer"
+          data-testid="draft-player-drawer-handle"
+          className="focus-citrus mb-2 flex w-full items-center justify-between rounded-[8px] border border-white/[0.08] bg-pressbox-tile px-3.5 py-2 text-left"
+        >
+          <span className="font-condensed font-bold text-[13px] uppercase tracking-[0.14em] text-pressbox-text">
+            Player list
+            <span className="ml-2 font-plex font-medium text-[11px] normal-case tracking-normal text-pressbox-text/50">
+              {availablePlayers.length} available
+            </span>
+          </span>
+          <span className="font-plex font-semibold text-[11px] uppercase tracking-[0.1em] text-pressbox-orange-soft">
+            {drawerOpen ? 'Fold \u25B4' : 'Open \u25BE'}
+          </span>
+        </button>
+      )}
+      <div id="draft-player-drawer" hidden={!isMobile && !drawerOpen} data-testid="draft-player-drawer">
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
         {/* PRESS BOX (2026-09-04): artboard 4a's strip — four centred
             columns in Barlow Condensed at .14em, an orange rule under the
@@ -2883,6 +2955,7 @@ function MainTabs({
           />
         </TabsContent>
       </Tabs>
+      </div>
 
       {/* V2-PARITY (2026-08-17) — draftable straight from the card when
           it's your turn. CARD UNIFICATION (2026-09-01): this is the same
