@@ -9,6 +9,7 @@ import { MatchupService } from '../services/MatchupService';
 import { ScheduleGenerationService } from '../services/ScheduleGenerationService';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { AppError } from '../lib/errors';
+import { assertMatchupVisible, assertMatchupTeamVisible } from '../lib/matchupVisibility';
 import { ok, fail, handleError } from '../lib/responses';
 import { logger, COLUMNS, getCurrentSeason, countsTowardRecord, toMatchupScore, getTodayMST } from '@citrus/shared';
 
@@ -364,8 +365,12 @@ matchupRoutes.get('/job-status', async (c) => {
 });
 
 // ── Matchup-by-ID routes ─────────────────────────────────────────────
-// RLS on the matchups table ensures users can only access matchups from
-// leagues they belong to. Auth middleware validates the JWT.
+// Auth middleware validates the JWT. Routes that read through the CALLER's
+// client (`/:matchupId`, `/scores`, `/lines`) are gated by RLS on `matchups`
+// and `fantasy_matchup_lines`. Routes that go through the service-role client
+// (daily-scores, frozen-roster-batch, ensure-rosters, daily-lineup,
+// frozen-roster) bypass RLS entirely and MUST call assertMatchupVisible /
+// assertMatchupTeamVisible first — see the IDOR note on those helpers.
 
 // GET /api/matchups/:matchupId — Get a specific matchup with lines
 matchupRoutes.get('/:matchupId', async (c) => {
@@ -401,6 +406,11 @@ matchupRoutes.get('/:matchupId/daily-scores', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
+  // The calculator runs on the service-role client and persists
+  // fantasy_matchup_lines; gate it on caller-visible matchups first.
+  const { error: notVisible } = await assertMatchupVisible(supabase, matchupId);
+  if (notVisible) return fail(c, notVisible);
+
   // PERF (2026-09-01): this route used to run ensureMatchupRosters here
   // AND calculateDailyMatchupScores below — but the calculator already
   // backfills fantasy_daily_rosters for both teams itself, so the ensure
@@ -428,43 +438,6 @@ matchupRoutes.get('/:matchupId/lines', async (c) => {
 
   return ok(c, lines);
 });
-
-// ── Matchup-scoped reads that bypass RLS ────────────────────────────────
-/**
- * IDOR guard for the matchup routes that read through the service-role client.
- *
- * MatchupService.getDailyLineup and getFrozenRoster both call getSupabaseAdmin()
- * so that AI-team rows stay visible, which bypasses RLS on
- * fantasy_daily_rosters entirely. Both routes take `teamId` from the query
- * string. Without this check any signed-in user could read any team's frozen
- * lineup for any matchup just by supplying the two UUIDs — including leagues
- * they have never belonged to, and leagues they were removed from (RLS would
- * deny them now, but the admin client never consults it).
- *
- * The lookup below deliberately uses the CALLER's token, not the admin client,
- * so the `matchups` SELECT policy ("Users can view matchups in their leagues")
- * is the gate: a caller outside the league gets no row back. The team check
- * then pins the request to the two teams actually in that matchup, so
- * membership in one league cannot be traded for a read of another league's
- * team by pairing a visible matchupId with a foreign teamId.
- */
-async function assertMatchupTeamVisible(
-  supabase: ReturnType<typeof createUserClient>,
-  matchupId: string,
-  teamId: string,
-): Promise<AppError | null> {
-  const { data, error } = await supabase
-    .from('matchups')
-    .select('team1_id, team2_id')
-    .eq('id', matchupId)
-    .maybeSingle();
-
-  if (error || !data) return AppError.notFound('Matchup');
-  if (teamId !== data.team1_id && teamId !== data.team2_id) {
-    return AppError.forbidden('That team is not in this matchup');
-  }
-  return null;
-}
 
 // GET /api/matchups/:matchupId/daily-lineup — Get frozen daily lineup
 matchupRoutes.get('/:matchupId/daily-lineup', async (c) => {
@@ -522,6 +495,11 @@ matchupRoutes.post('/:matchupId/frozen-roster-batch', validateBody(schemas.match
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
+  // Service-role read (plus backfill write) for both teams: caller must be
+  // able to see the matchup through league RLS first.
+  const { error: notVisible } = await assertMatchupVisible(supabase, matchupId);
+  if (notVisible) return fail(c, notVisible);
+
   const { entries, error } = await service.getFrozenRosterBatch(matchupId, body.dates);
   if (error) {
     return handleError(c, error, 'Failed to fetch frozen roster batch');
@@ -535,6 +513,11 @@ matchupRoutes.post('/:matchupId/ensure-rosters', async (c) => {
   const matchupId = c.req.param('matchupId');
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
+
+  // Persists team_lineups / fantasy_daily_rosters on the service-role
+  // client for both teams: caller must be able to see the matchup first.
+  const { error: notVisible } = await assertMatchupVisible(supabase, matchupId);
+  if (notVisible) return fail(c, notVisible);
 
   try {
     const result = await service.ensureMatchupRosters(matchupId);

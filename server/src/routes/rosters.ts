@@ -11,6 +11,7 @@ import { LineupService, lockedMoveMessage } from '../services/LineupService';
 import { SeasonStateService } from '../services/SeasonStateService';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
+import { assertMatchupTeamVisible } from '../lib/matchupVisibility';
 import { logger } from '@citrus/shared';
 import { ok, fail, handleError } from '../lib/responses';
 import { COLUMNS } from '@citrus/shared';
@@ -197,7 +198,14 @@ rosterRoutes.get('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
   return ok(c, data);
 });
 
-// GET /api/rosters/daily-roster — Get daily roster entries (auth-only, no league membership required)
+// GET /api/rosters/daily-roster — Get daily roster entries
+//
+// The read itself runs on the caller's client, so the league-scoped SELECT
+// policy on fantasy_daily_rosters is the primary gate. The visibility check
+// below is defence in depth: it pins team_id to the two teams in a matchup
+// the caller can see, answers 404/403 instead of a silently empty list for a
+// foreign league, and keeps the route safe if that policy ever drifts again
+// (a 2026-03 migration once widened it to USING (true)).
 rosterRoutes.get('/daily-roster', async (c) => {
   const teamId = c.req.query('team_id');
   const matchupId = c.req.query('matchup_id');
@@ -208,6 +216,9 @@ rosterRoutes.get('/daily-roster', async (c) => {
   }
 
   const supabase = createUserClient(c.get('userToken'));
+  const denied = await assertMatchupTeamVisible(supabase, matchupId, teamId);
+  if (denied) return fail(c, denied);
+
   const lineupService = new LineupService(supabase);
   const result = await lineupService.getDailyRoster(teamId, matchupId, rosterDate);
 
