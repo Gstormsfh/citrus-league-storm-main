@@ -42,7 +42,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -310,6 +310,65 @@ describe('the deploy mounts the secrets the API cannot run without', () => {
     expect(wf).toContain('--startup-probe=httpGet.path=/api/health');
     const yaml = withoutComments(read('ops/cloudrun/service.yaml'));
     expect(yaml).toContain('path: /api/health');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The workflow files must stay parseable (2026-09-16, PR #519).
+//
+// The string scans above passed while `.github/workflows/production-deploy.yml`
+// was invalid YAML: a step was named
+//   `API health check (fatal: secrets must be usable on the serving revision)`
+// and an unquoted plain scalar cannot contain ": ". GitHub refused the
+// whole file, both runs failed in zero seconds with no job and no log
+// (`gh run view --log-failed` says "log not found"), and the fix that
+// mounts the draft-token secret as code never deployed. This file cannot
+// parse YAML without a dependency, so it checks for the one construct that
+// breaks a plain scalar. Verified against every workflow in the repo: it
+// flags nothing else.
+// ---------------------------------------------------------------------------
+const WORKFLOWS_DIR = resolve(REPO, '.github/workflows');
+
+/** Lines whose value is an unquoted plain scalar containing ": " (fatal in YAML). */
+export function unquotedColonSpaceLines(yaml: string): Array<{ line: number; text: string }> {
+  const rule = /^\s*(?:- )?[A-Za-z0-9_.-]+:\s+(?!["'|>])(.*: .*)$/;
+  const out: Array<{ line: number; text: string }> = [];
+  yaml.split('\n').forEach((raw, i) => {
+    if (raw.trimStart().startsWith('#')) return;
+    const m = rule.exec(raw);
+    if (!m) return;
+    const value = m[1].split(/\s#/)[0]; // ": " inside a trailing comment is fine
+    if (value.includes(': ')) out.push({ line: i + 1, text: raw.trim() });
+  });
+  return out;
+}
+
+describe('every workflow file is YAML GitHub will accept', () => {
+  const files = readdirSync(WORKFLOWS_DIR).filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'));
+
+  it('finds the workflow files', () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  for (const file of files) {
+    it(`${file} has no unquoted value containing ": "`, () => {
+      const bad = unquotedColonSpaceLines(readFileSync(resolve(WORKFLOWS_DIR, file), 'utf8'));
+      expect(
+        bad,
+        `quote the value (single quotes are enough): ${bad.map((b) => `line ${b.line}: ${b.text}`).join('; ')}`,
+      ).toEqual([]);
+    });
+  }
+
+  it('the rule catches the exact line that broke PR #519', () => {
+    const broken = '      - name: API health check (fatal: secrets must be usable on the serving revision)';
+    expect(unquotedColonSpaceLines(broken)).toHaveLength(1);
+    expect(unquotedColonSpaceLines(`      - name: 'API health check (fatal: secrets)'`)).toEqual([]);
+    expect(unquotedColonSpaceLines('      - name: "API health check (fatal: secrets)"')).toEqual([]);
+    expect(unquotedColonSpaceLines('        run: |\n          echo "a: b"')).toEqual([]);
+    expect(unquotedColonSpaceLines('        url: https://example.com/x')).toEqual([]);
+    expect(unquotedColonSpaceLines('        # a comment with: colon')).toEqual([]);
+    expect(unquotedColonSpaceLines('        key: value # trailing: comment')).toEqual([]);
   });
 });
 

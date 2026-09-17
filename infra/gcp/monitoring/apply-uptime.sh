@@ -11,9 +11,9 @@
 # and the one signal that existed (e-mail) is not paging.
 #
 # This script creates or updates, idempotently, matched by DISPLAY NAME:
-#   1. an SMS notification channel (--sms +1XXXXXXXXXX; Google texts a
-#      verification code — see "SMS verification" below) and re-uses the
-#      e-mail channel apply-monitoring.sh created
+#   1. an SMS notification channel (--sms +1XXXXXXXXXX; the script then
+#      asks Google to text a verification code — see "SMS verification"
+#      below) and re-uses the e-mail channel apply-monitoring.sh created
 #   2. three Cloud Monitoring uptime checks, every 60 s from 3 regions:
 #        "Citrus API health: draft token"      GET citrusfantasysports.com/api/health
 #                                              2xx AND $.checks.draftToken == "ok"
@@ -42,31 +42,40 @@
 #   bash infra/gcp/monitoring/apply-uptime.sh --sms +15875550123
 #   bash infra/gcp/monitoring/apply-uptime.sh --sms +15875550123 --dry-run
 #   bash infra/gcp/monitoring/apply-uptime.sh --sms-verify 123456     # after the text arrives
+#   bash infra/gcp/monitoring/apply-uptime.sh --sms-send-code          # text didn't arrive: send another
 #
 # Flags:
 #   --project ID       GCP project (default: citrus-fantasy-prod)
 #   --sms +E164        phone number for the SMS channel; only needed the
 #                      first time (channel matched by display name after)
-#   --sms-verify CODE  submit the verification code Google texted
+#   --sms-verify CODE  submit the 6-digit verification code Google texted
+#   --sms-send-code    (re)send the verification code to the existing channel
 #   --dry-run          look everything up, print the plan, change nothing
 #   -h | --help
 #
 # SMS verification: an SMS channel receives NOTHING until verified.
-# After --sms creates it, Google texts a 6-digit code; run this script
-# again with --sms-verify CODE. `gcloud alpha monitoring channels describe`
-# shows verificationStatus: VERIFIED when done. The script refuses to
-# attach an unverified channel to a policy, so an unverified channel
-# cannot silently absorb alerts.
+# Creating a channel through the API does NOT send a code by itself (the
+# console does that for you); this script calls sendVerificationCode right
+# after creating the channel, Google texts a 6-digit code, and you run the
+# script again with --sms-verify CODE. gcloud (583.0.0) has no
+# `channels verify` or `send-verification-code` command, so those two
+# calls go straight to the Monitoring REST API with your gcloud
+# credentials (`gcloud auth print-access-token`). `gcloud alpha monitoring
+# channels describe` shows verificationStatus: VERIFIED when done. The
+# script refuses to attach an unverified channel to a policy, so an
+# unverified channel cannot silently absorb alerts.
 #
 # Needs: gcloud with the alpha component (policies/channels), a gcloud
-# recent enough to have `gcloud monitoring uptime` (2024+), python3.
+# recent enough to have `gcloud monitoring uptime` (2024+), curl, python3.
 # Permissions: roles/monitoring.editor on the project.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ID="${PROJECT_ID:-citrus-fantasy-prod}"
+MONITORING_API="${MONITORING_API:-https://monitoring.googleapis.com/v3}"  # overridable for tests
 SMS_NUMBER=""
 SMS_VERIFY_CODE=""
+SMS_SEND_CODE=false
 DRY_RUN=false
 EMAIL_CHANNEL_DISPLAY_NAME="Citrus ops email"
 SMS_CHANNEL_DISPLAY_NAME="Citrus ops SMS"
@@ -103,6 +112,7 @@ while [ $# -gt 0 ]; do
     --sms=*)       SMS_NUMBER="${1#*=}"; shift ;;
     --sms-verify)  SMS_VERIFY_CODE="$2"; shift 2 ;;
     --sms-verify=*) SMS_VERIFY_CODE="${1#*=}"; shift ;;
+    --sms-send-code) SMS_SEND_CODE=true; shift ;;
     --dry-run)     DRY_RUN=true; shift ;;
     -h|--help)     usage; exit 0 ;;
     *) die "unknown argument: $1 (try --help)" ;;
@@ -111,12 +121,51 @@ done
 
 command -v gcloud >/dev/null 2>&1 || die "gcloud not found on PATH"
 command -v python3 >/dev/null 2>&1 || die "python3 not found on PATH"
+command -v curl >/dev/null 2>&1 || die "curl not found on PATH"
+# Catch the placeholders from the docs before they reach the API.
+# (glob matches, not regex intervals: macOS bash 3.2 must run this)
+case "${SMS_NUMBER}" in
+  "") ;;
+  +[1-9]*) [[ "${SMS_NUMBER#+}" != *[!0-9]* && ${#SMS_NUMBER} -ge 9 && ${#SMS_NUMBER} -le 16 ]] || die "--sms wants a real E.164 number like +15875550123, got: ${SMS_NUMBER}" ;;
+  *) die "--sms wants a real E.164 number like +15875550123, got: ${SMS_NUMBER}" ;;
+esac
+case "${SMS_VERIFY_CODE}" in
+  "") ;;
+  [0-9][0-9][0-9][0-9][0-9][0-9]) ;;
+  *) die "--sms-verify wants the 6-digit code from the text, got: ${SMS_VERIFY_CODE}" ;;
+esac
 gcloud alpha monitoring policies --help >/dev/null 2>&1 || die "gcloud alpha component missing: gcloud components install alpha"
 gcloud monitoring uptime --help >/dev/null 2>&1 || die "this gcloud has no 'gcloud monitoring uptime' (update: gcloud components update)"
 ACTIVE_ACCOUNT="$(gcloud config get-value account 2>/dev/null || true)"
 [ -n "${ACTIVE_ACCOUNT}" ] || die "no active gcloud account (run: gcloud auth login)"
 WORK="$(mktemp -d)"; trap 'rm -rf "${WORK}"' EXIT
 log "project=${PROJECT_ID} account=${ACTIVE_ACCOUNT} dry_run=${DRY_RUN}"
+
+# ── Monitoring REST helper ───────────────────────────────────────────
+# gcloud exposes create/list/describe/update/delete for channels but not
+# the two verification RPCs, so those go to the API directly.
+monitoring_post() { # monitoring_post RESOURCE:VERB JSON_BODY -> response body; dies on non-2xx
+  local token out code
+  token="$(gcloud auth print-access-token 2>/dev/null)" || die "gcloud auth print-access-token failed (run: gcloud auth login)"
+  out="$(curl -sS -X POST \
+    -H "Authorization: Bearer ${token}" \
+    -H "x-goog-user-project: ${PROJECT_ID}" \
+    -H "Content-Type: application/json" \
+    -d "$2" -w '\n%{http_code}' "${MONITORING_API}/$1")" || die "curl to monitoring.googleapis.com failed"
+  code="${out##*$'\n'}"; out="${out%$'\n'*}"
+  case "${code}" in
+    2*) printf '%s' "${out}" ;;
+    *)  die "POST $1 -> HTTP ${code}: ${out}" ;;
+  esac
+}
+
+sms_send_code() { # asks Google to text the verification code to SMS_CHANNEL
+  plan "send SMS verification code via channel ${SMS_CHANNEL##*/}"
+  if [ "${DRY_RUN}" != true ]; then
+    monitoring_post "${SMS_CHANNEL}:sendVerificationCode" '{}' >/dev/null
+    log "   code sent. When the text arrives:  bash infra/gcp/monitoring/apply-uptime.sh --sms-verify <code>"
+  fi
+}
 
 channel_by_name() { # channel_by_name DISPLAY TYPE -> name or empty
   gcloud alpha monitoring channels list --project="${PROJECT_ID}" \
@@ -140,24 +189,30 @@ if [ -z "${SMS_CHANNEL}" ]; then
         --description="Citrus on-call phone (managed by infra/gcp/monitoring/apply-uptime.sh)" \
         --type=sms --channel-labels="number=${SMS_NUMBER}" --format='value(name)')"
       [ -n "${SMS_CHANNEL}" ] || die "SMS channel create returned no name"
-      log "   created ${SMS_CHANNEL}. Google is texting ${SMS_NUMBER} a code now."
-      log "   Re-run:  bash infra/gcp/monitoring/apply-uptime.sh --sms-verify <code>"
+      log "   created ${SMS_CHANNEL} -> ${SMS_NUMBER}"
+      sms_send_code
     fi
   fi
 else
   log "SMS channel: ${SMS_CHANNEL}"
+  [ "${SMS_SEND_CODE}" = true ] && sms_send_code
 fi
 
 if [ -n "${SMS_VERIFY_CODE}" ] && [ -n "${SMS_CHANNEL}" ] && [ "${DRY_RUN}" != true ]; then
   plan "verify SMS channel with code ${SMS_VERIFY_CODE}"
-  gcloud alpha monitoring channels verify "${SMS_CHANNEL}" --code="${SMS_VERIFY_CODE}" --project="${PROJECT_ID}" >/dev/null
+  resp="$(monitoring_post "${SMS_CHANNEL}:verify" "{\"code\":\"${SMS_VERIFY_CODE}\"}")"
+  vs="$(printf '%s' "${resp}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("verificationStatus",""))' 2>/dev/null || true)"
+  [ "${vs}" = "VERIFIED" ] || die "verify did not return VERIFIED (got: ${vs:-<none>}): ${resp}"
   log "   verified"
+  SMS_JUST_VERIFIED=true
 fi
 
 SMS_VERIFIED=false
-if [ -n "${SMS_CHANNEL}" ]; then  # read-only; fine in dry-run
+if [ "${SMS_JUST_VERIFIED:-false}" = true ]; then
+  SMS_VERIFIED=true  # the verify response said so; no need to re-read
+elif [ -n "${SMS_CHANNEL}" ]; then  # read-only; fine in dry-run
   vs="$(gcloud alpha monitoring channels describe "${SMS_CHANNEL}" --project="${PROJECT_ID}" --format='value(verificationStatus)' 2>/dev/null || true)"
-  if [ "${vs}" = "VERIFIED" ]; then SMS_VERIFIED=true; else log "   SMS channel is ${vs:-UNVERIFIED}: it will NOT be attached to policies until verified (--sms-verify CODE)"; fi
+  if [ "${vs}" = "VERIFIED" ]; then SMS_VERIFIED=true; else log "   SMS channel is ${vs:-UNVERIFIED}: it will NOT be attached to policies until verified (--sms-verify CODE; --sms-send-code if the text never came)"; fi
 fi
 
 CHANNELS_JSON="$(python3 - "${EMAIL_CHANNEL}" "$([ "${SMS_VERIFIED}" = true ] && echo "${SMS_CHANNEL}" || echo "")" <<'PY'
@@ -180,27 +235,37 @@ CHECK_IDS=()
 for i in "${!CHECKS[@]}"; do
   spec="${CHECKS[$i]}"
   IFS='|' read -r display policy host path matcher <<<"${spec}"
-  args=(--resource-type=uptime-url "--resource-labels=host=${host},project_id=${PROJECT_ID}"
-        --protocol=https --port=443 "--path=${path}" --period=1 --timeout=10 "--regions=${REGIONS}" --validate-ssl)
+  # `uptime create` and `uptime update` take different flags (checked
+  # against gcloud 585): the monitored resource and protocol are fixed at
+  # creation, and update spells lists as --set-regions / --set-status-*.
+  args=("--path=${path}" --period=1 --timeout=10 --port=443 --validate-ssl=true)
+  create_args=(--resource-type=uptime-url "--resource-labels=host=${host},project_id=${PROJECT_ID}"
+               --protocol=https "--regions=${REGIONS}")
+  update_args=("--set-regions=${REGIONS}")
   case "${matcher}" in
     json:*)
-      args+=(--status-classes=2xx --matcher-type=matches-json-path --matcher-content=ok
-             "--json-path=${matcher#json:}" --json-path-matcher-type=exact-match) ;;
+      # For JSONPath matchers the expected content is parsed as a JSON
+      # value, so a string must carry its own double quotes ("ok", not ok);
+      # the API rejects the bare form with "Unable to parse 'required_content'".
+      args+=(--matcher-type=matches-json-path '--matcher-content="ok"'
+             "--json-path=${matcher#json:}" --json-path-matcher-type=exact-match)
+      create_args+=(--status-classes=2xx); update_args+=(--set-status-classes=2xx) ;;
     body404:*)
-      args+=(--status-codes=404 --matcher-type=contains-string "--matcher-content=${matcher#body404:}") ;;
+      args+=(--matcher-type=contains-string "--matcher-content=${matcher#body404:}")
+      create_args+=(--status-codes=404); update_args+=(--set-status-codes=404) ;;
     *) die "bad matcher spec: ${matcher}" ;;
   esac
   existing="$(uptime_name_by_display "${display}")"
   if [ -n "${existing}" ]; then
     plan "update uptime check \"${display}\" (${existing##*/})"
     if [ "${DRY_RUN}" != true ]; then
-      gcloud monitoring uptime update "${existing##*/}" --project="${PROJECT_ID}" "${args[@]}" >/dev/null
+      gcloud monitoring uptime update "${existing##*/}" --project="${PROJECT_ID}" "${update_args[@]}" "${args[@]}" >/dev/null
     fi
     CHECK_IDS[$i]="${existing##*/}"
   else
     plan "create uptime check \"${display}\": https://${host}${path} [${matcher}]"
     if [ "${DRY_RUN}" != true ]; then
-      created="$(gcloud monitoring uptime create "${display}" --project="${PROJECT_ID}" "${args[@]}" --format='value(name)')"
+      created="$(gcloud monitoring uptime create "${display}" --project="${PROJECT_ID}" "${create_args[@]}" "${args[@]}" --format='value(name)')"
       [ -n "${created}" ] || die "uptime create returned no name for \"${display}\""
       log "   created ${created}"
       CHECK_IDS[$i]="${created##*/}"
