@@ -1,6 +1,7 @@
 import { playerEligiblePositionsLabel } from '@citrus/shared';
 import { PlayerAffiliationDetails } from '@/components/player/PlayerAffiliationDetails';
 import { PlayerAvailabilityDetails } from '@/components/player/PlayerAvailabilityDetails';
+import { ProjectionProvenance } from '@/components/player/ProjectionProvenance';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { heroMetricTile } from '@/components/player/heroMetricTile';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
@@ -1010,6 +1011,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
             {/* ─── Overview Tab ─── */}
             <TabsContent value="summary" className="mt-0 space-y-4">
               <PlayerAvailabilityDetails playerId={player.id} name={player.name} context={indexEntry?.canonical_context} availability={indexEntry?.availability ?? player.availability} />
+              <ProjectionProvenance context={indexEntry?.canonical_context} isGoalie={isGoalie} />
               {/* WHICH SEASON THESE NUMBERS ARE (2026-09-04).
                   
                   The Game Log carries a season picker and these two tabs do

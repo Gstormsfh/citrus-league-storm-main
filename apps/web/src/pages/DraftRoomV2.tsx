@@ -104,9 +104,11 @@ import {
   capKeyFor,
   normalizeDraftPosition,
   picksUntilNextTurn,
+  forecastNoteFor,
   qualitySignalFor,
   scarcityStrip,
   type DraftPosition,
+  type ForecastNote,
   type QualitySignal,
 } from '@/components/draft/draftDecision';
 import { useOnClockAlarm } from '@/hooks/useOnClockAlarm';
@@ -2156,6 +2158,16 @@ function MainTabs({
     return map;
   }, [dashboardIndex]);
 
+  /** Forecast provenance/status per player, for the pool's headline label. */
+  const forecastNotes = useMemo(() => {
+    const map = new Map<string, ForecastNote>();
+    for (const entry of dashboardIndex) {
+      const note = forecastNoteFor(entry);
+      if (note) map.set(String(entry.id), note);
+    }
+    return map;
+  }, [dashboardIndex]);
+
   /**
    * POSITIONAL SCARCITY — the question a manager is actually answering under
    * a shot clock. Counts are taken from the pool and the picks already made,
@@ -2827,6 +2839,7 @@ function MainTabs({
                  season fantasy points exactly as before. */
               projectedFptsMap={projectedFptsMap}
               qualitySignals={qualitySignals}
+              forecastNotes={forecastNotes}
               /* STORMY'S NEED LINE (2026-09-05, artboard 4a): the league's
                  slots, the positions already drafted, the picks before the
                  next turn -- all held here already. Not in an auction. */

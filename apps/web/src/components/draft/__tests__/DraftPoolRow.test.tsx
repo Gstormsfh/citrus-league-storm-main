@@ -280,3 +280,37 @@ describe('DraftPoolRow — the Players-row cut (2026-09-05, artboard 4a)', () =>
     expect(screen.queryByText(/D1/)).toBeNull();
   });
 });
+
+describe('DraftPoolRow — where the forecast came from (2026-09-14)', () => {
+  it('labels a cohort prior "prior" and a manual forecast "manual", never "proj"', () => {
+    const { rerender } = render(<DraftPoolRow {...base} projection={PROJECTION} forecast={{ provenance: 'DEFAULT', status: 'projected' }} />);
+    expect(screen.getByTestId('draft-pool-projection-label').textContent).toBe('prior');
+    expect(screen.getByTestId('draft-pool-projection-label').getAttribute('title')).toMatch(/Cohort prior/);
+    rerender(<DraftPoolRow {...base} projection={PROJECTION} forecast={{ provenance: 'MANUAL', status: 'projected' }} />);
+    expect(screen.getByTestId('draft-pool-projection-label').textContent).toBe('manual');
+    rerender(<DraftPoolRow {...base} projection={PROJECTION} forecast={{ provenance: 'MODEL', status: 'projected' }} />);
+    expect(screen.getByTestId('draft-pool-projection-label').textContent).toBe('proj');
+    expect(screen.getByTestId('draft-pool-projection-label').getAttribute('title')).toMatch(/model forecast/);
+  });
+
+  it('a rates-only rookie leads with a dash labelled "rates" and says why on the meta line', () => {
+    render(<DraftPoolRow {...base} player={mkPlayer({ games_played: 0, points: 0 })} seasonFpts={0} projection={null} forecast={{ provenance: 'MANUAL', status: 'rates_only' }} />);
+    expect(screen.getByTestId('draft-pool-projection').textContent).toBe('–');
+    expect(screen.getByTestId('draft-pool-projection-label').textContent).toBe('rates');
+    expect(screen.getByTestId('draft-pool-rates-only').textContent).toBe('rates only · no NHL workload');
+  });
+
+  it('a sort override still wins the headline over the rates-only dash', () => {
+    render(<DraftPoolRow {...base} projection={null} forecast={{ provenance: 'MANUAL', status: 'rates_only' }} headlineOverride={{ value: 30, decimals: 0, label: 'G' }} />);
+    expect(screen.getByTestId('draft-pool-projection').textContent).toBe('30');
+    expect(screen.getByTestId('draft-pool-projection-label').textContent).toBe('G');
+    expect(screen.getByTestId('draft-pool-rates-only')).toBeTruthy();
+  });
+
+  it('without a note the row reads exactly as before', () => {
+    render(<DraftPoolRow {...base} projection={PROJECTION} forecast={null} />);
+    expect(screen.getByTestId('draft-pool-projection-label').textContent).toBe('proj');
+    expect(screen.getByTestId('draft-pool-projection-label').getAttribute('title')).toBeNull();
+    expect(screen.queryByTestId('draft-pool-rates-only')).toBeNull();
+  });
+});

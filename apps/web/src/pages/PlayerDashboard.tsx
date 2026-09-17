@@ -1,6 +1,7 @@
 import { playerEligiblePositionsLabel } from '@citrus/shared';
 import { PlayerAffiliationDetails } from '@/components/player/PlayerAffiliationDetails';
 import { PlayerAvailabilityDetails } from '@/components/player/PlayerAvailabilityDetails';
+import { ProjectionProvenance } from '@/components/player/ProjectionProvenance';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { sourceSeasonLabel } from '@/utils/sourceSeasonContext';
 import { useMemo, useState } from 'react';
@@ -796,6 +797,7 @@ export default function PlayerDashboard() {
         <PlayerAvailabilityBadge availability={indexEntry?.availability} className="mb-2" />
           <PlayerAffiliationDetails affiliation={indexEntry?.current_affiliation} projectionTeam={indexEntry?.projection_team} />
         <PlayerAvailabilityDetails playerId={playerId} name={indexEntry?.name ?? ""} context={indexEntry?.canonical_context} availability={indexEntry?.availability} />
+        <ProjectionProvenance context={indexEntry?.canonical_context} isGoalie={!!indexEntry?.is_goalie} />
         {showRink ? (
           <>
             <RinkHeatmap

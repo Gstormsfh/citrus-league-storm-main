@@ -608,3 +608,17 @@ describe('ordinalPercentile', () => {
     expect(ordinalPercentile(100)).toBe('100th');
   });
 });
+
+describe('forecastNoteFor', () => {
+  it('reads provenance and status off the published context and nothing else', async () => {
+    const { forecastNoteFor, forecastHeadlineLabel } = await import('../draftDecision');
+    const entry = { id: 1, canonical_context: { provenance: 'DEFAULT', status: 'projected' } } as never;
+    expect(forecastNoteFor(entry)).toEqual({ provenance: 'DEFAULT', status: 'projected' });
+    expect(forecastHeadlineLabel(forecastNoteFor(entry))).toBe('prior');
+    expect(forecastNoteFor({ id: 2, canonical_context: null } as never)).toBeNull();
+    expect(forecastNoteFor({ id: 3 } as never)).toBeNull();
+    expect(forecastNoteFor({ id: 4, canonical_context: { provenance: 'WEIRD', status: 'odd' } } as never)).toBeNull();
+    expect(forecastNoteFor({ id: 5, canonical_context: { provenance: null, status: 'rates_only' } } as never)).toEqual({ provenance: null, status: 'rates_only' });
+    expect(forecastHeadlineLabel(null)).toBe('proj');
+  });
+});

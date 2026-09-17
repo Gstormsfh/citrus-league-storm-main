@@ -312,6 +312,52 @@ export function picksUntilNextTurn(
  * `utils/playerPercentiles.ts` for why forwards, defencemen and goalies are
  * never pooled.
  */
+/**
+ * WHERE THE FORECAST CAME FROM, ON THE ROW (2026-09-14).
+ *
+ * The dashboard-index payload carries `canonical_context.provenance`
+ * (MODEL / MANUAL / DEFAULT) and `.status` (projected / rates_only /
+ * unresolved) for every published player, and the pool never read either:
+ * a cohort prior and a model forecast printed the same "proj", and a rookie
+ * with conditional rates but no allocated workload printed last season's
+ * points with nothing saying why there is no projection. Projection
+ * standard rule 5: a number that reaches a screen without provenance is a
+ * bug. Pure read of fields already on the entry; no inference.
+ */
+export interface ForecastNote {
+  provenance: 'MODEL' | 'MANUAL' | 'DEFAULT' | null;
+  status: 'projected' | 'rates_only' | 'unresolved' | null;
+}
+
+const PROVENANCES = new Set(['MODEL', 'MANUAL', 'DEFAULT']);
+const STATUSES = new Set(['projected', 'rates_only', 'unresolved']);
+
+export function forecastNoteFor(entry: DashboardIndexEntry | null | undefined): ForecastNote | null {
+  const ctx = entry?.canonical_context;
+  if (!ctx) return null;
+  const provenance = typeof ctx.provenance === 'string' && PROVENANCES.has(ctx.provenance) ? ctx.provenance as ForecastNote['provenance'] : null;
+  const status = typeof ctx.status === 'string' && STATUSES.has(ctx.status) ? ctx.status as ForecastNote['status'] : null;
+  if (!provenance && !status) return null;
+  return { provenance, status };
+}
+
+/** The headline label under a projected total: what kind of forecast it is. */
+export function forecastHeadlineLabel(note: ForecastNote | null | undefined): string {
+  if (note?.provenance === 'DEFAULT') return 'prior';
+  if (note?.provenance === 'MANUAL') return 'manual';
+  return 'proj';
+}
+
+/** The `title` behind that label, in full. */
+export function forecastHeadlineTitle(note: ForecastNote | null | undefined): string | undefined {
+  switch (note?.provenance) {
+    case 'MODEL': return 'Citrus model forecast from this player\u2019s NHL history';
+    case 'MANUAL': return 'Manual forecast: set by hand because the model could not see this player; reviewed and recorded';
+    case 'DEFAULT': return 'Cohort prior: a fallback drawn from a comparable cohort, not an individual forecast';
+    default: return undefined;
+  }
+}
+
 export interface QualitySignal {
   metric: string;
   /**

@@ -26,7 +26,8 @@ import { positionChipClasses, positionChipKey } from '@/components/roster/positi
 import { playerPositions } from '@/components/roster/positions';
 import type { PositionType } from '@/utils/rosterUtils';
 import { mugFromDirectory } from '@/components/roster/headshot';
-import type { DraftProjection, QualitySignal } from './draftDecision';
+import type { DraftProjection, ForecastNote, QualitySignal } from './draftDecision';
+import { forecastHeadlineLabel, forecastHeadlineTitle } from './draftDecision';
 
 interface PlayerPoolProps {
   /**
@@ -78,6 +79,12 @@ interface PlayerPoolProps {
    */
   qualitySignals?: ReadonlyMap<string, QualitySignal>;
   /**
+   * Forecast provenance/status per player id, from the same payload (see
+   * `draftDecision.forecastNoteFor`). Optional and empty by default for the
+   * same reason as `qualitySignals`.
+   */
+  forecastNotes?: ReadonlyMap<string, ForecastNote>;
+  /**
    * DR-3.1 (2026-07-29) — F8 fix: when the caller is on the clock,
    * EVERY available row shows an always-visible inline Draft button
    * (industry pattern: Yahoo/ESPN). One click from "I want him" to
@@ -118,6 +125,7 @@ export const POOL_ARM_TTL_MS = 6000;
  * keep their context values at module scope.
  */
 const EMPTY_SIGNALS: ReadonlyMap<string, QualitySignal> = new Map();
+const EMPTY_NOTES: ReadonlyMap<string, ForecastNote> = new Map();
 
 /**
  * Likewise for the projections. This default used to be an inline
@@ -151,6 +159,7 @@ export const PlayerPool = memo(({
   scoringReady = false,
   projectedFptsMap = EMPTY_PROJECTIONS,
   qualitySignals = EMPTY_SIGNALS,
+  forecastNotes = EMPTY_NOTES,
   isYourTurn = false,
   need = null,
   isSubmitPending = false,
@@ -485,7 +494,11 @@ export const PlayerPool = memo(({
         </td>
         <td className="px-2 py-1.5 text-xs text-pastel-cream/70">{player.team}</td>
         <td className="px-2 py-1.5 text-xs text-center font-medium text-pastel-cream">{player.games_played}</td>
-        <td className="px-2 py-1.5 text-xs text-center font-bold text-sky-300 bg-sky-500/10" title={`${projectedFptsMap.get(player.id)?.gamesRemaining || 0} games remaining`}>{Number.isFinite(projectedFptsMap.get(player.id)?.total) ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-bold text-sky-300 bg-sky-500/10" title={Number.isFinite(projectedFptsMap.get(player.id)?.total) ? [`${projectedFptsMap.get(player.id)?.gamesRemaining || 0} games remaining`, forecastHeadlineTitle(forecastNotes.get(player.id))].filter(Boolean).join('. ') : forecastNotes.get(player.id)?.status === 'rates_only' ? 'Conditional per-game rates published; no NHL workload allocated, so no season total' : undefined}>
+          {Number.isFinite(projectedFptsMap.get(player.id)?.total)
+            ? <>{(projectedFptsMap.get(player.id)!.total).toFixed(1)}{forecastHeadlineLabel(forecastNotes.get(player.id)) !== 'proj' && <span className="ml-1 text-[9px] font-semibold uppercase text-sky-200/70">{forecastHeadlineLabel(forecastNotes.get(player.id))}</span>}</>
+            : forecastNotes.get(player.id)?.status === 'rates_only' ? <span className="text-[10px] font-semibold uppercase text-sky-200/60">rates</span> : '-'}
+        </td>
         <td className="px-2 py-1.5 text-xs text-center font-semibold text-sky-300 bg-sky-500/10">{Number.isFinite(projectedFptsMap.get(player.id)?.perGp) ? (projectedFptsMap.get(player.id)!.perGp).toFixed(2) : '-'}</td>
         <td className="px-2 py-1.5 text-xs text-center font-bold text-emerald-300 bg-emerald-500/10">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
         <td className="px-2 py-1.5 text-xs text-center font-semibold text-emerald-300 bg-emerald-500/10">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(2) : '-'}</td>
@@ -580,7 +593,7 @@ export const PlayerPool = memo(({
   });
     Row.displayName = 'PlayerRow';
     return Row;
-  }, [selectedPlayer?.id, draftedSet, isDraftActive, isYourTurn, isSubmitPending, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, onShowCard, fptsMap, projectedFptsMap, positionType]);
+  }, [selectedPlayer?.id, draftedSet, isDraftActive, isYourTurn, isSubmitPending, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, onShowCard, fptsMap, projectedFptsMap, forecastNotes, positionType]);
 
   /**
    * THE PHONE POOL, PRESS BOX (2026-09-04) — artboard 4a.
@@ -720,6 +733,7 @@ export const PlayerPool = memo(({
               seasonFpts={fptsMap.get(player.id) || 0}
               projection={projectedFptsMap.get(player.id) ?? null}
               signal={qualitySignals.get(player.id) ?? null}
+              forecast={forecastNotes.get(player.id) ?? null}
               seasonLine={draftPoolSeasonLine(player)}
               positionRank={positionRankMap.get(player.id) ?? null}
               headlineOverride={poolHeadlineFor(sortBy, {
