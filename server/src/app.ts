@@ -52,6 +52,7 @@ import { cacheControlMiddleware } from './middleware/cacheControl';
 import { AppError } from './lib/errors';
 import { supabaseBreaker } from './lib/circuitBreaker';
 import { logger } from '@citrus/shared';
+import { issueDraftToken, verifyDraftToken } from './lib/draftToken';
 
 export type Env = {
   Variables: {
@@ -170,6 +171,28 @@ app.use('/api/auth/signup', authRateLimit);
 // 5 req/min brute-force ceiling as signup.
 app.use('/api/auth/check-method', authRateLimit);
 
+/**
+ * Health probe for the draft-token secret: sign a throwaway draft-scoped
+ * token and verify it, exactly the path `GET /api/drafts/:id/server` and the
+ * engine's upgrade handler take. Returns `ok`, `unconfigured` (no secret in
+ * the environment) or `broken` (secret present but the round trip failed).
+ * Pure CPU, sub-millisecond; safe on a 5-second startup probe.
+ */
+async function probeDraftTokenSigning(): Promise<'ok' | 'unconfigured' | 'broken'> {
+  if (!process.env.SUPABASE_JWT_SECRET) return 'unconfigured';
+  try {
+    const token = await issueDraftToken({
+      userId: '00000000-0000-0000-0000-000000000000',
+      draftId: '00000000-0000-0000-0000-000000000000',
+      leagueId: '00000000-0000-0000-0000-000000000000',
+    });
+    const verified = await verifyDraftToken(token, '00000000-0000-0000-0000-000000000000');
+    return verified.ok ? 'ok' : 'broken';
+  } catch {
+    return 'broken';
+  }
+}
+
 // ── Health check — no auth required ──────────────────────────────────
 app.get('/api/health', async (c) => {
   const checks: Record<string, string> = {};
@@ -202,6 +225,29 @@ app.get('/api/health', async (c) => {
   checks.server = 'ok';
   checks.circuitBreaker = supabaseBreaker.currentState === 'CLOSED' ? 'ok' : supabaseBreaker.currentState.toLowerCase();
   if (supabaseBreaker.currentState !== 'CLOSED') healthy = false;
+
+  // REQUIRED SECRETS (2026-09-16 outage). The API moved to a new Cloud Run
+  // service (Montreal, PR #512) that had never been given the two secrets
+  // that were set by hand on the old one. Every server-side signal stayed
+  // green: this route said "ok", the deploy said "ok", the engine said "ok".
+  // Meanwhile `GET /api/drafts/:id/server` threw on every call because
+  // `issueDraftToken` had no `SUPABASE_JWT_SECRET`, and every draft room in
+  // production sat on "Reconnecting..." until the founder found it by hand
+  // during a mock draft. The scheduled-jobs router was in the same state
+  // behind `SCHEDULED_TRIGGER_SECRET`.
+  //
+  // So health now proves the secrets, not just their presence: the draft
+  // token check signs and verifies a real token (a local HMAC round trip,
+  // no I/O), which is what discovery does per request. A missing or
+  // unusable secret reports `unconfigured` and makes the whole response
+  // 503. service.yaml points Cloud Run's startup probe at this route, so a
+  // revision built without the secrets never becomes ready and traffic
+  // stays on the last good one; production-deploy.yml reads the same
+  // fields and fails the job. Silence is not health.
+  checks.draftToken = await probeDraftTokenSigning();
+  if (checks.draftToken !== 'ok') healthy = false;
+  checks.scheduledTrigger = process.env.SCHEDULED_TRIGGER_SECRET ? 'ok' : 'unconfigured';
+  if (checks.scheduledTrigger !== 'ok') healthy = false;
 
   return c.json({
     status: healthy ? 'ok' : 'degraded',

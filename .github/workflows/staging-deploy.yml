@@ -140,10 +140,22 @@ jobs:
             YAHOO_CLIENT_ID=YAHOO_CLIENT_ID:latest
             YAHOO_CLIENT_SECRET=YAHOO_CLIENT_SECRET:latest
             YAHOO_TOKEN_ENCRYPTION_KEY=YAHOO_TOKEN_ENCRYPTION_KEY:latest
+            SUPABASE_JWT_SECRET=supabase-jwt-secret:latest
+            SCHEDULED_TRIGGER_SECRET=scheduled-trigger-secret:latest
+          # DRAFT_WS_HOST / SUPABASE_JWT_SECRET / SCHEDULED_TRIGGER_SECRET
+          # (2026-09-16): same three the production deploy carries, pointed
+          # at the staging engine. Without them /api/health answers 503 and
+          # the revision never takes traffic, which is the point: a staging
+          # API that cannot hand out draft tokens is not a staging API.
+          # `supabase-jwt-secret` is the name the staging engine VM reads;
+          # `scheduled-trigger-secret` must exist in the staging project's
+          # Secret Manager (any value; only the header match uses it).
           env_vars: |
             NODE_ENV=production
             DEPLOYMENT_ENV=staging
             YAHOO_REDIRECT_URI=https://citrus-fantasy-staging.web.app/import/yahoo/callback
+            DRAFT_WS_HOST=draft-staging.citrusfantasysports.com
+            DRAFT_WS_PORT=443
           # Staging resource limits (match ops/cloudrun/service-staging.yaml).
           # Smaller than prod: no real users depend on staging warmth.
           flags: >-

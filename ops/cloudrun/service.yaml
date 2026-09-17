@@ -75,6 +75,23 @@ spec:
               value: "draft.citrusfantasysports.com"
             - name: DRAFT_WS_PORT
               value: "443"
+            # Both secrets below were set by hand on the Iowa service and
+            # never declared here, so the Montreal service was born without
+            # them (2026-09-16: every draft room down, all signals green).
+            # `services replace` on this file would have deleted them from
+            # any service that had them. Same Secret Manager names the
+            # engine VM and production-deploy.yml use; deployConfig.test.ts
+            # pins them in both files.
+            - name: SUPABASE_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: supabase-jwt-secret
+            - name: SCHEDULED_TRIGGER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: scheduled-trigger-secret
           startupProbe:
             httpGet:
               path: /api/health

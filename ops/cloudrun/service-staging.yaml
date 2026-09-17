@@ -102,6 +102,22 @@ spec:
                   name: YAHOO_TOKEN_ENCRYPTION_KEY
             - name: YAHOO_REDIRECT_URI
               value: https://citrus-fantasy-staging.web.app/import/yahoo/callback
+            - name: DRAFT_WS_HOST
+              value: "draft-staging.citrusfantasysports.com"
+            - name: DRAFT_WS_PORT
+              value: "443"
+            # Same secrets the production service mounts (2026-09-16); see
+            # ops/cloudrun/service.yaml for why they are secretKeyRefs.
+            - name: SUPABASE_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: supabase-jwt-secret
+            - name: SCHEDULED_TRIGGER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: scheduled-trigger-secret
           startupProbe:
             httpGet:
               path: /api/health

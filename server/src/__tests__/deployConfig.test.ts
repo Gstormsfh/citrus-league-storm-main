@@ -206,6 +206,113 @@ describe('the deploy declares where the draft engine lives', () => {
   });
 });
 
+/**
+ * SECRETS THE SERVICE CANNOT RUN WITHOUT (2026-09-16).
+ *
+ * The API was moved to a new Cloud Run service (Montreal, PR #512). The old
+ * service carried `SUPABASE_JWT_SECRET` and `SCHEDULED_TRIGGER_SECRET` as
+ * hand-set console variables, declared in no repo-tracked file, so the new
+ * service was created without them. `issueDraftToken` threw on every
+ * discovery call and every draft room in production sat on "Reconnecting..."
+ * for two days, found by the founder mid mock draft. The scheduled-jobs
+ * router was refusing everything behind the second one; it only kept
+ * working because the cron jobs still pointed at the old service.
+ *
+ * Same defect class as DRAFT_WS_HOST above, same guard: the names must be
+ * declared in both files the deploy machinery reads, outside comments. Two
+ * extra properties matter for secrets specifically:
+ *
+ *   - They must come from Secret Manager (`secrets:` block / secretKeyRef),
+ *     never from `env_vars` via `${{ secrets.X }}`, because an unset GitHub
+ *     secret renders as the empty string and the deploy still goes green.
+ *   - The Secret Manager NAME must be the one the engine VM reads
+ *     (`infra/gce/draft-engine-startup.sh`, default `supabase-jwt-secret`),
+ *     because a token the API signs has to verify on the engine. Two copies
+ *     of the same value under two names is the drift this file exists to
+ *     prevent.
+ */
+const REQUIRED_SECRETS = {
+  SUPABASE_JWT_SECRET: 'supabase-jwt-secret',
+  SCHEDULED_TRIGGER_SECRET: 'scheduled-trigger-secret',
+} as const;
+
+const STAGING_DEPLOY_FILES = [
+  '.github/workflows/staging-deploy.yml',
+  'ops/cloudrun/service-staging.yaml',
+] as const;
+
+describe('the deploy mounts the secrets the API cannot run without', () => {
+  for (const rel of [...DEPLOY_FILES, ...STAGING_DEPLOY_FILES]) {
+    for (const name of Object.keys(REQUIRED_SECRETS)) {
+      it(`${rel} declares ${name} outside a comment`, () => {
+        const body = withoutComments(read(rel));
+        expect(
+          body.includes(name),
+          `${name} is not declared in ${rel}. A service deployed from this file ` +
+            `will answer /api/health with 503 and never take traffic; a service ` +
+            `that already had the secret loses it on \`services replace\`.`,
+        ).toBe(true);
+      });
+    }
+  }
+
+  it.each(['.github/workflows/production-deploy.yml', '.github/workflows/staging-deploy.yml'])(
+    '%s mounts each secret from Secret Manager, not through env_vars',
+    (rel) => {
+      const wf = withoutComments(read(rel));
+      const envBlock = wf.split('env_vars: |')[1]?.split(/\n\s{10}[a-z#-]/)[0] ?? '';
+      for (const [name, smName] of Object.entries(REQUIRED_SECRETS)) {
+        const mounted = wf.split('\n').some((l) => l.trim() === `${name}=${smName}:latest`);
+        expect(mounted, `${name} must appear as "${name}=${smName}:latest" under secrets: |`).toBe(true);
+        expect(
+          envBlock.includes(`${name}=`),
+          `${name} must not be passed through env_vars; an unset GitHub secret renders empty and the deploy stays green`,
+        ).toBe(false);
+      }
+    },
+  );
+
+  it.each(['ops/cloudrun/service.yaml', 'ops/cloudrun/service-staging.yaml'])('%s mounts each secret from the same Secret Manager name', (rel) => {
+    const yaml = withoutComments(read(rel));
+    for (const [name, smName] of Object.entries(REQUIRED_SECRETS)) {
+      const idx = yaml.indexOf(`- name: ${name}`);
+      expect(idx, `${name} missing from service.yaml`).toBeGreaterThan(-1);
+      const stanza = yaml.slice(idx, idx + 220);
+      expect(stanza, `${name} must be a secretKeyRef, not a literal value`).toContain('secretKeyRef');
+      expect(stanza, `${name} must reference Secret Manager secret ${smName}`).toContain(`name: ${smName}`);
+    }
+  });
+
+  it('the staging deploy points discovery at the staging engine, not localhost', () => {
+    for (const rel of STAGING_DEPLOY_FILES) {
+      const body = withoutComments(read(rel));
+      expect(body, `${rel} must declare DRAFT_WS_HOST`).toContain('DRAFT_WS_HOST');
+      expect(body, `${rel} must point at the staging engine`).toContain('draft-staging.citrusfantasysports.com');
+    }
+  });
+
+  it('the API signs draft tokens with the same secret the engine VM verifies them with', () => {
+    const startup = read('infra/gce/draft-engine-startup.sh');
+    expect(startup).toContain(`SECRET_JWT_NAME="\${SECRET_JWT_NAME:-${REQUIRED_SECRETS.SUPABASE_JWT_SECRET}}"`);
+  });
+
+  it('the post-deploy health step fails the job when either secret is unusable', () => {
+    const wf = read('.github/workflows/production-deploy.yml');
+    const step = wf.split('API health check')[1] ?? '';
+    expect(step).toContain('.checks.draftToken');
+    expect(step).toContain('.checks.scheduledTrigger');
+    expect(step, 'a non-200 health response must fail the job, not warn').toContain('exit 1');
+    expect(step).not.toContain('::warning::API health check returned');
+  });
+
+  it('the deploy points the startup probe at /api/health so an unhealthy revision never takes traffic', () => {
+    const wf = withoutComments(read('.github/workflows/production-deploy.yml'));
+    expect(wf).toContain('--startup-probe=httpGet.path=/api/health');
+    const yaml = withoutComments(read('ops/cloudrun/service.yaml'));
+    expect(yaml).toContain('path: /api/health');
+  });
+});
+
 describe('the guard bites', () => {
   // A scan that cannot fail is a scan that proves nothing. These pin the
   // detector itself rather than the repo's current state.

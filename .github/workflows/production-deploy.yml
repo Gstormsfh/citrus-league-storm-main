@@ -467,6 +467,32 @@ jobs:
             FCM_PROJECT_ID=citrus-fantasy-prod
             DRAFT_WS_HOST=draft.citrusfantasysports.com
             DRAFT_WS_PORT=443
+          # ── SECRETS FROM SECRET MANAGER, NOT FROM env_vars ───────────
+          # (2026-09-16 outage.) SUPABASE_JWT_SECRET signs every draft
+          # token and SCHEDULED_TRIGGER_SECRET gates every cron route. Both
+          # had been set by hand on the Iowa service and declared in no
+          # repo-tracked file, so the Montreal service created for the
+          # latency arc (PR #512) shipped without them: discovery threw on
+          # every call and every draft room in production sat on
+          # "Reconnecting..." while this workflow, /api/health and the
+          # engine all reported green.
+          #
+          # They are mounted from Secret Manager rather than passed through
+          # env_vars for two reasons. The engine VM reads the SAME secret
+          # (infra/gce/draft-engine-startup.sh, `supabase-jwt-secret`), so a
+          # single source of truth is what makes API-signed tokens verify on
+          # the engine; a GitHub secret would be a second copy that can
+          # drift. And an unset `${{ secrets.X }}` renders as an empty
+          # string, which is exactly how DRAFT_WS_HOST was lost on
+          # 2026-09-03; a missing Secret Manager secret fails the deploy
+          # instead. deploy-cloudrun merges this block into the service's
+          # existing secrets (update strategy defaults to merge), and
+          # ops/cloudrun/service.yaml carries the same two names so a
+          # `services replace` cannot drop them. deployConfig.test.ts pins
+          # both files.
+          secrets: |
+            SUPABASE_JWT_SECRET=supabase-jwt-secret:latest
+            SCHEDULED_TRIGGER_SECRET=scheduled-trigger-secret:latest
           # ── Cloud Run scaling config ────────────────────────────────
           # These flags MUST stay in sync with ops/cloudrun/service.yaml.
           # The April 10 disaster (LIVE_DRAFT_DISASTER_POSTMORTEM.md §3)
@@ -485,6 +511,7 @@ jobs:
             --timeout=60s
             --no-cpu-throttling
             --cpu-boost
+            --startup-probe=httpGet.path=/api/health,httpGet.port=8080,initialDelaySeconds=5,periodSeconds=5,timeoutSeconds=4,failureThreshold=6
 
       # Prove the revision we just built is the one serving traffic.
       # Without this the job can go green while Cloud Run silently keeps
@@ -554,20 +581,45 @@ jobs:
           fi
           echo "Serving revision $SERVING is running this build." | tee /tmp/deploy-api.summary
 
-      - name: API health check
+      - name: API health check (fatal: secrets must be usable on the serving revision)
         if: steps.check-gcp.outputs.has_creds == 'true'
         run: |
-          API_URL=$(gcloud run services describe citrus-api --region=$API_REGION --format='value(status.url)' 2>/dev/null) || true
-          if [ -n "$API_URL" ]; then
-            echo "Checking $API_URL/api/health..."
-            sleep 10
-            status=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/health" --max-time 10) || true
-            if [ "$status" = "200" ]; then
-              echo "API health check passed (HTTP $status)"
-            else
-              echo "::warning::API health check returned HTTP $status"
-            fi
+          set -uo pipefail
+          # This step used to WARN on a non-200 and never read the body. On
+          # 2026-09-16 the serving revision answered 200 with no
+          # SUPABASE_JWT_SECRET and every draft room was down. /api/health
+          # now returns 503 with `checks.draftToken` / `checks.scheduledTrigger`
+          # set to `unconfigured` in that state; this step fails the job on
+          # either. Three attempts absorb a cold start.
+          API_URL=$(gcloud run services describe citrus-api --region=$API_REGION --format='value(status.url)')
+          if [ -z "$API_URL" ]; then
+            echo "::error::Could not resolve the citrus-api URL in $API_REGION."
+            exit 1
           fi
+          echo "Checking $API_URL/api/health..."
+          for attempt in 1 2 3; do
+            sleep 10
+            body=$(curl -s "$API_URL/api/health" --max-time 10) || body=""
+            status=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/health" --max-time 10) || status="000"
+            echo "attempt $attempt: HTTP $status"
+            echo "$body" | jq . 2>/dev/null || echo "$body"
+            if [ "$status" = "200" ]; then break; fi
+          done
+          if [ "$status" != "200" ]; then
+            echo "::error::/api/health returned HTTP $status on the serving revision. Not healthy; not proceeding."
+            exit 1
+          fi
+          draft_token=$(echo "$body" | jq -r '.checks.draftToken // "missing"')
+          scheduled=$(echo "$body" | jq -r '.checks.scheduledTrigger // "missing"')
+          if [ "$draft_token" != "ok" ]; then
+            echo "::error::checks.draftToken=$draft_token — the API cannot sign draft tokens. Every draft room would fail to connect. Mount supabase-jwt-secret on the service."
+            exit 1
+          fi
+          if [ "$scheduled" != "ok" ]; then
+            echo "::error::checks.scheduledTrigger=$scheduled — the API will refuse every scheduled job (waivers, roster lock, sweeps). Mount scheduled-trigger-secret on the service."
+            exit 1
+          fi
+          echo "API health check passed: draftToken=$draft_token scheduledTrigger=$scheduled"
 
       - name: Report run
         if: always()
