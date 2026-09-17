@@ -12,7 +12,7 @@
         "filter": "metric.type = \"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type = \"uptime_url\" AND metric.label.check_id = \"${CHECK_ID}\"",
         "aggregations": [
           {
-            "alignmentPeriod": "300s",
+            "alignmentPeriod": "1200s",
             "perSeriesAligner": "ALIGN_NEXT_OLDER",
             "crossSeriesReducer": "REDUCE_COUNT_FALSE",
             "groupByFields": ["resource.label.*"]
