@@ -581,7 +581,7 @@ jobs:
           fi
           echo "Serving revision $SERVING is running this build." | tee /tmp/deploy-api.summary
 
-      - name: API health check (fatal: secrets must be usable on the serving revision)
+      - name: 'API health check (fatal: secrets must be usable on the serving revision)'
         if: steps.check-gcp.outputs.has_creds == 'true'
         run: |
           set -uo pipefail

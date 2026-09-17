@@ -9,7 +9,7 @@
     {
       "displayName": "logging/user/citrus_draft_canary_ok reports no data for 15 minutes",
       "conditionAbsent": {
-        "filter": "metric.type = \"logging.googleapis.com/user/citrus_draft_canary_ok\"",
+        "filter": "metric.type = \"logging.googleapis.com/user/citrus_draft_canary_ok\" AND resource.type = \"cloud_run_revision\"",
         "aggregations": [
           {
             "alignmentPeriod": "300s",

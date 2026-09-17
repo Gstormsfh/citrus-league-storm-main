@@ -192,8 +192,9 @@ intended order (the check exists to catch exactly that state).
 Apply:
 
 ```
-bash infra/gcp/monitoring/apply-uptime.sh --sms +1XXXXXXXXXX      # first time: creates the channel, Google texts a code
-bash infra/gcp/monitoring/apply-uptime.sh --sms-verify 123456      # second time: verifies it and attaches it everywhere
+bash infra/gcp/monitoring/apply-uptime.sh --sms +1XXXXXXXXXX      # first time: creates the channel and asks Google to text a code
+bash infra/gcp/monitoring/apply-uptime.sh --sms-verify 123456      # second time: verifies it, then creates the checks and policies
+bash infra/gcp/monitoring/apply-uptime.sh --sms-send-code          # only if the text never arrived: sends another code
 bash infra/gcp/monitoring/apply-uptime.sh --dry-run               # any time: shows the plan
 ```
 

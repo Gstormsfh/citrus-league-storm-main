@@ -27,7 +27,6 @@
   ],
   "notificationChannels": ${NOTIFICATION_CHANNELS},
   "alertStrategy": {
-    "notificationRateLimit": { "period": "600s" },
     "autoClose": "1800s"
   },
   "severity": "ERROR",
