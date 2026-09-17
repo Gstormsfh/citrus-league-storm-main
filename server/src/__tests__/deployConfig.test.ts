@@ -372,6 +372,44 @@ describe('every workflow file is YAML GitHub will accept', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// The draft canary's league and user (2026-09-17). The canary is inert
+// without them (it logs draft_canary.disabled and the absence alert pages),
+// and they were first set by hand on one revision, which is how the
+// 2026-09-16 secrets went missing. Both deploy files must declare them, with
+// the same values, and the values must be uuids rather than placeholders.
+// ---------------------------------------------------------------------------
+const CANARY_VARS = ['DRAFT_CANARY_LEAGUE_ID', 'DRAFT_CANARY_USER_ID'] as const;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+function declaredValue(body: string, name: string): string | undefined {
+  // production-deploy.yml: `NAME=value` inside the env_vars literal block.
+  const flat = new RegExp(`^\\s*${name}=(\\S+)\\s*$`, 'm').exec(body);
+  if (flat) return flat[1];
+  // service.yaml: `- name: NAME` followed by `value: "..."`.
+  const nested = new RegExp(`- name: ${name}\\s*\\n\\s*value: "([^"]+)"`).exec(body);
+  return nested?.[1];
+}
+
+describe('the deploy declares the draft canary league and user', () => {
+  for (const rel of DEPLOY_FILES) {
+    for (const name of CANARY_VARS) {
+      it(`${rel} declares ${name} as a uuid`, () => {
+        const value = declaredValue(withoutComments(read(rel)), name);
+        expect(value, `${name} is not declared in ${rel}; the canary would boot disabled`).toBeDefined();
+        expect(value, `${name} in ${rel} is not a uuid (placeholder left in?)`).toMatch(UUID);
+      });
+    }
+  }
+
+  it('both files name the same league and the same user', () => {
+    for (const name of CANARY_VARS) {
+      const values = DEPLOY_FILES.map((rel) => declaredValue(withoutComments(read(rel)), name));
+      expect(new Set(values).size, `${name} differs between the deploy files: ${values.join(' vs ')}`).toBe(1);
+    }
+  });
+});
+
 describe('the guard bites', () => {
   // A scan that cannot fail is a scan that proves nothing. These pin the
   // detector itself rather than the repo's current state.
