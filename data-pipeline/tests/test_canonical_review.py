@@ -351,3 +351,39 @@ class OrganizationOpportunityReviewTests(unittest.TestCase):
         self.assertIsNone(result['players'][1]['counts'])
         basis['evidence'] = []
         with self.assertRaises(ContractError): apply_patch(self.doc, patch)
+
+
+class PublicationCeilingTests(unittest.TestCase):
+    """2026-09-14: the MODEL ceiling and per-team schedule reach the publication path."""
+
+    def skater(self, **over):
+        doc = fixture()
+        p = doc['players'][0]
+        p.update({'position': 'C', 'is_goalie': False, 'rates': {'goals': .5}, 'counts': {'goals': 41.5},
+                  'exposure': {**p['exposure'], 'unit': 'games', 'used': 83, 'baseline': 83}})
+        p.update(over)
+        rebuild(doc)
+        doc['revision'] = digest(doc)
+        return doc
+
+    def test_model_skater_may_use_schedule_minus_one_but_not_the_full_schedule(self):
+        validate(self.skater())
+        with self.assertRaisesRegex(ContractError, 'MODEL exposure exceeds'):
+            validate(self.skater(exposure={'unit': 'games', 'used': 84, 'baseline': 84, 'kind': 'workbook_override',
+                                          'roster_probability': .5, 'probability_semantics': 'metadata_only'}))
+
+    def test_manual_skater_and_model_goalie_may_use_the_full_schedule(self):
+        validate(self.skater(provenance='MANUAL', exposure={'unit': 'games', 'used': 84, 'baseline': 84, 'kind': 'workbook_override',
+                                                            'roster_probability': .5, 'probability_semantics': 'metadata_only'}))
+        validate(fixture())  # MODEL goalie at 84 starts: bounded by the crease ledger, not the skater ceiling
+
+    def test_allocated_exposure_needs_a_scheduled_team_not_a_literal_84(self):
+        doc = self.skater()
+        doc['players'][0]['team'] = 'ZZZ'
+        doc['teams'][0]['team'] = 'ZZZ'
+        doc['schedule'] = {'ZZZ': 84, 'AAA': 84}  # team coverage check passes; then the player's own budget is checked
+        del doc['schedule']['ZZZ']
+        doc['teams'] = [{'team': 'AAA', 'notes': [], 'lineup_slots': []}]
+        doc['revision'] = digest(doc)
+        with self.assertRaisesRegex(ContractError, 'missing from the season schedule'):
+            validate(doc)

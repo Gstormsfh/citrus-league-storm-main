@@ -58,10 +58,16 @@ class Projection:
     override_reason: Optional[str] = None
 
 
+# The MODEL games-played ceiling sits this many games under the team's
+# schedule: 83 of 84 for 2026-27. Enforced here for workbook rows and, since
+# 2026-09-14, in canonical_review.validate on the publication path and in
+# citrus_projection_invariants() daily. One number, three readers.
+MODEL_GP_CEILING_MARGIN = 1
+
 def skater_from_workbook(*, player_id, team, season_counts, baseline_gp,
                          gp_used, provenance, role_context, source,
                          roster_probability=1.0, override_reason=None,
-                         scheduled_games=84, model_gp_ceiling=83):
+                         scheduled_games=84, model_gp_ceiling=None):
     """Normalize season counts to rates without changing intentional GP choices.
 
     Probability uses [0, 1], so callers must explicitly convert workbook percent
@@ -72,7 +78,7 @@ def skater_from_workbook(*, player_id, team, season_counts, baseline_gp,
     baseline = _number(baseline_gp, "baseline_gp")
     used = _number(gp_used, "gp_used")
     schedule = _number(scheduled_games, "scheduled_games")
-    ceiling = _number(model_gp_ceiling, "model_gp_ceiling")
+    ceiling = _number(schedule - MODEL_GP_CEILING_MARGIN if model_gp_ceiling is None else model_gp_ceiling, "model_gp_ceiling")
     probability = _number(roster_probability, "roster_probability")
     if baseline <= 0:
         raise ContractError("Positive baseline_gp required to infer rates")

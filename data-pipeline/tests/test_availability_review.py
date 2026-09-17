@@ -13,9 +13,12 @@ from projection_contract import ContractError
 
 
 def player(pid, name, team):
+    # A MODEL skater may use at most schedule - 1 games (the intentional
+    # ceiling projection_contract enforces, now checked by validate); 83 of
+    # the 84-game fixture schedule. rebuild() rederives counts from rates.
     return {'player_id': pid, 'name': name, 'team': team, 'position': 'C', 'is_goalie': False,
-            'status': 'projected', 'provenance': 'MODEL', 'rates': {'goals': .5}, 'counts': {'goals': 42},
-            'exposure': {'unit': 'games', 'used': 84, 'baseline': 84, 'kind': 'workbook_override',
+            'status': 'projected', 'provenance': 'MODEL', 'rates': {'goals': .5}, 'counts': {'goals': 41.5},
+            'exposure': {'unit': 'games', 'used': 83, 'baseline': 83, 'kind': 'workbook_override',
                          'roster_probability': .5, 'probability_semantics': 'metadata_only'},
             'rate_policy': 'refresh_model', 'exposure_policy': 'preserve_season_override',
             'availability': {'status': 'unknown', 'authority': 'unknown', 'as_of': '2026-09-12', 'source': None, 'return_window': None},
@@ -24,8 +27,10 @@ def player(pid, name, team):
 
 def goalie(pid, name, team):
     g = player(pid, name, team)
+    # The one goalie carries every start so the crease ledger balances; goalie
+    # starts are bounded by that ledger, not by the skater ceiling.
     g.update({'position': 'G', 'is_goalie': True, 'rates': {'saves': 20}, 'counts': {'saves': 1680},
-              'exposure': {**g['exposure'], 'unit': 'starts'}})
+              'exposure': {**g['exposure'], 'unit': 'starts', 'used': 84, 'baseline': 84}})
     return g
 
 

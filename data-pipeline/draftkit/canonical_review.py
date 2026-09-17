@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 from canonical_inputs import VERSION, GOALIE_COLS, SKATER_COLS, number, unique_ids, coverage_blockers, optional_lineup_context, has_evidence
-from projection_contract import ContractError
+from projection_contract import ContractError, MODEL_GP_CEILING_MARGIN
 
 
 def digest(document):
@@ -128,8 +128,21 @@ def validate(document):
         if exposure['unit'] != ('starts' if p['is_goalie'] else 'games'):
             raise ContractError(f'{pid}: wrong exposure unit')
         used = exposure['used']
-        if used is not None and not 0 <= strict_number(used, 'exposure') <= schedule.get(p['team'], 84):
+        if used is not None and p['team'] not in schedule:
+            # Never validate an allocated workload against a literal 84: the
+            # schedule is derived per team, and a team that is not in it has
+            # no budget to allocate against.
+            raise ContractError(f'{pid}: allocated exposure for a team missing from the season schedule')
+        if used is not None and not 0 <= strict_number(used, 'exposure') <= schedule[p['team']]:
             raise ContractError(f'{pid}: exposure outside team schedule')
+        # The MODEL skater games-played ceiling (projection_contract.MODEL_GP_CEILING_MARGIN):
+        # a model skater may use at most one game fewer than its team's schedule.
+        # Deliberately 83 of 84 for 2026-27. MANUAL and DEFAULT rows are reviewed
+        # by hand and may use the full schedule; goalie starts are bounded by the
+        # crease ledger instead.
+        if (used is not None and not p['is_goalie'] and p['provenance'] == 'MODEL' and p['status'] == 'projected'
+                and strict_number(used, 'exposure') > schedule[p['team']] - MODEL_GP_CEILING_MARGIN + 1e-9):
+            raise ContractError(f'{pid}: MODEL exposure exceeds the intentional schedule-{MODEL_GP_CEILING_MARGIN:g} ceiling')
         probability = exposure.get('roster_probability')
         if probability is not None and not 0 <= strict_number(probability, 'roster_probability') <= 1:
             raise ContractError(f'{pid}: probability must be between zero and one')

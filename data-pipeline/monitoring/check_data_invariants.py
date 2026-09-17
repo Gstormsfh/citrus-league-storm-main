@@ -184,7 +184,15 @@ INVARIANT_FNS = ("citrus_data_invariants", "citrus_model_invariants",
                  # a feature the model splits on, which carried the bulk
                  # import's definition for eight seasons and a broken one
                  # for the ninth. Outputs were clean the whole time.
-                 "citrus_feature_provenance")
+                 "citrus_feature_provenance",
+                 # Added 2026-09-14. The projection standards, checked after
+                 # publication rather than only at it: the crease in the
+                 # serving table, the published schedule budgets against
+                 # nhl_games as it stands today, the MODEL skater games
+                 # ceiling (83 of 84) that projection_contract.py declared
+                 # and nothing on the publication path enforced, and
+                 # provenance on every published row.
+                 "citrus_projection_invariants")
 
 
 def run_checks(db: SupabaseRest) -> List[Dict[str, Any]]:
@@ -194,7 +202,7 @@ def run_checks(db: SupabaseRest) -> List[Dict[str, Any]]:
         if not isinstance(got, list):
             raise RuntimeError(
                 f"{fn}() did not return rows. Are the migrations "
-                "20260825235000 / 20260826000000 / 20260826010000 applied?"
+                "20260825235000 / 20260826000000 / 20260826010000 / 20260914190000 applied?"
             )
         rows.extend(got)
     return rows
