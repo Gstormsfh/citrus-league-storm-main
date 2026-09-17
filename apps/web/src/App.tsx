@@ -17,6 +17,7 @@ import NativeBootSplash from "./components/NativeBootSplash";
 import { reportBootStage } from "@/lib/bootStages";
 import { LeagueLoadErrorBanner } from "./components/LeagueLoadErrorBanner";
 import { RouteUnlock } from "./components/RouteUnlock";
+import { CampaignRedirect } from "./components/CampaignRedirect";
 import { TermsGate } from "./components/TermsGate";
 import { CookieConsent } from "./components/CookieConsent";
 import ScrollToTop from "./components/ScrollToTop";
@@ -236,6 +237,8 @@ const App = () => {
                   <main id="main-content">
                   <Routes>
                     <Route path="/" element={<Index />} />
+                    <Route path="/go/:handle" element={<CampaignRedirect />} />
+                    <Route path="/go" element={<CampaignRedirect />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/account-deleted" element={<AccountDeleted />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
