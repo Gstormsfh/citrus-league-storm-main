@@ -198,6 +198,15 @@ bash infra/gcp/monitoring/apply-uptime.sh --sms-send-code          # only if the
 bash infra/gcp/monitoring/apply-uptime.sh --dry-run               # any time: shows the plan
 ```
 
+The three uptime policies align over 1200 s (Google's own uptime-policy
+template value) with a 120 s duration. `ALIGN_NEXT_OLDER` takes each
+region's newest sample inside the window, so detection is still
+duration-bound (about two minutes after the second region fails), but a
+single missed sample from one region can no longer drop the failing
+count below the threshold and close the incident. With 300 s the first
+production incident (2026-09-16) opened and closed several times while
+the API was continuously red.
+
 An unverified SMS channel is never attached to a policy, so a typo in
 the number cannot silently absorb alerts. To test the page: scale the
 API to a revision without the secret on staging, or simpler, temporarily
