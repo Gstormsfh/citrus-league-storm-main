@@ -165,6 +165,91 @@ weekly scorecard (`.github/workflows/draft-scorecard.yml` →
 `data-pipeline/monitoring/draft_latency_scorecard.py` →
 `draft_latency_scorecard` view), not Cloud Monitoring.
 
+## Edge uptime checks and paging (`apply-uptime.sh`, 2026-09-16)
+
+Everything above watches the engine from the inside. On 2026-09-16 the
+engine was healthy and every draft room in production was down anyway:
+the API had been moved to a new Cloud Run service (PR #512) that never
+received `SUPABASE_JWT_SECRET`, so `GET /api/drafts/:id/server` threw on
+every call and no browser could get a token. Watchdog green, errors
+zero, deploy green, e-mail silent. The founder found it mid mock draft.
+
+`apply-uptime.sh` adds the outside view and a phone:
+
+| Object | What it proves | Fails when |
+|---|---|---|
+| uptime check **Citrus API health: draft token** | `GET https://citrusfantasysports.com/api/health` is 2xx and `$.checks.draftToken == "ok"` (the route signs and verifies a real draft token per request; see `server/src/app.ts`) | API down, Firebase rewrite broken, or the serving revision cannot sign draft tokens (the 2026-09-16 case) |
+| uptime check **Citrus API health: scheduled trigger** | same URL, `$.checks.scheduledTrigger == "ok"` | the serving revision would refuse every `/api/scheduled/*` job (waivers, roster lock, sweeps) |
+| uptime check **Citrus draft engine edge** | `GET https://draft.citrusfantasysports.com/` is `404` with `uWebSockets` in the body (no page at `/`; the socket is at `/ws/draft/<id>`) | DNS, Caddy/TLS, VM or container not serving to the public internet |
+| policies `alert-uptime-*.json` | one per check, fires when 2+ of 3 regions fail for 2 minutes | |
+| channel **Citrus ops SMS** | a phone number; attached to the three policies above AND to the three engine policies this directory already owns | |
+
+Every check runs every 60 s from three US regions. The two `/api/health`
+checks are red until the health route that reports `checks.draftToken`
+and `checks.scheduledTrigger` is the serving revision; that is the
+intended order (the check exists to catch exactly that state).
+
+Apply:
+
+```
+bash infra/gcp/monitoring/apply-uptime.sh --sms +1XXXXXXXXXX      # first time: creates the channel, Google texts a code
+bash infra/gcp/monitoring/apply-uptime.sh --sms-verify 123456      # second time: verifies it and attaches it everywhere
+bash infra/gcp/monitoring/apply-uptime.sh --dry-run               # any time: shows the plan
+```
+
+An unverified SMS channel is never attached to a policy, so a typo in
+the number cannot silently absorb alerts. To test the page: scale the
+API to a revision without the secret on staging, or simpler, temporarily
+edit the JSON path in the console to `$.checks.nothing` and wait two
+minutes; then re-run the script, which puts it back.
+
+### The canary league
+
+`server/src/canary/draftCanary.ts` runs inside every citrus-api instance:
+every 5 minutes it signs a draft token exactly as `GET /api/drafts/:id/server`
+does, opens `wss://draft.citrusfantasysports.com/ws/draft/<league>` with the
+token as the subprotocol (what the browser does), and expects the engine's
+first frame to be a `snapshot`. It logs `draft_canary.ok` or
+`draft_canary.failed`; `apply-uptime.sh` turns those into a log-based
+metric, an absence alert (15 min, CRITICAL) and a failure alert (ERROR).
+This is the only signal that proves the engine ACCEPTS the API's token.
+
+It needs one permanent league and one user, provisioned once by a human:
+
+1. In the app, sign up a dedicated user (suggested: `canary@citrusfantasysports.com`).
+   Note its auth uid (Supabase -> Authentication -> Users).
+2. Signed in as that user, start a mock draft (Armchair GM -> Mock Draft).
+   Make one pick, then **Pause** as commissioner. The league is now
+   `draft_status = 'in_progress'`, `draft_state = 'paused'`, has
+   `draft_order` rows, and the engine holds it resident without a clock.
+3. Mark it so nothing sweeps or lists it (Supabase SQL editor, prod):
+
+   ```sql
+   update public.leagues
+      set name = 'CANARY: do not touch',
+          settings = coalesce(settings, '{}'::jsonb) || '{"practice": true, "canary": true}'::jsonb
+    where id = '<league uuid from step 2>';
+   ```
+
+   Migration `20260917020000_canary_league_survives_the_practice_sweep.sql`
+   makes `sweep_practice_leagues()` skip `settings.canary = true`; apply
+   it before the 24-hour sweep runs on the new league.
+4. Put both ids on the serving revision (and in `production-deploy.yml`
+   `env_vars`, so the next deploy keeps them):
+
+   ```
+   gcloud run services update citrus-api --region=northamerica-northeast1 --project=citrus-fantasy-prod --update-env-vars=DRAFT_CANARY_LEAGUE_ID=<league uuid>,DRAFT_CANARY_USER_ID=<user uuid>
+   ```
+5. Within a minute the boot log shows `draft_canary.started`; within six,
+   `draft_canary.ok`. Then re-run `apply-uptime.sh` so the absence policy
+   starts judging.
+
+A paused league does not autopick, writes no `draft_events`, is excluded
+from the deploy freeze gate (practice), and survives an engine restart
+(the boot scan rehydrates every `in_progress` league). If someone resumes
+or completes it, the canary reports `closed_before_snapshot` / 4400 and
+the runbook in the alert says how to re-provision.
+
 ## Apply (Cloud Shell, ~2 minutes)
 
 ```bash

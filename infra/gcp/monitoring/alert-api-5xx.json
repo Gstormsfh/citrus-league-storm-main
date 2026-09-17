@@ -1,0 +1,39 @@
+{
+  "displayName": "Citrus API: 5xx responses (10+ in 5 min)",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "**What it means.** The citrus-api Cloud Run service in northamerica-northeast1 returned ten or more 5xx responses in a five-minute window. The API has no error tracker of its own (Sentry is web-only), so this is the server-side error signal. Discovery failing on every call (2026-09-16) would have tripped this within a minute of the first manager opening a draft room.\n\n**What to do.**\n1. `gcloud logging read 'resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"citrus-api\" AND httpRequest.status>=500' --project=citrus-fantasy-prod --freshness=15m --limit=20 --format='value(timestamp,httpRequest.status,httpRequest.requestUrl)'` - which routes.\n2. `gcloud logging read 'resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"citrus-api\" AND severity>=ERROR' --project=citrus-fantasy-prod --freshness=15m --limit=20 --format=json | jq -r '.[] | .jsonPayload.message // .jsonPayload.event // .textPayload'` - why.\n3. If it started with a deploy: `gcloud run services update-traffic citrus-api --region=northamerica-northeast1 --to-revisions=<previous>=100`.\n\nManaged by `infra/gcp/monitoring/apply-uptime.sh` (`alert-api-5xx.json`)."
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "citrus-api 5xx count over 5 min",
+      "conditionThreshold": {
+        "filter": "metric.type = \"run.googleapis.com/request_count\" AND resource.type = \"cloud_run_revision\" AND resource.label.service_name = \"citrus-api\" AND metric.label.response_code_class = \"5xx\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "groupByFields": ["resource.label.service_name"]
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 9,
+        "duration": "0s",
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "notificationChannels": ${NOTIFICATION_CHANNELS},
+  "alertStrategy": {
+    "notificationRateLimit": { "period": "600s" },
+    "autoClose": "1800s"
+  },
+  "severity": "ERROR",
+  "enabled": true,
+  "userLabels": {
+    "app": "citrus-api",
+    "managed-by": "apply-uptime-sh"
+  }
+}

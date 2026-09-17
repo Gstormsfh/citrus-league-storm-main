@@ -42,6 +42,7 @@ if (proxyUrl) {
 
 import { serve } from '@hono/node-server';
 import { app } from './app';
+import { startDraftCanary } from './canary/draftCanary';
 import {
   logger,
   createConsoleLogger,
@@ -71,9 +72,18 @@ const server = serve({
   logger.info(`Citrus API server running on http://localhost:${info.port}`);
 });
 
+// DRAFT CANARY (2026-09-16). Every 5 minutes: sign a draft token the way
+// discovery does, open the engine socket, expect a snapshot. Logs
+// `draft_canary.ok` / `draft_canary.failed`; the absence of `ok` pages
+// (infra/gcp/monitoring/apply-uptime.sh). Inert, and says so, unless
+// DRAFT_CANARY_LEAGUE_ID / DRAFT_CANARY_USER_ID are set. See
+// server/src/canary/draftCanary.ts for why this exists.
+const stopDraftCanary = startDraftCanary();
+
 // ── Graceful shutdown ────────────────────────────────────────────────
 function shutdown(signal: string) {
   logger.info(`[${signal}] Shutting down gracefully...`);
+  stopDraftCanary?.();
   server.close(() => {
     logger.info('Server closed. Goodbye.');
     process.exit(0);

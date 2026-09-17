@@ -1,0 +1,36 @@
+{
+  "displayName": "Citrus draft engine: not reachable from the internet (edge uptime check)",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "**What it means.** The public uptime check on `https://draft.citrusfantasysports.com/` is failing from 2+ regions. A healthy engine answers `404` with a `uWebSockets/20 Server` body (there is no page at `/`; the socket lives at `/ws/draft/<id>`). Anything else means DNS, the Caddy TLS front, the VM, or the container is not serving. This is the check the internal `watchdog_ok` alert cannot make: the engine can be perfectly healthy on the inside and unreachable from a manager's phone.\n\n**What to do (in order).**\n1. `curl -sv https://draft.citrusfantasysports.com/ 2>&1 | tail -20` - TLS failure, connection refused, or a non-uWS body tells you which layer.\n2. `dig +short draft.citrusfantasysports.com` must be the VM's static IP (`gcloud compute instances describe citrus-draft-engine-prod --zone=northamerica-northeast1-a --format='value(networkInterfaces[0].accessConfigs[0].natIP)'`).\n3. VM state: `gcloud compute instances describe citrus-draft-engine-prod --zone=northamerica-northeast1-a --format='value(status)'`; if not RUNNING, `docs/RUNBOOKS/draft-engine-v2-operations.md` section 2.1.\n4. Caddy cert: `gcloud compute ssh citrus-draft-engine-prod --zone=northamerica-northeast1-a -- sudo docker logs --tail 50 citrus-caddy`.\n\nManaged by `infra/gcp/monitoring/apply-uptime.sh` (`alert-uptime-engine-edge.json`)."
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "uptime check \"Citrus draft engine edge\" failing from 2+ regions",
+      "conditionThreshold": {
+        "filter": "metric.type = \"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type = \"uptime_url\" AND metric.label.check_id = \"${CHECK_ID}\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_NEXT_OLDER",
+            "crossSeriesReducer": "REDUCE_COUNT_FALSE",
+            "groupByFields": ["resource.label.*"]
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 1,
+        "duration": "120s",
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "notificationChannels": ${NOTIFICATION_CHANNELS},
+  "severity": "CRITICAL",
+  "enabled": true,
+  "userLabels": {
+    "app": "citrus-draft-engine",
+    "managed-by": "apply-uptime-sh",
+    "runbook": "draft-engine-v2-operations-s2-1"
+  }
+}

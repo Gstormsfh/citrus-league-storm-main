@@ -1,0 +1,36 @@
+{
+  "displayName": "Citrus API: /api/health draftToken not ok (edge uptime check)",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "**What it means.** The public uptime check on `https://citrusfantasysports.com/api/health` is failing from 2+ regions. It fails when the API is unreachable, answers non-2xx, or answers 200 without `checks.draftToken == \"ok\"`. That last case is the 2026-09-16 outage: the serving Cloud Run revision had no `SUPABASE_JWT_SECRET`, discovery threw on every call, and every draft room in production sat on \"Reconnecting...\" while every other signal was green.\n\n**What to do (in order).**\n1. `curl -s https://citrusfantasysports.com/api/health | jq .` - read `status` and `checks`.\n2. `checks.draftToken == unconfigured` -> the serving revision has no secret. `gcloud run services update citrus-api --region=northamerica-northeast1 --project=citrus-fantasy-prod --update-secrets=SUPABASE_JWT_SECRET=supabase-jwt-secret:latest`\n3. `checks.draftToken == broken` -> the secret is present but sign/verify fails; compare the Secret Manager version the API mounts to the one the engine VM read at boot (`deployment.fingerprint` log line).\n4. Non-2xx or unreachable -> Cloud Run revision health: `gcloud run services describe citrus-api --region=northamerica-northeast1 --format='value(status.conditions)'`, then Firebase Hosting rewrite in `firebase.json`.\n\nManaged by `infra/gcp/monitoring/apply-uptime.sh` (`alert-uptime-api-draft-token.json`). Edit the file, re-run the script; do not hand-edit in the console."
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "uptime check \"Citrus API health: draft token\" failing from 2+ regions",
+      "conditionThreshold": {
+        "filter": "metric.type = \"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type = \"uptime_url\" AND metric.label.check_id = \"${CHECK_ID}\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_NEXT_OLDER",
+            "crossSeriesReducer": "REDUCE_COUNT_FALSE",
+            "groupByFields": ["resource.label.*"]
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 1,
+        "duration": "120s",
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "notificationChannels": ${NOTIFICATION_CHANNELS},
+  "severity": "CRITICAL",
+  "enabled": true,
+  "userLabels": {
+    "app": "citrus-api",
+    "managed-by": "apply-uptime-sh",
+    "incident": "2026-09-16-missing-jwt-secret"
+  }
+}
