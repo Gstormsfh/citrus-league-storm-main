@@ -12,15 +12,17 @@
  * web only, so the iOS build says "finish on the web" rather than asking
  * for a credential the App Store does not allow it to.
  *
- * The history attaches to a Citrus league the user commissions. With none,
- * the door is Create league; the import is one step after.
+ * The history attaches to a Citrus league the user commissions, or, in one
+ * tap, to a new league Citrus sets up from the source's own settings
+ * (2026-09-17): name, format, scoring, roster, draft type, playoffs, keepers,
+ * team count, then every season behind it and an invite link for the managers.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
-import { importApi, type EspnCredentials, type EspnDiscovery, type ImportJob, type YahooChain, type YahooConnection } from '@/api/imports';
+import { importApi, type EspnCredentials, type EspnDiscovery, type FoundedLeague, type ImportJob, type YahooChain, type YahooConnection } from '@/api/imports';
 import Navbar from '@/components/Navbar';
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { ImportProgress } from '@/components/history/ImportProgress';
@@ -33,6 +35,9 @@ import { useToast } from '@/hooks/use-toast';
 
 const dataOf = <T,>(res: unknown): T | null => ((res as { data?: T })?.data ?? null);
 const SCORING_LABEL: Record<string, string> = { h2h_points: 'H2H points', h2h_categories: 'H2H categories', h2h_one_win: 'H2H categories', roto: 'Rotisserie', points: 'Total points', unknown: 'Custom' };
+/** The target select's value for "set a new league up from the import". */
+export const NEW_LEAGUE = 'new';
+const FORMAT_WORDS: Record<string, string> = { 'h2h-points': 'head-to-head points', 'h2h-categories': 'head-to-head categories', roto: 'rotisserie', 'total-points': 'total points' };
 
 export default function ImportLeague() {
   usePageMeta({ title: 'Bring your league', description: 'Import every season, champion and record from Yahoo, ESPN, Fantrax or anywhere into Citrus.', path: '/import' });
@@ -45,11 +50,24 @@ export default function ImportLeague() {
   const commissioned = useMemo(() => (league?.userLeagues ?? []).filter((l) => l.commissioner_id === user?.id), [league?.userLeagues, user?.id]);
   const [targetId, setTargetId] = useState<string>(params.get('league') ?? '');
   useEffect(() => {
-    if (!targetId && commissioned.length === 1) setTargetId(commissioned[0].id);
-  }, [commissioned, targetId]);
+    if (targetId) return;
+    if (commissioned.length === 1) setTargetId(commissioned[0].id);
+    else if (!league?.loading && commissioned.length === 0) setTargetId(NEW_LEAGUE);
+  }, [commissioned, targetId, league?.loading]);
+  const founding = targetId === NEW_LEAGUE;
   const target = commissioned.find((l) => l.id === targetId) ?? null;
 
   const [job, setJob] = useState<ImportJob | null>(null);
+  /** The league one tap just set up, while its import runs. */
+  const [founded, setFounded] = useState<FoundedLeague | null>(null);
+  const jobLeagueId = founded?.league.id ?? target?.id ?? null;
+
+  const onFounded = async (f: FoundedLeague) => {
+    setFounded(f);
+    setJob(f.job);
+    try { await league?.refreshLeagues?.(); } catch { /* the list catches up on the next load */ }
+  };
+  const reset = () => { setJob(null); setFounded(null); };
 
   // ---- ESPN -----------------------------------------------------------------
   const [espnLink, setEspnLink] = useState('');
@@ -76,12 +94,19 @@ export default function ImportLeague() {
   };
 
   const startEspn = async () => {
-    if (!discovery || !target) return;
+    if (!discovery) return;
     try {
-      const j = dataOf<ImportJob>(await importApi.startEspn(target.id, { externalLeagueId: discovery.externalLeagueId, latestEspnSeason: discovery.latestEspnSeason, credentials: creds }));
+      if (founding && !founded) {
+        const f = dataOf<FoundedLeague>(await importApi.foundEspn({ externalLeagueId: discovery.externalLeagueId, latestEspnSeason: discovery.latestEspnSeason, credentials: creds }));
+        if (f) await onFounded(f);
+        return;
+      }
+      const leagueId = founded?.league.id ?? target?.id;
+      if (!leagueId) return;
+      const j = dataOf<ImportJob>(await importApi.startEspn(leagueId, { externalLeagueId: discovery.externalLeagueId, latestEspnSeason: discovery.latestEspnSeason, credentials: creds }));
       if (j) setJob(j);
     } catch (e) {
-      toast({ title: "Import didn't start", description: (e as Error).message });
+      toast({ title: founding ? "League setup didn't finish" : "Import didn't start", description: (e as Error).message });
     }
   };
 
@@ -117,13 +142,22 @@ export default function ImportLeague() {
       setConnecting(false);
     }
   };
+  const [startingKey, setStartingKey] = useState<string | null>(null);
   const startYahoo = async (chain: YahooChain) => {
-    if (!target) return;
+    setStartingKey(chain.key);
     try {
+      if (founding) {
+        const f = dataOf<FoundedLeague>(await importApi.foundYahoo({ leagueKey: chain.key }));
+        if (f) await onFounded(f);
+        return;
+      }
+      if (!target) return;
       const j = dataOf<ImportJob>(await importApi.startYahoo(target.id, { leagueKey: chain.key }));
       if (j) setJob(j);
     } catch (e) {
-      toast({ title: "Import didn't start", description: (e as Error).message });
+      toast({ title: founding ? "League setup didn't finish" : "Import didn't start", description: (e as Error).message });
+    } finally {
+      setStartingKey(null);
     }
   };
 
@@ -165,25 +199,27 @@ export default function ImportLeague() {
             <Eyebrow>✦ Into which Citrus league?</Eyebrow>
             {league?.loading ? (
               <p className="mt-2 font-barlow text-[13px] text-white/55">Loading your leagues…</p>
-            ) : commissioned.length === 0 ? (
-              <div className="mt-2">
-                <p className="font-barlow text-[13px] leading-[1.45] text-white/60">History attaches to a league you commission. Create yours first; this is one step after.</p>
-                <Link to="/create-league" className="mt-3 inline-flex h-10 items-center rounded-[10px] bg-pressbox-orange px-4 font-condensed font-bold text-[14px] uppercase tracking-[0.06em] text-pressbox-orange-ink">Create your league</Link>
-              </div>
             ) : (
               <div className="mt-2">
                 <label className="sr-only" htmlFor="import-target-league">Citrus league</label>
                 <select id="import-target-league" value={targetId} onChange={(e) => setTargetId(e.target.value)} className={inputClass} disabled={!!job}>
-                  <option value="" className="text-black">Choose a league</option>
+                  {commissioned.length > 0 && <option value="" className="text-black">Choose a league</option>}
+                  <option value={NEW_LEAGUE} className="text-black">A new league, set up from the import</option>
                   {commissioned.map((l) => <option key={l.id} value={l.id} className="text-black">{l.name}</option>)}
                 </select>
+                <p className="mt-1.5 font-barlow text-[12px] leading-[1.45] text-white/50">
+                  {founding
+                    ? 'One tap: Citrus creates the league with its name, format, scoring, roster, draft type, playoffs and keeper rule from the source, brings every season over, and gives you an invite link for your managers.'
+                    : 'Or bring the history into a league you already run.'}
+                </p>
               </div>
             )}
           </Panel>
 
-          {job && target && (
+          {job && jobLeagueId && (
             <div className="mt-4">
-              <ImportProgress leagueId={target.id} job={job} credentialsSlot={job.platform === 'espn' ? (
+              {founded && <FoundedPanel founded={founded} />}
+              <ImportProgress leagueId={jobLeagueId} job={job} credentialsSlot={job.platform === 'espn' ? (
                 <div>
                   {signInPanel}
                   {!native && creds && (
@@ -191,7 +227,7 @@ export default function ImportLeague() {
                   )}
                 </div>
               ) : undefined} />
-              <button type="button" onClick={() => setJob(null)} className="mt-2 font-barlow text-[13px] text-pressbox-orange-soft">Import another league</button>
+              <button type="button" onClick={reset} className="mt-2 font-barlow text-[13px] text-pressbox-orange-soft">Import another league</button>
             </div>
           )}
 
@@ -228,8 +264,8 @@ export default function ImportLeague() {
                       <button type="button" onClick={() => setShowSignIn(true)} className="mt-1 font-barlow text-[13px] text-pressbox-orange-soft">Sign in to ESPN for the older seasons</button>
                     )}
                     {showSignIn && <div className="mt-2">{signInPanel}</div>}
-                    <HistoryButton className="mt-3" disabled={!target} onClick={() => void startEspn()}>
-                      {target ? `Import into ${target.name}` : 'Choose a Citrus league first'}
+                    <HistoryButton className="mt-3" disabled={!target && !founding} onClick={() => void startEspn()}>
+                      {founding ? 'Bring it to Citrus' : target ? `Import into ${target.name}` : 'Choose a Citrus league first'}
                     </HistoryButton>
                   </div>
                 )}
@@ -288,7 +324,7 @@ export default function ImportLeague() {
                           </span>
                         </span>
                         {chain.seasons.some((s) => !s.isFinished) && <Chip>In play</Chip>}
-                        <HistoryButton disabled={!target} onClick={() => void startYahoo(chain)}>Import</HistoryButton>
+                        <HistoryButton disabled={(!target && !founding) || startingKey != null} busy={startingKey === chain.key} onClick={() => void startYahoo(chain)}>{founding ? 'Bring it to Citrus' : 'Import'}</HistoryButton>
                       </div>
                     ))}
                     <p className="mt-2 font-barlow text-[11px] text-white/55">Fantasy data provided by Yahoo Fantasy</p>
@@ -306,3 +342,49 @@ export default function ImportLeague() {
     </div>
   );
 }
+
+/** The league one tap set up: what carried over, what to look at, where to go, who to invite. */
+function FoundedPanel({ founded }: { founded: FoundedLeague }) {
+  const { toast } = useToast();
+  const { league, plan } = founded;
+  const inviteLink = league.join_code ? `${window.location.origin}/join/${league.join_code}` : null;
+  const copy = async () => {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      toast({ title: 'Invite link copied', description: 'Send it to your managers. When they join, they pick their own name in the trophy room.' });
+    } catch {
+      toast({ title: 'Copy it by hand', description: inviteLink });
+    }
+  };
+  const bits = [
+    FORMAT_WORDS[plan.scoringFormat] ?? plan.scoringFormat,
+    `${plan.teamsCount} teams`,
+    `${plan.draftType} draft, ${plan.draftRounds} rounds`,
+    plan.playoffTeams ? `${plan.playoffTeams}-team playoffs` : null,
+    plan.keeper.enabled ? `${plan.keeper.count} keepers` : null,
+  ].filter(Boolean).join(' · ');
+  return (
+    <Panel className="mb-3 ring-pressbox-sage/40" testId="founded-league">
+      <Eyebrow>✦ Your league is set up</Eyebrow>
+      <p className="mt-1 font-condensed font-bold text-[18px] text-pressbox-text">{league.name}</p>
+      <p className="font-barlow text-[12px] text-white/55">{bits}</p>
+      {plan.notes.length > 0 && (
+        <ul className="mt-2 space-y-1" aria-label="Things to look at">
+          {plan.notes.map((n) => <li key={n} className="font-barlow text-[12px] leading-[1.4] text-white/60">{n}</li>)}
+        </ul>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Link to={`/league/${league.id}/history`} className="inline-flex h-9 items-center rounded-[10px] bg-pressbox-orange px-3.5 font-condensed font-bold text-[13px] uppercase tracking-[0.06em] text-pressbox-orange-ink">Open the trophy room</Link>
+        <Link to={`/league/${league.id}`} className="font-barlow text-[13px] text-pressbox-orange-soft">League settings</Link>
+        {inviteLink && (
+          <button type="button" onClick={() => void copy()} className="font-barlow text-[13px] text-pressbox-orange-soft">Copy the invite link</button>
+        )}
+      </div>
+      <p className="mt-2 font-barlow text-[12px] leading-[1.4] text-white/50">
+        Your managers join with the link and pick their own name from the league's history; their titles and records are theirs the moment they do.
+      </p>
+    </Panel>
+  );
+}
+

@@ -222,3 +222,46 @@ describe('POST /api/leagues/:leagueId/imports/yahoo', () => {
     expect(audits[0]).toMatchObject({ p_event_type: 'LEAGUE_HISTORY_IMPORT', p_details: { platform: 'yahoo', leagueKey: '453.l.200' } });
   });
 });
+
+describe('POST /api/imports/yahoo/found', () => {
+  it('503 when Yahoo is off; 409 when not connected; nothing created either way', async () => {
+    const db = makeDb('u-test');
+    configure(false);
+    let { app } = await import('../../app');
+    expect((await post(app, '/api/imports/yahoo/found', { leagueKey: '453.l.200' })).status).toBe(503);
+    configure(true);
+    ({ app } = await import('../../app'));
+    expect((await post(app, '/api/imports/yahoo/found', { leagueKey: '453.l.200' })).status).toBe(409);
+    expect(db.rows('leagues')).toHaveLength(1);
+  });
+
+  it('one tap: the league is created from the newest Yahoo season and the import runs into it', async () => {
+    const db = makeDb('u-test', { profiles: [{ id: 'u-test', username: 'gs', first_name: 'Garrett', last_name: 'S', default_team_name: 'Storm Front' }] });
+    await connected(db);
+    mockYahoo();
+    const audits: any[] = [];
+    db.rpcHandlers.log_security_event = (args) => { audits.push(args); return null; };
+    const { app } = await import('../../app');
+    const res = await post(app, '/api/imports/yahoo/found', { leagueKey: '453.l.200' });
+    expect(res.status).toBe(201);
+    const body = (await res.json()).data;
+
+    const league = db.rows('leagues').find((l) => l.id !== LEAGUE)!;
+    expect(body.league).toMatchObject({ id: league.id, name: 'Puck' });
+    expect(league).toMatchObject({ commissioner_id: 'u-test', imported_from: 'yahoo', league_size: 2, scoring_settings: { skater: { goals: 7 }, goalie: {} } });
+    expect(league.settings).toMatchObject({ scoringFormat: 'h2h-points', teamsCount: 2, playoffTeams: 2, foundedFrom: { platform: 'yahoo', externalLeagueId: '453.l.200' } });
+    expect(db.rows('teams').filter((t) => t.league_id === league.id)).toHaveLength(1);
+    expect(body.job).toMatchObject({ league_id: league.id, platform: 'yahoo', external_league_id: '453.l.200', status: 'queued' });
+
+    for (let i = 0; i < 240; i++) {
+      await new Promise((r) => setTimeout(r, 25));
+      const row = db.rows('import_jobs').find((j) => j.id === body.job.id)!;
+      if (row.status === 'done' || row.status === 'failed' || row.status === 'partial' || row.status === 'needs_credentials') break;
+    }
+    const finished = db.rows('import_jobs').find((j) => j.id === body.job.id)!;
+    expect(finished.status).toBe('done');
+    expect(finished.seasons_imported).toEqual([2024]);
+    expect(db.rows('league_members').find((m) => m.league_id === league.id && m.owner_id === 'u-test')).toBeTruthy();
+    expect(audits.map((a) => a.p_event_type)).toEqual(expect.arrayContaining(['LEAGUE_CREATE', 'LEAGUE_HISTORY_IMPORT']));
+  });
+});

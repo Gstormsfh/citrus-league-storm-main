@@ -50,6 +50,24 @@ export interface YahooLeagueSeason { leagueKey: string; season: number; name: st
 export interface YahooChain { key: string; name: string; latestSeason: number; scoringType: string; numTeams: number | null; seasons: YahooLeagueSeason[] }
 export interface YahooDiscovery { guid: string | null; chains: YahooChain[] }
 
+/** What a one-tap league was set up with, and what the commissioner should look at. */
+export interface FoundingPlan {
+  name: string;
+  scoringFormat: string;
+  scoringSettings: { skater: Record<string, number>; goalie: Record<string, number> } | null;
+  categories: string[] | null;
+  rosterSlots: Record<string, number>;
+  rosterSize: number;
+  draftRounds: number;
+  draftType: 'snake' | 'auction';
+  teamsCount: number;
+  playoffTeams: number | null;
+  playoffWeeks: number | null;
+  keeper: { enabled: boolean; count: number };
+  notes: string[];
+}
+export interface FoundedLeague { league: { id: string; name: string; join_code: string | null }; job: ImportJob; plan: FoundingPlan }
+
 export interface HistorySeason { season: number; platform: string; team_count: number | null; champion: string | null; runner_up: string | null; regular_season_winner: string | null }
 export interface HistoryStanding { season: number; member_id: string; team_name: string | null; rank: number | null; wins: number | null; losses: number | null; ties: number | null; points_for: number | null; points_against: number | null; made_playoffs: boolean | null; playoff_finish: number | null; playoff_seed: number | null; category_record: string | null }
 export interface HistoryMember { member_id: string; display_name: string; owner_id: string | null; first_season: number | null; last_season: number | null; seasons_played: number | null; titles: number | null; finals_lost: number | null; playoff_seasons: number | null; best_finish: number | null; career_wins: number | null; career_losses: number | null; career_ties: number | null }
@@ -133,6 +151,10 @@ export const importApi = {
   startEspn(leagueId: string, body: { externalLeagueId: string; latestEspnSeason?: number; seasons?: number[]; credentials?: EspnCredentials }) {
     return apiClient.post<ImportJob>(`/api/leagues/${leagueId}/imports/espn`, body);
   },
+  /** One tap: a new Citrus league set up from the ESPN league, with the import running into it. */
+  foundEspn(body: { externalLeagueId: string; latestEspnSeason?: number; credentials?: EspnCredentials }) {
+    return apiClient.post<FoundedLeague>('/api/imports/espn/found', body, { timeoutMs: 60_000 });
+  },
 
   // ---- Yahoo --------------------------------------------------------------
   yahooConnectUrl() {
@@ -152,6 +174,10 @@ export const importApi = {
   },
   startYahoo(leagueId: string, body: { leagueKey: string; seasons?: number[] }) {
     return apiClient.post<ImportJob>(`/api/leagues/${leagueId}/imports/yahoo`, body);
+  },
+  /** One tap: a new Citrus league set up from the Yahoo league, with the import running into it. */
+  foundYahoo(body: { leagueKey: string }) {
+    return apiClient.post<FoundedLeague>('/api/imports/yahoo/found', body, { timeoutMs: 60_000 });
   },
 
   // ---- screenshots, any platform -------------------------------------------
