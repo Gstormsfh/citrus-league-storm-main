@@ -6,11 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Star, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Clock, Info } from 'lucide-react';
-import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Player } from '@/services/PlayerService';
 import { ScoringCalculator, ScoringSettings } from '@citrus/shared';
 import { DraftPoolRow } from './DraftPoolRow';
+import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { poolHeadlineFor } from './draftPoolHeadline';
 import { draftPoolSeasonLine, positionRanks } from './draftPoolLine';
 import { draftNeedLine } from './draftNeed';
@@ -126,6 +126,8 @@ export const POOL_ARM_TTL_MS = 6000;
  */
 const EMPTY_SIGNALS: ReadonlyMap<string, QualitySignal> = new Map();
 const EMPTY_NOTES: ReadonlyMap<string, ForecastNote> = new Map();
+/** Columns whose first click sorts ascending (everything else sorts best-first). */
+const NATURALLY_ASCENDING = new Set(['projRank', 'name', 'pos', 'team']);
 
 /**
  * Likewise for the projections. This default used to be an inline
@@ -189,7 +191,12 @@ export const PlayerPool = memo(({
   // Default sort is the overall projected-fantasy-points ranking (#1 / #2 / #3...).
   // This gives users a single "who's best to draft next" ordering out of the box.
   const [sortBy, setSortBy] = useState('projRank');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  // RANK READS #1 FIRST (2026-09-14). `#` is the one column whose natural
+  // order is ascending, so it starts 'asc' and the arrow says so; every
+  // stat column starts 'desc' (best first). Before this the rank comparator
+  // ignored direction entirely: the header toggled the arrow and nothing
+  // else moved.
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showDrafted, setShowDrafted] = useState(false);
   /** `★ 6` (artboard 4a): the pool narrowed to your queue, in the pool's own order. */
   const [queuedOnly, setQueuedOnly] = useState(false);
@@ -316,13 +323,15 @@ export const PlayerPool = memo(({
     // (goalies have wins/saves/gaa, skaters have points/goals/assists — mixing them
     // produces NaN from undefined fields, causing "wonky" sort in All Players view).
     const rankCompare = (a: typeof filtered[0], b: typeof filtered[0]) => {
-      // Rank: lower is better (#1 > #2). Always sort ascending regardless
-      // of sortDirection — "#1 first" is what users want. Ties broken by
-      // projected FPTS descending. Unranked players (missing projections)
-      // fall to the bottom via 999999.
-      const ra = rankMap.get(a.id) ?? 999999;
-      const rb = rankMap.get(b.id) ?? 999999;
-      return ra - rb;
+      // Rank: lower is better (#1 first). 'asc' is the natural order and
+      // the default; 'desc' flips it. Unranked players (missing projections)
+      // stay at the BOTTOM in both directions: they have no rank to sort by,
+      // and floating them to the top on a flip would put the players with
+      // the least information first.
+      const ra = rankMap.get(a.id);
+      const rb = rankMap.get(b.id);
+      if (ra == null || rb == null) return ra == null ? (rb == null ? 0 : 1) : -1;
+      return sortDirection === 'asc' ? ra - rb : rb - ra;
     };
     const goalieSort = (a: typeof filtered[0], b: typeof filtered[0]) => {
       if (sortBy === 'projFpts' || sortBy === 'projFptsPerGp') {
@@ -347,7 +356,12 @@ export const PlayerPool = memo(({
         }
         case 'projFpts': comparison = (projectedFptsMap.get(b.id)?.total || 0) - (projectedFptsMap.get(a.id)?.total || 0); break;
         case 'projFptsPerGp': comparison = (projectedFptsMap.get(b.id)?.perGp || 0) - (projectedFptsMap.get(a.id)?.perGp || 0); break;
-        case 'name': comparison = a.full_name.localeCompare(b.full_name); break;
+        // Text columns: the comparator's 'desc' sense is Z→A so the shared
+        // direction flip below gives A→Z under 'asc', which is their default.
+        case 'name': comparison = b.full_name.localeCompare(a.full_name); break;
+        case 'pos': comparison = String(b.position).localeCompare(String(a.position)); break;
+        case 'team': comparison = String(b.team).localeCompare(String(a.team)); break;
+        case 'gp': comparison = (b.games_played || 0) - (a.games_played || 0); break;
         default: comparison = (b.wins || 0) - (a.wins || 0);
       }
       return sortDirection === 'desc' ? comparison : -comparison;
@@ -382,7 +396,12 @@ export const PlayerPool = memo(({
         }
         case 'projFpts': comparison = (projectedFptsMap.get(b.id)?.total || 0) - (projectedFptsMap.get(a.id)?.total || 0); break;
         case 'projFptsPerGp': comparison = (projectedFptsMap.get(b.id)?.perGp || 0) - (projectedFptsMap.get(a.id)?.perGp || 0); break;
-        case 'name': comparison = a.full_name.localeCompare(b.full_name); break;
+        // Text columns: the comparator's 'desc' sense is Z→A so the shared
+        // direction flip below gives A→Z under 'asc', which is their default.
+        case 'name': comparison = b.full_name.localeCompare(a.full_name); break;
+        case 'pos': comparison = String(b.position).localeCompare(String(a.position)); break;
+        case 'team': comparison = String(b.team).localeCompare(String(a.team)); break;
+        case 'gp': comparison = (b.games_played || 0) - (a.games_played || 0); break;
         default: comparison = (b.points || 0) - (a.points || 0);
       }
       return sortDirection === 'desc' ? comparison : -comparison;
@@ -426,9 +445,10 @@ export const PlayerPool = memo(({
       // Toggle direction if clicking same stat
       setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc');
     } else {
-      // Set new stat and default to descending
       setSortBy(stat);
-      setSortDirection('desc');
+      // Rank, name, position and team read naturally A→Z / #1 first;
+      // every stat column reads best-first.
+      setSortDirection(NATURALLY_ASCENDING.has(stat) ? 'asc' : 'desc');
     }
   };
 
@@ -451,12 +471,12 @@ export const PlayerPool = memo(({
         )}
         onClick={() => !isDrafted && onPlayerSelect(player)}
       >
-        <td className="px-1.5 py-2 text-center w-[44px] sticky left-0 z-sticky-base bg-pastel-surface-tile text-pastel-cream">
+        <td className="px-1 py-2 text-center w-10 min-w-10 max-w-10 sticky left-0 z-sticky-base bg-pastel-surface-tile text-pastel-cream">
           <span className="text-xs font-mono text-pastel-cream font-bold">
             {displayRank}
           </span>
         </td>
-        <td className="px-2 py-2 sticky left-[44px] bg-pastel-surface-tile z-sticky-base text-pastel-cream">
+        <td className="px-1.5 py-2 sticky left-10 bg-pastel-surface-tile z-sticky-base text-pastel-cream min-w-[210px]">
           <div className="flex items-center gap-1.5">
             {/* 2026-09-03 headshot audit: this was a bare <img> that set
                 `display: none` on itself when the CDN failed, so a broken
@@ -474,6 +494,13 @@ export const PlayerPool = memo(({
                 real name; 190px covers the longest names in the league
                 before truncation even starts. */}
             <span className="font-medium text-sm truncate max-w-[190px]">{player.full_name}</span>
+            {/* STATUS ON THE LINE (2026-09-14, Garrett: "if a player is
+                injured it will show that on their line?"). The phone row
+                has drawn this badge since the availability feed landed; the
+                desktop row never did, so on the web an IR player looked
+                exactly like a healthy one. Same badge, same evidence rule:
+                dated status only, nothing when there is none. */}
+            <PlayerAvailabilityBadge availability={player.availability} />
           </div>
         </td>
         <td className="px-2 py-1.5 text-pastel-cream">
@@ -527,7 +554,7 @@ export const PlayerPool = memo(({
             <td className="px-2 py-1.5 text-xs text-center text-pastel-cream/70">{player.xGoals.toFixed(2)}</td>
           </>
         )}
-        <td className="px-2 py-1.5 text-pastel-cream sticky right-0 z-sticky-base bg-pastel-surface-tile shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.6)]">
+        <td className="px-2 py-1.5 text-pastel-cream w-[124px] min-w-[124px] sticky right-0 z-sticky-base bg-pastel-surface-tile shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.6)]">
           <div className="flex items-center gap-1 relative z-10" onClick={(e) => e.stopPropagation()}>
             {onShowCard && (
               <Button
@@ -638,7 +665,7 @@ export const PlayerPool = memo(({
           value={searchTerm}
           onValueChange={setSearchTerm}
           sort={
-            <Select value={sortBy} onValueChange={(value) => { setSortBy(value); setSortDirection('desc'); }}>
+            <Select value={sortBy} onValueChange={(value) => { setSortBy(value); setSortDirection(NATURALLY_ASCENDING.has(value) ? 'asc' : 'desc'); }}>
               <SelectTrigger className={cn(PB_SORT_TRIGGER, 'w-auto gap-1.5 border-0 [&>svg]:hidden')} aria-label={`Sort by ${sortLabel}. Change sort`}>
                 {sortLabel} &#9662;
               </SelectTrigger>
@@ -874,87 +901,9 @@ export const PlayerPool = memo(({
           </SelectContent>
         </Select>
 
-        <div className="hidden sm:block space-y-1">
-          <Label className="text-xs text-pastel-cream/70">Sort By</Label>
-          <Select value={sortBy} onValueChange={(value) => {
-            setSortBy(value);
-            setSortDirection('desc');
-          }}>
-            <SelectTrigger className="bg-pastel-surface-tile backdrop-blur-sm border-white/10">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              {selectedPosition === 'G' ? (
-                <>
-                  <SelectItem value="projRank">Overall Rank (#1 →)</SelectItem>
-                  <SelectItem value="wins">Wins</SelectItem>
-                  <SelectItem value="losses">Losses</SelectItem>
-                  <SelectItem value="gaa">GAA</SelectItem>
-                  <SelectItem value="savePct">Save %</SelectItem>
-                  <SelectItem value="saves">Saves</SelectItem>
-                  <SelectItem value="shutouts">Shutouts</SelectItem>
-                  <SelectItem value="name">Name</SelectItem>
-                </>
-              ) : (
-                <>
-                  <SelectItem value="projRank">Overall Rank (#1 →)</SelectItem>
-                  <SelectItem value="points">Points</SelectItem>
-                  <SelectItem value="goals">Goals</SelectItem>
-                  <SelectItem value="assists">Assists</SelectItem>
-                  <SelectItem value="plusMinus">+/-</SelectItem>
-                  <SelectItem value="ppp">PPP</SelectItem>
-                  <SelectItem value="shp">SHP</SelectItem>
-                  <SelectItem value="shots">Shots</SelectItem>
-                  <SelectItem value="hits">Hits</SelectItem>
-                  <SelectItem value="blocks">Blocks</SelectItem>
-                  <SelectItem value="pim">PIM</SelectItem>
-                  <SelectItem value="toi">TOI</SelectItem>
-                  <SelectItem value="xGoals">xGoals</SelectItem>
-                  <SelectItem value="name">Name</SelectItem>
-                </>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Mobile sort select - ALL stats available */}
-        <Select value={sortBy} onValueChange={(value) => { setSortBy(value); setSortDirection('desc'); }}>
-          <SelectTrigger className="sm:hidden w-[80px] h-9 bg-pastel-surface-tile backdrop-blur-sm border-white/10 text-xs">
-            <SelectValue placeholder="Sort" />
-          </SelectTrigger>
-          <SelectContent>
-            {selectedPosition === 'G' ? (
-              <>
-                <SelectItem value="projRank">Rank</SelectItem>
-                <SelectItem value="wins">W</SelectItem>
-                <SelectItem value="losses">L</SelectItem>
-                <SelectItem value="gaa">GAA</SelectItem>
-                <SelectItem value="savePct">SV%</SelectItem>
-                <SelectItem value="saves">SV</SelectItem>
-                <SelectItem value="shutouts">SO</SelectItem>
-                <SelectItem value="name">Name</SelectItem>
-              </>
-            ) : (
-              <>
-                <SelectItem value="projRank">Rank</SelectItem>
-                <SelectItem value="points">PTS</SelectItem>
-                <SelectItem value="goals">G</SelectItem>
-                <SelectItem value="assists">A</SelectItem>
-                <SelectItem value="plusMinus">+/-</SelectItem>
-                <SelectItem value="ppp">PPP</SelectItem>
-                <SelectItem value="shp">SHP</SelectItem>
-                <SelectItem value="shots">SOG</SelectItem>
-                <SelectItem value="hits">HIT</SelectItem>
-                <SelectItem value="blocks">BLK</SelectItem>
-                <SelectItem value="pim">PIM</SelectItem>
-                <SelectItem value="toi">TOI</SelectItem>
-                <SelectItem value="xGoals">xG</SelectItem>
-                <SelectItem value="name">Name</SelectItem>
-              </>
-            )}
-          </SelectContent>
-        </Select>
-
+        {/* SORT LIVES IN THE HEADERS (2026-09-14, Garrett): the "Sort By"
+            select that duplicated every column header is gone. Click a
+            header to sort by it, click again to flip. */}
         <Button
           variant={showDrafted ? "default" : "outline"}
           size="sm"
@@ -982,10 +931,17 @@ export const PlayerPool = memo(({
             viewport keeps the board and the queue in view instead of
             pushing them off-screen. */}
         <div className="overflow-auto scrollbar-pressbox lg:max-h-[calc(100dvh-18rem)]" style={{ WebkitOverflowScrolling: 'touch' }}>
-          <table className="w-full min-w-[1400px] text-sm border-collapse">
+          <table className="w-full min-w-[1360px] text-sm border-collapse">
             <thead className="bg-pastel-surface-high sticky top-0 z-sticky-raised border-b border-white/10">
               <tr>
-                <th className="px-1.5 py-2 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs w-[44px] sticky left-0 z-sticky-base bg-pastel-surface-high"
+                {/* PINNED COLUMNS, PINNED WIDTHS (2026-09-14). `#` is 40px and
+                    Player is stuck at left-10 (40px) — the same number, in one
+                    scale. Before this `#` asked for w-[44px], the table gave it
+                    33px, and Player was stuck at left-[44px]: an 11px gap
+                    between the two, painted over the start of the Pos column
+                    and its chip. `min-w`/`max-w` hold the cell at its width;
+                    `w-` alone is a suggestion to a table. */}
+                <th className="px-1 py-2 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs w-10 min-w-10 max-w-10 sticky left-0 z-sticky-base bg-pastel-surface-high"
                   onClick={() => handleHeaderClick('projRank')}
                 >
                   <div className="flex items-center justify-center gap-0.5">
@@ -996,10 +952,50 @@ export const PlayerPool = memo(({
                     {sortBy !== 'projRank' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th className="px-2 py-2 text-left font-semibold text-pastel-cream sticky left-[44px] bg-pastel-surface-high z-sticky-base min-w-[190px]">Player</th>
-                <th className="px-2 py-2 text-left font-semibold text-pastel-cream">Pos</th>
-                <th className="px-2 py-2 text-left font-semibold text-pastel-cream">Team</th>
-                <th className="px-2 py-2 text-center font-semibold text-pastel-cream">GP</th>
+                <th className="px-1.5 py-2 text-left font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none sticky left-10 bg-pastel-surface-high z-sticky-base min-w-[210px]"
+                  onClick={() => handleHeaderClick('name')}
+                >
+                  <div className="flex items-center  gap-0.5">
+                    Player
+                    {sortBy === 'name' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'name' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-1.5 py-2 text-left font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none w-[52px] min-w-[52px]"
+                  onClick={() => handleHeaderClick('pos')}
+                >
+                  <div className="flex items-center  gap-0.5">
+                    Pos
+                    {sortBy === 'pos' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'pos' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-1.5 py-2 text-left font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none w-[52px] min-w-[52px]"
+                  onClick={() => handleHeaderClick('team')}
+                >
+                  <div className="flex items-center  gap-0.5">
+                    Team
+                    {sortBy === 'team' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'team' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-1.5 py-2 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs w-[44px] min-w-[44px]"
+                  onClick={() => handleHeaderClick('gp')}
+                >
+                  <div className="flex items-center justify-center gap-0.5">
+                    GP
+                    {sortBy === 'gp' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'gp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
                 {/* DESKTOP POOL (2026-09-10): the decision columns lead. Before this the
                     projection, fantasy-point and Actions columns sat 1,000px+ to the right
                     in a 1400px table inside a ~990px pane, so on a 1512px MacBook the
@@ -1255,7 +1251,10 @@ export const PlayerPool = memo(({
                 </th>
                   </>
                 )}
-                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream text-xs sticky right-0 z-sticky-base bg-pastel-surface-high shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.6)]">Actions</th>
+                {/* Actions is stuck to the right edge and MUST own its width: it
+                    used to be allotted ~53px and paint an 86px button, and the
+                    overflow sat on top of the xG column. */}
+                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream text-xs w-[124px] min-w-[124px] sticky right-0 z-sticky-base bg-pastel-surface-high shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.6)]">Actions</th>
               </tr>
             </thead>
             <tbody>

@@ -462,7 +462,8 @@ describe('ENGINE-EAR v3 Slice 1 item 6 — INSTANT-AUTOPICK arm (source-shape)',
     // future refactor drops the .select fields or narrows the .eq
     // filter, INSTANT-AUTOPICK stops working — silently.
     expect(lobbyManagerSource).toMatch(/\.from\(['"]teams['"]\)/);
-    expect(lobbyManagerSource).toMatch(/\.select\(['"]id, owner_id['"]\)/);
+    // 2026-09-14: the same read now also carries teams.autodraft_enabled.
+    expect(lobbyManagerSource).toMatch(/\.select\(['"]id, owner_id, autodraft_enabled['"]\)/);
     expect(lobbyManagerSource).toMatch(/\.eq\(['"]league_id['"], this\.leagueId\)/);
   });
 

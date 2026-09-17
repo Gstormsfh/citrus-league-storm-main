@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 // and the Supabase client at module scope.
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { positionChipKey } from '@/components/roster/positionChip';
+import { Mug } from '@/components/roster/Mug';
 import type { PositionType } from '@/utils/rosterUtils';
 
 /*
@@ -62,6 +63,8 @@ interface DraftPick {
   timestamp: number;
   /** The NHL club, `EDM`. v1Adapters sets it; v1's own picks may not. */
   playerTeam?: string;
+  /** The NHL headshot; the desktop card draws it as the face (2026-09-14). */
+  headshotUrl?: string | null;
 }
 
 interface Team {
@@ -91,6 +94,14 @@ interface DraftBoardProps {
    * slots spoken for before their picks land. Drawn as a KEEPER cell.
    */
   keeperSlots?: ReadonlyMap<string, string>;
+  /**
+   * THE BOARD AS A WINDOW (2026-09-14, Garrett, desktop only): show this
+   * many rounds and scroll the rest inside the board, so the pool can sit
+   * directly beneath it. The column heads stay pinned; the window follows
+   * the clock by the same rule as the horizontal centring (once on mount,
+   * again on your own pick). Unset (the phone) renders every round in flow.
+   */
+  viewportRows?: number;
 }
 
 /**
@@ -102,6 +113,10 @@ interface DraftBoardProps {
  * cell is an 8px line on a Press Box surface, where orange means "your
  * pick" and nothing else.
  */
+/** One DESKTOP board row: the 72px cell plus the 4px grid gap; the head row is the 11px label plus its padding. (Only the desktop window reads these.) */
+const BOARD_ROW_PX = 76;
+const BOARD_HEAD_PX = 22;
+
 const normalizePosition = (pos: string, positionType: PositionType): string =>
   positionChipKey(pos, positionType);
 
@@ -117,6 +132,7 @@ export const DraftBoard = ({
   userTeamId = null,
   lastPicks = 3,
   keeperSlots,
+  viewportRows,
 }: DraftBoardProps) => {
   const totalPicks = teams.length * totalRounds;
   const isLinear = draftType === 'linear';
@@ -144,10 +160,35 @@ export const DraftBoard = ({
     return pickNumber === currentPick;
   };
 
+  /**
+   * THE CARD IS THE COLOUR (2026-09-14, Garrett: "the cards themselves
+   * should be the citrus colours, not the positional highlight"). On a
+   * wide board a made pick's whole card wears the roster's position
+   * colour — sage C, sage-soft LW, orange RW, grey D, muted G — with the
+   * name in that colour's own ink. Every class is `lg:`-prefixed: the
+   * phone board keeps its 8px monochrome line.
+   */
+  const boardCard: Record<string, string> = {
+    LW: 'lg:bg-pastel-sage-soft lg:text-pastel-forest',
+    C: 'lg:bg-pastel-sage lg:text-pastel-forest',
+    RW: 'lg:bg-pastel-orange lg:text-white',
+    D: 'lg:bg-white/10 lg:text-pastel-cream',
+    G: 'lg:bg-pastel-sage/15 lg:text-pastel-cream',
+    UTIL: 'lg:bg-pastel-sage lg:text-pastel-forest',
+    F: 'lg:bg-pastel-orange lg:text-white',
+  };
+  const cardTone = (label: string): string => boardCard[label.toUpperCase()] ?? 'lg:bg-white/15 lg:text-pastel-cream';
+
   /** `Draisaitl` from `Leon Draisaitl`; `J. Hughes` when two share a name is the caller's job. */
   const surname = (fullName: string) => {
     const parts = fullName.trim().split(/\s+/);
     return parts.length === 1 ? parts[0] : parts.slice(1).join(' ');
+  };
+  /** `L. Draisaitl` from `Leon Draisaitl` (2026-09-14, Garrett: "first initial then last name. G. Storms"). Desktop cards only. */
+  const initialSurname = (fullName: string) => {
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0];
+    return `${parts[0].charAt(0).toUpperCase()}. ${parts.slice(1).join(' ')}`;
   };
   /** `BENCH` from `Bench Bosses`: the first word, uppercased, or `YOU`. */
   const columnHead = (team: Team) =>
@@ -178,21 +219,45 @@ export const DraftBoard = ({
      for. Re-runs as the pick moves. */
   const onClockRef = useRef<HTMLDivElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  // SCROLL FREELY (2026-09-14, Garrett): this used to re-centre on the
+  // on-clock cell for EVERY pick, so a manager reading three columns over
+  // was dragged back each time anyone drafted. Now it centres once, when the
+  // board first mounts, and again only when the clock lands on YOUR pick,
+  // which is the one moment the board owes you its attention. Every other
+  // pick leaves the scroll position exactly where the manager put it.
+  const centredOnceRef = useRef(false);
+  const onClockTeamId = useMemo(() => {
+    if (!currentPick || teams.length === 0) return null;
+    const round = Math.ceil(currentPick / teams.length);
+    const indexInRound = (currentPick - 1) % teams.length;
+    const isOddRound = round % 2 === 1;
+    const teamIndex = (isLinear || isOddRound) ? indexInRound : (teams.length - 1 - indexInRound);
+    return teams[teamIndex]?.id ?? null;
+  }, [currentPick, teams, isLinear]);
   useEffect(() => {
     const cell = onClockRef.current;
     const scroller = scrollerRef.current;
     if (!cell || !scroller) return;
+    const myPick = userTeamId != null && onClockTeamId === userTeamId;
+    if (centredOnceRef.current && !myPick) return;
+    centredOnceRef.current = true;
     // The scroller's OWN scrollLeft, never `scrollIntoView`: that walks every
     // scrollable ancestor and dragged the whole page sideways, header and
     // tabs with it, the first time this ran.
     const target = cell.offsetLeft - scroller.clientWidth / 2 + cell.offsetWidth / 2;
     scroller.scrollLeft = Math.max(0, target);
-  }, [currentPick]);
+    if (viewportRows) {
+      // Keep the on-clock round one row below the pinned heads, so the round
+      // above stays readable and four more sit beneath it.
+      const rowTop = cell.offsetTop - BOARD_ROW_PX - BOARD_HEAD_PX;
+      scroller.scrollTop = Math.max(0, rowTop);
+    }
+  }, [currentPick, onClockTeamId, userTeamId, viewportRows]);
 
   return (
     <div className={cn(PB_TYPE)} data-testid="draft-board">
       <div className="flex items-center justify-between gap-2 px-3.5">
-        <h2 className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text">
+        <h2 className="font-condensed font-bold text-[15px] lg:text-[18px] uppercase tracking-[0.08em] text-pressbox-text">
           Board
         </h2>
         <span className="font-plex font-medium text-[11px] text-pressbox-text/50 whitespace-nowrap">
@@ -200,7 +265,12 @@ export const DraftBoard = ({
         </span>
       </div>
 
-      <div ref={scrollerRef} className="relative mt-2 overflow-x-auto scrollbar-hide ios-scroll">
+      <div
+        ref={scrollerRef}
+        className={cn('relative mt-2 overflow-x-auto scrollbar-hide ios-scroll', viewportRows && 'lg:overflow-y-auto lg:max-h-[var(--board-viewport)] lg:scrollbar-pressbox')}
+        style={viewportRows ? ({ '--board-viewport': `${BOARD_HEAD_PX + viewportRows * BOARD_ROW_PX}px` } as React.CSSProperties) : undefined}
+        data-testid="draft-board-scroller"
+      >
         {/* `min-w-max`: a block-level grid is only as wide as the scroller
             (393) while its tracks overflow to 1060, and a sticky rail can
             never leave its containing block's box — so it stuck at the
@@ -209,6 +279,7 @@ export const DraftBoard = ({
         <div
           className={cn(
             'grid gap-1 pr-3.5',
+            viewportRows && 'lg:[&>.board-head]:sticky lg:[&>.board-head]:top-0 lg:[&>.board-head]:z-sticky-raised lg:[&>.board-head]:bg-pressbox-surface',
             // `min-w-max` is what makes the phone board wider than its
             // scroller (and what lets `left:0` mean the screen edge). On
             // desktop that is exactly what has to go.
@@ -225,12 +296,12 @@ export const DraftBoard = ({
         >
           {/* Column heads. The round rail's corner is sticky too, so the
               heads never slide under a floating label. */}
-          <div className="sticky left-0 z-sticky-base bg-pressbox-surface pl-3.5" />
+          <div className="board-head sticky left-0 z-sticky-base bg-pressbox-surface pl-3.5" />
           {teams.map((team) => (
             <div
               key={team.id}
               className={cn(
-                'pb-1 text-center font-plex font-semibold text-[9px] truncate',
+                'board-head pb-1 text-center font-plex font-semibold text-[9px] lg:text-[11px] truncate',
                 team.id === userTeamId ? 'text-pressbox-orange-soft' : 'text-pressbox-text/50',
               )}
               title={`${team.name} · ${team.owner}`}
@@ -243,7 +314,7 @@ export const DraftBoard = ({
             const round = roundIndex + 1;
             return (
               <div key={round} className="contents">
-                <div className="sticky left-0 z-sticky-base flex items-center bg-pressbox-surface pl-3.5 font-plex font-semibold text-[9px] text-pressbox-text/40">
+                <div className="sticky left-0 z-sticky-base flex items-center bg-pressbox-surface pl-3.5 font-plex font-semibold text-[9px] lg:text-[11px] text-pressbox-text/40">
                   R{round}
                 </div>
                 {teams.map((team, teamIndex) => {
@@ -257,34 +328,55 @@ export const DraftBoard = ({
                       <div
                         key={`${round}-${team.id}`}
                         ref={onClockRef}
-                        className="h-[54px] rounded-[8px] bg-pressbox-orange text-pressbox-orange-ink flex flex-col items-center justify-center px-[7px] py-1.5"
+                        className="h-[54px] lg:h-[72px] rounded-[8px] bg-pressbox-orange text-pressbox-orange-ink flex flex-col items-center justify-center px-[7px] py-1.5"
                         data-testid="draft-board-on-clock"
                       >
-                        <span className="font-plex font-semibold text-[18px] leading-none tabular-nums">
+                        <span className="font-plex font-semibold text-[18px] lg:text-[22px] leading-none tabular-nums">
                           {pickLabel(round, pickNumber)}
                         </span>
-                        <span className="mt-[3px] font-plex font-semibold text-[8px] opacity-80">ON THE CLOCK</span>
+                        <span className="mt-[3px] font-plex font-semibold text-[8px] lg:text-[10px] opacity-80">ON THE CLOCK</span>
                       </div>
                     );
                   }
 
                   if (pick) {
+                    const posLabel = normalizePosition(pick.position, positionType);
+                    const tone = cardTone(posLabel);
                     return (
                       <button
                         type="button"
                         key={`${round}-${team.id}`}
                         onClick={() => onPlayerClick?.(pick.playerId)}
                         aria-label={`${pick.playerName}, pick ${pickLabel(round, pickNumber)}`}
+                        data-position={posLabel}
                         className={cn(
                           'h-[54px] rounded-[8px] bg-pressbox-tile px-[7px] py-1.5 text-left min-w-0 active:bg-pressbox-tile-high',
-                          mine && 'shadow-[inset_0_0_0_1px_rgba(255,107,26,0.35)]',
+                          'lg:h-[72px] lg:px-1.5 lg:py-2',
+                          tone,
+                          mine && 'shadow-[inset_0_0_0_1px_rgba(255,107,26,0.35)] lg:shadow-[inset_0_0_0_2px_rgba(255,255,255,0.55)]',
                         )}
                       >
-                        <span className="block font-barlow font-bold text-[12px] truncate text-pressbox-text">
+                        {/* THE FACE (2026-09-14, Garrett: "headshots as the initial
+                            circle, much like mobile"). Desktop only: the shared Mug,
+                            headshot → crest → initials, then the club and position,
+                            then the surname across the card's whole width. */}
+                        <span className="hidden lg:block min-w-0">
+                          <span className="flex items-center gap-1 min-w-0">
+                            <Mug p={{ name: pick.playerName, image: pick.headshotUrl ?? null, team: pick.playerTeam ?? null }} size="xs" className="flex-none" />
+                            <span className="min-w-0 font-plex font-semibold text-[10px] uppercase tracking-[0.04em] opacity-80 truncate" data-testid="draft-board-position">
+                              {posLabel}{pick.playerTeam ? ` ${pick.playerTeam}` : ''}
+                            </span>
+                          </span>
+                          <span className="block mt-1 font-barlow font-bold text-[13px] leading-tight tracking-tight truncate" data-testid="draft-board-name">
+                            {initialSurname(pick.playerName)}
+                          </span>
+                        </span>
+                        {/* Phone: exactly the line it had. */}
+                        <span className="block font-barlow font-bold text-[12px] truncate text-pressbox-text lg:hidden">
                           {surname(pick.playerName)}
                         </span>
-                        <span className="block mt-[3px] font-plex font-medium text-[8px] text-pressbox-text/50 truncate">
-                          {normalizePosition(pick.position, positionType)}
+                        <span className="block mt-[3px] font-plex font-medium text-[8px] text-pressbox-text/50 truncate lg:hidden">
+                          {posLabel}
                           {pick.playerTeam ? ` · ${pick.playerTeam}` : ''}
                         </span>
                       </button>
@@ -297,7 +389,7 @@ export const DraftBoard = ({
                       <div
                         key={`${round}-${team.id}`}
                         className={cn(
-                          'h-[54px] rounded-[8px] bg-pressbox-tile/60 border border-pressbox-sage/40 px-[7px] py-1.5 min-w-0',
+                          'h-[54px] lg:h-[72px] rounded-[8px] bg-pressbox-tile/60 border border-pressbox-sage/40 px-[7px] py-1.5 min-w-0',
                           mine && 'shadow-[inset_0_0_0_1px_rgba(255,107,26,0.35)]',
                         )}
                         data-testid="draft-board-keeper"
@@ -312,7 +404,7 @@ export const DraftBoard = ({
                     <div
                       key={`${round}-${team.id}`}
                       className={cn(
-                        'h-[54px] rounded-[8px] border border-dashed px-[7px] py-1.5 font-plex font-medium text-[8px]',
+                        'h-[54px] lg:h-[72px] rounded-[8px] border border-dashed px-[7px] py-1.5 font-plex font-medium text-[8px] lg:text-[11px]',
                         mine
                           ? 'border-pressbox-orange-soft/40 text-pressbox-orange-soft'
                           : 'border-white/[0.12] text-pressbox-text/35',
@@ -334,8 +426,11 @@ export const DraftBoard = ({
         </p>
       )}
 
+      {/* In window mode the player list sits directly under the board
+          (Garrett: "that's the most important list for the user to see"),
+          so LAST PICKS steps aside on desktop. The phone keeps it. */}
       {lastPicks > 0 && recent.length > 0 && (
-        <div className="mt-3.5 px-3.5">
+        <div className={cn('mt-3.5 px-3.5', viewportRows && 'lg:hidden')} data-testid="draft-board-last-picks">
           <h3 className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text">
             Last picks
           </h3>

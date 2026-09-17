@@ -93,6 +93,8 @@ describe('resolvePlayerDisplay', () => {
       playerName: 'Auston Matthews',
       position: 'C',
       playerTeam: 'TOR',
+      // 2026-09-14: the desktop board draws the face, so the headshot rides along.
+      headshotUrl: map.get('8478050')!.headshot_url ?? null,
     });
   });
 
@@ -128,6 +130,7 @@ describe('rosterEntryToDraftPick', () => {
       pick: 3,
       timestamp: 3000,
       playerTeam: 'TOR',
+      headshotUrl: players.get('8478050')!.headshot_url ?? null,
     });
   });
 
