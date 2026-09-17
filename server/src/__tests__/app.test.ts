@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { app } from '../app';
 
 // Mock the environment before importing app
@@ -18,6 +18,52 @@ describe('API App — Global Middleware & Health Check', () => {
     expect(body.service).toBe('citrus-api');
     expect(body.timestamp).toBeDefined();
     expect(typeof body.uptime).toBe('number');
+  });
+
+  // 2026-09-16: a Cloud Run service without SUPABASE_JWT_SECRET answered
+  // 200 here while every draft room in production was down. Health must
+  // prove the two secrets the API cannot run without, and say so with 503
+  // so the startup probe and the deploy job both refuse the revision.
+  describe('proves the secrets the API cannot run without', () => {
+    const saved: Record<string, string | undefined> = {};
+    beforeEach(() => {
+      saved.jwt = process.env.SUPABASE_JWT_SECRET;
+      saved.sched = process.env.SCHEDULED_TRIGGER_SECRET;
+    });
+    afterEach(() => {
+      if (saved.jwt === undefined) delete process.env.SUPABASE_JWT_SECRET;
+      else process.env.SUPABASE_JWT_SECRET = saved.jwt;
+      if (saved.sched === undefined) delete process.env.SCHEDULED_TRIGGER_SECRET;
+      else process.env.SCHEDULED_TRIGGER_SECRET = saved.sched;
+    });
+
+    it('reports draftToken=unconfigured and 503 when SUPABASE_JWT_SECRET is missing', async () => {
+      delete process.env.SUPABASE_JWT_SECRET;
+      process.env.SCHEDULED_TRIGGER_SECRET = 'x';
+      const res = await app.request('/api/health');
+      const body = await res.json();
+      expect(body.checks.draftToken).toBe('unconfigured');
+      expect(body.status).toBe('degraded');
+      expect(res.status).toBe(503);
+    });
+
+    it('reports scheduledTrigger=unconfigured and 503 when SCHEDULED_TRIGGER_SECRET is missing', async () => {
+      process.env.SUPABASE_JWT_SECRET = 'a-secret-long-enough-for-hs256-signing';
+      delete process.env.SCHEDULED_TRIGGER_SECRET;
+      const res = await app.request('/api/health');
+      const body = await res.json();
+      expect(body.checks.scheduledTrigger).toBe('unconfigured');
+      expect(res.status).toBe(503);
+    });
+
+    it('reports draftToken=ok only after a real sign-and-verify round trip', async () => {
+      process.env.SUPABASE_JWT_SECRET = 'a-secret-long-enough-for-hs256-signing';
+      process.env.SCHEDULED_TRIGGER_SECRET = 'x';
+      const res = await app.request('/api/health');
+      const body = await res.json();
+      expect(body.checks.draftToken).toBe('ok');
+      expect(body.checks.scheduledTrigger).toBe('ok');
+    });
   });
 
   it('returns 404 JSON for unknown routes', async () => {
