@@ -18,18 +18,38 @@ cheaper than a 40-minute outage in front of every owner in the league.
 
 ## T-60 minutes — Infrastructure
 
+> **Run the script first.** `bash scripts/ops/draft-preflight.sh` executes
+> every machine-checkable item in this section (edge health including the
+> two secrets the API must be able to use, engine reachability and TLS,
+> Cloud Run region/scaling/env/revision state, VM auto-restart, DNS,
+> engine watchdog, draft canary, freeze gate, kill switch) and prints
+> PASS/FAIL with evidence. The bullets below are what it checks and what
+> to do when a line is red. Added 2026-09-16 after two days of every draft
+> room being down while this checklist, pointed at the old region, would
+> have read green.
+
+- [ ] **The API can sign draft tokens and accept scheduled jobs.**
+      `curl -s https://citrusfantasysports.com/api/health | jq .checks`
+      Expected: `draftToken: "ok"` and `scheduledTrigger: "ok"`. Either
+      `unconfigured` is the 2026-09-16 outage: the serving revision is
+      missing `SUPABASE_JWT_SECRET` / `SCHEDULED_TRIGGER_SECRET`. Fix:
+      `gcloud run services update citrus-api --region=northamerica-northeast1 --update-secrets=SUPABASE_JWT_SECRET=supabase-jwt-secret:latest,SCHEDULED_TRIGGER_SECRET=scheduled-trigger-secret:latest`
+      The API lives in **northamerica-northeast1 (Montreal)** since PR #512;
+      anything you check in us-central1 is a service nobody deploys to.
+
 - [ ] **Cloud Run scaling is correct.**
-      `gcloud run services describe citrus-api --region=us-central1 --format="value(spec.template.metadata.annotations)"`
+      `gcloud run services describe citrus-api --region=northamerica-northeast1 --format="value(spec.template.metadata.annotations)"`
       Expected: `minScale=1, maxScale=10`, `cpu-throttling=false`,
       `startup-cpu-boost=true`. Memory = 2Gi, CPU = 2.
-      If wrong: `gcloud run services replace ops/cloudrun/service.yaml --region=us-central1`
+      If wrong: `gcloud run services replace ops/cloudrun/service.yaml --region=northamerica-northeast1`
       That command is DECLARATIVE and deletes any env var the file omits.
       `DRAFT_WS_HOST` and `DRAFT_WS_PORT` are declared in it as of
-      2026-09-03; before running `replace`, confirm they are still there,
-      or you will take every draft room offline.
+      2026-09-03, and `SUPABASE_JWT_SECRET` / `SCHEDULED_TRIGGER_SECRET`
+      as secretKeyRefs as of 2026-09-16; before running `replace`, confirm
+      all four are still there, or you will take every draft room offline.
 
 - [ ] **The browser knows where the draft engine is.**
-      `gcloud run services describe citrus-api --region=us-central1 --format='value(spec.template.spec.containers[0].env)' | tr ',' '\\n' | grep -i draft`
+      `gcloud run services describe citrus-api --region=northamerica-northeast1 --format='value(spec.template.spec.containers[0].env)' | tr ',' '\\n' | grep -i draft`
       Expected: `DRAFT_WS_HOST=draft.citrusfantasysports.com` and
       `DRAFT_WS_PORT=443`. Empty output is the worst failure mode in this
       document: discovery keeps returning HTTP 200, every server-side signal
@@ -119,10 +139,10 @@ cheaper than a 40-minute outage in front of every owner in the league.
 ## T-15 minutes — Rollback Readiness
 
 - [ ] **Previous Cloud Run revision is pinned and retrievable.**
-      `gcloud run revisions list --service=citrus-api --region=us-central1 --limit=5`
+      `gcloud run revisions list --service=citrus-api --region=northamerica-northeast1 --limit=5`
       Write down the last-known-good revision name. If the draft breaks,
       you will roll forward to it:
-      `gcloud run services update-traffic citrus-api --to-revisions=<REV>=100 --region=us-central1`
+      `gcloud run services update-traffic citrus-api --to-revisions=<REV>=100 --region=northamerica-northeast1`
 
 - [ ] **`nuclear_reset_draft` RPC is available.**
       `SELECT proname FROM pg_proc WHERE proname = 'nuclear_reset_draft';`
@@ -155,7 +175,7 @@ cheaper than a 40-minute outage in front of every owner in the league.
 Keep these open in separate tabs:
 
 1. **Cloud Run metrics** —
-   `https://console.cloud.google.com/run/detail/us-central1/citrus-api/metrics`
+   `https://console.cloud.google.com/run/detail/northamerica-northeast1/citrus-api/metrics`
    Watch: request count, p99 latency, error rate. Alarm if p99 > 2s
    or error rate > 1%.
 
@@ -187,7 +207,7 @@ Keep these open in separate tabs:
 
 3. **Roll back Cloud Run** if the incident started after a recent deploy:
    `gcloud run services update-traffic citrus-api
-   --to-revisions=<last-known-good>=100 --region=us-central1`
+   --to-revisions=<last-known-good>=100 --region=northamerica-northeast1`
 
 4. **If the draft state is corrupted**, the commissioner can run
    `nuclear_reset_draft(p_league_id, p_session_id)` via Supabase SQL

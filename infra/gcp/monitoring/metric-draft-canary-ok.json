@@ -1,0 +1,21 @@
+{
+  "name": "citrus_draft_canary_ok",
+  "description": "Count of `draft_canary.ok` lines from the citrus-api Cloud Run service (server/src/canary/draftCanary.ts). Every 5 minutes each API instance signs a draft token exactly as discovery does, opens wss://draft.citrusfantasysports.com/ws/draft/<canary league> and receives the engine's snapshot. It is the only signal that proves the API's token is accepted by the engine; on 2026-09-16 every other signal was green while no browser could join a draft. Managed by infra/gcp/monitoring/apply-uptime.sh.",
+  "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"citrus-api\" AND jsonPayload.event=\"draft_canary.ok\"",
+  "metricDescriptor": {
+    "metricKind": "DELTA",
+    "valueType": "INT64",
+    "unit": "1",
+    "displayName": "Citrus draft canary ok count",
+    "labels": [
+      {
+        "key": "location",
+        "valueType": "STRING",
+        "description": "Cloud Run region of the instance that ran the canary."
+      }
+    ]
+  },
+  "labelExtractors": {
+    "location": "EXTRACT(resource.labels.location)"
+  }
+}

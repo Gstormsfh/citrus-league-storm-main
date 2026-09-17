@@ -1,0 +1,36 @@
+{
+  "displayName": "Citrus API: /api/health scheduledTrigger not ok (edge uptime check)",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "**What it means.** `https://citrusfantasysports.com/api/health` is answering without `checks.scheduledTrigger == \"ok\"`, or not answering. Without `SCHEDULED_TRIGGER_SECRET` the `/api/scheduled/*` router refuses every request: daily roster lock, waiver processing, trade-review sweep, matchup sweep and news ingest all stop, and the GitHub Actions jobs that call them go red.\n\n**What to do.**\n1. `curl -s https://citrusfantasysports.com/api/health | jq .checks`\n2. `unconfigured` -> `gcloud run services update citrus-api --region=northamerica-northeast1 --project=citrus-fantasy-prod --update-secrets=SCHEDULED_TRIGGER_SECRET=scheduled-trigger-secret:latest`\n3. Confirm the next scheduled run: GitHub -> Actions -> daily-waiver-process -> Run workflow, then the Cloud Run request log should show `northamerica-northeast1 200 .../api/scheduled/waiver-process`.\n\nManaged by `infra/gcp/monitoring/apply-uptime.sh` (`alert-uptime-api-scheduled-trigger.json`)."
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "uptime check \"Citrus API health: scheduled trigger\" failing from 2+ regions",
+      "conditionThreshold": {
+        "filter": "metric.type = \"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type = \"uptime_url\" AND metric.label.check_id = \"${CHECK_ID}\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_NEXT_OLDER",
+            "crossSeriesReducer": "REDUCE_COUNT_FALSE",
+            "groupByFields": ["resource.label.*"]
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 1,
+        "duration": "120s",
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "notificationChannels": ${NOTIFICATION_CHANNELS},
+  "severity": "ERROR",
+  "enabled": true,
+  "userLabels": {
+    "app": "citrus-api",
+    "managed-by": "apply-uptime-sh",
+    "incident": "2026-09-16-missing-jwt-secret"
+  }
+}

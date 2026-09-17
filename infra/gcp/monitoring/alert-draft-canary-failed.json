@@ -1,0 +1,33 @@
+{
+  "displayName": "Citrus draft canary: a join attempt failed",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "**What it means.** A citrus-api instance logged `draft_canary.failed`: it signed a draft token and the engine did not answer with a snapshot within 10 s. `reason` says which leg: `token_issue_failed` (API cannot sign), `socket_error` (handshake refused: engine down, TLS, or 401 token rejected), `closed_before_snapshot` with `closeCode` (4300 bad claims, 4400 canary league has no draft_order, 1011 engine precheck error), `unexpected_first_message`, `timeout`. One failure pages at ERROR; the companion absence policy pages CRITICAL when nothing succeeds for 15 min.\n\nRunbook: same steps as \"Citrus draft canary: no successful join for 15 min\".\n\nManaged by `infra/gcp/monitoring/apply-uptime.sh` (`alert-draft-canary-failed.json`)."
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "draft_canary.failed log entry received",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"citrus-api\" AND jsonPayload.event=\"draft_canary.failed\"",
+        "labelExtractors": {
+          "reason": "EXTRACT(jsonPayload.reason)",
+          "closeCode": "EXTRACT(jsonPayload.closeCode)",
+          "detail": "EXTRACT(jsonPayload.detail)"
+        }
+      }
+    }
+  ],
+  "notificationChannels": ${NOTIFICATION_CHANNELS},
+  "alertStrategy": {
+    "notificationRateLimit": { "period": "600s" },
+    "autoClose": "1800s"
+  },
+  "severity": "ERROR",
+  "enabled": true,
+  "userLabels": {
+    "app": "citrus-api",
+    "managed-by": "apply-uptime-sh",
+    "incident": "2026-09-16-missing-jwt-secret"
+  }
+}
