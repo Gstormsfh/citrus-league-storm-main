@@ -75,6 +75,12 @@ spec:
               value: "draft.citrusfantasysports.com"
             - name: DRAFT_WS_PORT
               value: "443"
+            # The draft canary's league and user (2026-09-17); see the note
+            # above env_vars in production-deploy.yml. Keep in sync.
+            - name: DRAFT_CANARY_LEAGUE_ID
+              value: "8c715c23-d3a8-4bd9-86cc-6265083c3e72"
+            - name: DRAFT_CANARY_USER_ID
+              value: "39040c29-f860-430a-802e-4ca6e4fa0a7d"
             # Both secrets below were set by hand on the Iowa service and
             # never declared here, so the Montreal service was born without
             # them (2026-09-16: every draft room down, all signals green).

@@ -444,6 +444,17 @@ jobs:
           # Changing engines is now a tracked one-line PR, which is the
           # correct weight for a change that repoints every draft room.
           #
+          # DRAFT_CANARY_LEAGUE_ID / DRAFT_CANARY_USER_ID (2026-09-17). The
+          # in-process draft canary (server/src/canary/draftCanary.ts) joins
+          # this league's draft room through the real engine every five
+          # minutes and logs draft_canary.ok; its absence pages. The league
+          # is a paused practice league named "CANARY: do not touch",
+          # flagged settings.canary so the nightly sweep skips it, owned by
+          # the canary user. Both ids were first set by hand on revision
+          # citrus-api-00015; they are declared here so no future revision
+          # is born without them (the 2026-09-16 failure class). Re-provision
+          # per infra/gcp/monitoring/README.md, "The canary league".
+          #
           # These comments are deliberately ABOVE `env_vars: |` and not
           # inside it. See the 2026-08-24 note below.
           env_vars: |
@@ -467,6 +478,8 @@ jobs:
             FCM_PROJECT_ID=citrus-fantasy-prod
             DRAFT_WS_HOST=draft.citrusfantasysports.com
             DRAFT_WS_PORT=443
+            DRAFT_CANARY_LEAGUE_ID=8c715c23-d3a8-4bd9-86cc-6265083c3e72
+            DRAFT_CANARY_USER_ID=39040c29-f860-430a-802e-4ca6e4fa0a7d
           # ── SECRETS FROM SECRET MANAGER, NOT FROM env_vars ───────────
           # (2026-09-16 outage.) SUPABASE_JWT_SECRET signs every draft
           # token and SCHEDULED_TRIGGER_SECRET gates every cron route. Both
