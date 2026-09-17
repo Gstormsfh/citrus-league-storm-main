@@ -38,17 +38,11 @@
             "thresholds": [
               {
                 "label": "Mandate autopick p95 (1000 ms)",
-                "value": 1000,
-                "color": "RED",
-                "direction": "ABOVE",
-                "targetAxis": "Y1"
+                "value": 1000
               },
               {
                 "label": "Mandate autopick p99 (2000 ms)",
-                "value": 2000,
-                "color": "YELLOW",
-                "direction": "ABOVE",
-                "targetAxis": "Y1"
+                "value": 2000
               }
             ],
             "dataSets": [
@@ -122,17 +116,11 @@
             "thresholds": [
               {
                 "label": "Mandate fanout p95 (200 ms)",
-                "value": 200,
-                "color": "RED",
-                "direction": "ABOVE",
-                "targetAxis": "Y1"
+                "value": 200
               },
               {
                 "label": "Mandate manual pick p95 (300 ms, end to end)",
-                "value": 300,
-                "color": "YELLOW",
-                "direction": "ABOVE",
-                "targetAxis": "Y1"
+                "value": 300
               }
             ],
             "dataSets": [
@@ -206,10 +194,7 @@
             "thresholds": [
               {
                 "label": "Mandate fanout p95 (200 ms)",
-                "value": 200,
-                "color": "RED",
-                "direction": "ABOVE",
-                "targetAxis": "Y1"
+                "value": 200
               }
             ],
             "dataSets": [
@@ -271,10 +256,7 @@
             "thresholds": [
               {
                 "label": "RPC guidance (200 ms)",
-                "value": 200,
-                "color": "YELLOW",
-                "direction": "ABOVE",
-                "targetAxis": "Y1"
+                "value": 200
               }
             ],
             "dataSets": [
@@ -336,17 +318,11 @@
             "thresholds": [
               {
                 "label": "Mandate manual p95 (300 ms)",
-                "value": 300,
-                "color": "RED",
-                "direction": "ABOVE",
-                "targetAxis": "Y1"
+                "value": 300
               },
               {
                 "label": "Mandate manual p99 (500 ms)",
-                "value": 500,
-                "color": "YELLOW",
-                "direction": "ABOVE",
-                "targetAxis": "Y1"
+                "value": 500
               }
             ],
             "dataSets": [
@@ -404,10 +380,7 @@
             "thresholds": [
               {
                 "label": "absent",
-                "value": 1,
-                "color": "RED",
-                "direction": "BELOW",
-                "targetAxis": "Y1"
+                "value": 1
               }
             ],
             "dataSets": [
@@ -451,10 +424,7 @@
             "thresholds": [
               {
                 "label": "alert threshold (> 2)",
-                "value": 2,
-                "color": "RED",
-                "direction": "ABOVE",
-                "targetAxis": "Y1"
+                "value": 2
               }
             ],
             "dataSets": [

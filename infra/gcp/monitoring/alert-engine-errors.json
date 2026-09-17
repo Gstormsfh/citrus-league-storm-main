@@ -9,7 +9,7 @@
     {
       "displayName": "logging/user/citrus_engine_error_count > 2 per 5-minute window",
       "conditionThreshold": {
-        "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_error_count\"",
+        "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_error_count\" AND resource.type = \"gce_instance\"",
         "aggregations": [
           {
             "alignmentPeriod": "300s",
