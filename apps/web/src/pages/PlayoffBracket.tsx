@@ -655,7 +655,7 @@ const PlayoffBracket = () => {
           the league menu — replaces the 09-01 title bar and its hamburger,
           which opened the old menu sheet. One menu in the app. */}
       <PressBoxLeagueChrome />
-      <main className="w-full lg:pt-24 lg:pb-8 pb-app-chrome">
+      <main className="w-full lg:pt-app-header lg:pb-8 pb-app-chrome">
         <div className="w-full m-0 p-0">
           <div className={cn(
             "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",

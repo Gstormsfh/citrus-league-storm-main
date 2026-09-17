@@ -62,7 +62,7 @@ export default function MockDraft() {
         <PressBoxAppHeader title="Mock draft" logoSrc="/favicon.svg" onBack={() => navigate(-1)} />
       </div>
 
-      <div className="relative z-10 max-w-2xl mx-auto px-3.5 pb-app-chrome lg:pt-24 lg:pb-8">
+      <div className="relative z-10 max-w-2xl mx-auto px-3.5 pb-app-chrome lg:pt-app-header lg:pb-8">
         <p className="mt-4 font-plex font-medium text-[10px] tracking-[0.06em] uppercase text-pressbox-text/45">
           Same room, same engine, same clock
         </p>

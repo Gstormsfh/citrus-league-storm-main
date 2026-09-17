@@ -40,7 +40,7 @@ export default function ImportYahooCallback() {
       <div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]">
         <PressBoxAppHeader title="Yahoo" logoSrc="/favicon.svg" />
       </div>
-      <main className="pb-app-chrome lg:pt-24">
+      <main className="pb-app-chrome lg:pt-app-header">
         <div className="pb-type mx-auto w-full max-w-md px-3.5 pt-8 lg:px-6">
           {error ? (
             <EmptyState

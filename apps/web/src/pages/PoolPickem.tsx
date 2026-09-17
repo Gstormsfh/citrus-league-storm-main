@@ -356,7 +356,7 @@ const PoolPickem = () => {
         onWeekNext={() => setCurrentWeek((w) => w + 1)}
       />
 
-      <main className={cn(PB_TYPE, 'w-full max-lg:pt-0 pt-20 lg:pt-24 lg:pb-8 pb-app-chrome max-lg:font-barlow')}>
+      <main className={cn(PB_TYPE, 'w-full max-lg:pt-0 pt-20 lg:pt-app-header lg:pb-8 pb-app-chrome max-lg:font-barlow')}>
         <div className="flex lg:gap-0">
         {/* Main picks column — centered with padding */}
         <div className="flex-1 min-w-0 px-3 sm:px-4 lg:px-8 xl:px-12">

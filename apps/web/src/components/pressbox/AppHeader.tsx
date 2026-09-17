@@ -49,7 +49,7 @@ export function PressBoxAppHeader({
   className,
 }: PressBoxAppHeaderProps) {
   return (
-    <header className={cn(PB_TYPE, 'flex items-center justify-between gap-2 pl-4 pr-4 pt-2 pb-1.5', className)}>
+    <header className={cn(PB_TYPE, 'flex items-center justify-between gap-2 pl-4 pr-4 pt-2 pb-3.5', className)}>
       <div className="flex items-center gap-2 min-w-0">
         {onBack && (
           <button

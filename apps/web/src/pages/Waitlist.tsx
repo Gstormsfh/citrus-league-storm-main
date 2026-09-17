@@ -19,7 +19,7 @@ const Waitlist = () => {
   return (
     <DarkLayout>
       <Navbar />
-      <main className="relative pt-24 pb-20">
+      <main className="relative pt-app-header pb-20">
         {/* Hero Section */}
         <section className="relative overflow-hidden">
           <div className="max-w-[1100px] mx-auto px-6 py-16 md:py-24">

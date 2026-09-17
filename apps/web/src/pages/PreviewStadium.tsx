@@ -94,7 +94,7 @@ export default function PreviewStadium() {
       </header>
 
       {/* HERO */}
-      <section className="relative max-w-[1240px] mx-auto px-6 pt-16 lg:pt-24 pb-20">
+      <section className="relative max-w-[1240px] mx-auto px-6 pt-16 lg:pt-app-header pb-20">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
           {/* LEFT — copy */}
           <div className="lg:col-span-6">

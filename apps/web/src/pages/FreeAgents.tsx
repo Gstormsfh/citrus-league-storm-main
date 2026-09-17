@@ -82,14 +82,9 @@ import {
 import { cn } from '@/lib/utils';
 import { useOwnership } from '@/hooks/useRosterWeek';
 import { ArrowLeftRight } from 'lucide-react';
+import { FreeAgentAddButton } from '@/components/freeagents/FreeAgentAddButton';
+import { FreeAgentSummaryTable } from '@/components/freeagents/FreeAgentSummaryTable';
 import { supabase } from '@/integrations/supabase/client';
-
-// Returns extra Tailwind classes for the +Add button based on waiver state.
-const addBtnColorCls = (p: Player, claimed = false) => claimed
-  ? 'bg-emerald-900 hover:bg-emerald-800 text-emerald-200 border-emerald-500'
-  : p.is_on_waivers
-  ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600'
-  : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700';
 
 /** The directory carries ids as strings; every roster/waiver call wants numbers. */
 const toNumericId = (id: string | number): number =>
@@ -1728,7 +1723,7 @@ const FreeAgents = () => {
           }
         />
       </div>
-      <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
+      <main className="hidden lg:block w-full lg:pt-app-header lg:pb-8">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile,
               left on desktop; Notifications on the right from 1400px, where the
@@ -1843,19 +1838,33 @@ const FreeAgents = () => {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Top Trending Table */}
                     <Card>
-                      <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-lg font-bold flex items-center gap-2">
-                          <TrendingUp className="h-5 w-5 text-green-500" />
-                          Top Trending
-                          {trendingData.size > 0 && (
-                            <Badge className="text-[11px] ml-2 bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0">
-                              Live
-                            </Badge>
-                          )}
-                        </CardTitle>
-                        <Button variant="ghost" size="sm" onClick={() => setViewMode('all')}>See All</Button>
+                      {/* MIRRORED HEADERS (2026-09-14): the two summary cards
+                          share one header shape — icon, title, badge; a
+                          subtitle line; See All — so they sit level side by
+                          side. Same rule for the empty state and the table. */}
+                      <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
+                        <div className="min-w-0">
+                          <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 flex-wrap">
+                            <TrendingUp className="h-5 w-5 text-green-500 shrink-0" />
+                            Top Trending
+                            {trendingData.size > 0 && (
+                              <Badge className="text-[11px] bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0">
+                                Live
+                              </Badge>
+                            )}
+                          </CardTitle>
+                          <p className="text-[11px] font-normal text-white/55 mt-0.5">
+                            {trendingData.size > 0 ? 'Most added this week' : 'Add activity not available yet'}
+                          </p>
+                        </div>
+                        <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setViewMode('all')}>See All</Button>
                       </CardHeader>
                       <CardContent className="p-0">
+                        {topTrending.length === 0 && (
+                          <div className="px-4 py-6 text-center text-sm text-white/55">
+                            No free agents match these filters.
+                          </div>
+                        )}
                         {/* Phone list — the shared FreeAgentRow. The old rows
                             here carried a name, a position and an add count:
                             nothing you could pick a player WITH. */}
@@ -1880,55 +1889,17 @@ const FreeAgents = () => {
 
                         {/* The table, from `md` up — see FA_TABLE_ONLY. */}
                         <div className={FA_TABLE_ONLY}>
-                          <Table className="[&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Player</TableHead>
-                                <TableHead className="text-right whitespace-nowrap">Pos</TableHead>
-                                <TableHead className="text-right whitespace-nowrap">Adds</TableHead>
-                                <TableHead className="w-[70px]"></TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {topTrending.map(player => (
-                              <TableRow key={player.id}>
-                                <TableCell className="font-medium">
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <Mug p={mugFromDirectory(player)} size="xs" />
-                                    <div className="flex flex-col min-w-0">
-                                      <span 
-                                        className="hover:underline hover:text-pastel-orange cursor-pointer truncate"
-                                        onClick={() => handlePlayerClick(player)}
-                                      >
-                                        {player.full_name}
-                                      </span>
-                                      <span className="text-xs text-white/55">{player.team}</span>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">{playerEligiblePositionsLabel(player, leaguePosType)}</TableCell>
-                                <TableCell className="text-right font-bold text-green-600">
-                                  {player.adds.toLocaleString()}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex gap-1">
-                                    <Button 
-                                      size="icon" 
-                                      variant="ghost" 
-                                      className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-white/55'}`}
-                                      onClick={() => toggleWatchlist(player)}
-                                    >
-                                      <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
-                                    </Button>
-                                    <Button size="default" variant="default" className={`h-10 w-10 font-bold text-xl border shadow-sm disabled:opacity-50 ${addBtnColorCls(player, hasPendingClaim(player))}`} title={hasPendingClaim(player) ? 'Claim filed. Click to cancel' : player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : (hasPendingClaim(player) ? '✓' : player.is_on_waivers ? 'W' : '+')}
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+                          <FreeAgentSummaryTable
+                            players={topTrending}
+                            metric={{ header: 'Adds', render: (player) => <span className="font-bold text-green-600">{(player as typeof topTrending[number]).adds.toLocaleString()}</span> }}
+                            positionType={leaguePosType}
+                            isWatched={(player) => watchlist.has(player.id)}
+                            addState={(player) => hasPendingClaim(player) ? 'claimed' : player.is_on_waivers ? 'claim' : 'add'}
+                            pendingPlayerId={addingPlayerId}
+                            onOpen={handlePlayerClick}
+                            onToggleWatch={toggleWatchlist}
+                            onAdd={handleAddPlayer}
+                          />
                         </div>
                       </CardContent>
                     </Card>
@@ -2005,87 +1976,22 @@ const FreeAgents = () => {
 
                         {/* The table, from `md` up — see FA_TABLE_ONLY. */}
                         <div className={FA_TABLE_ONLY}>
-                          <Table className="[&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Player</TableHead>
-                                <TableHead className="text-right whitespace-nowrap">Pos</TableHead>
-                                <TableHead className="text-center whitespace-nowrap">Schedule</TableHead>
-                                <TableHead className="text-right whitespace-nowrap">Proj</TableHead>
-                                <TableHead className="w-[70px]"></TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {topProjected.map(player => (
-                              <TableRow key={player.id}>
-                                <TableCell className="font-medium">
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <Mug p={mugFromDirectory(player)} size="xs" />
-                                    <div className="flex flex-col min-w-0">
-                                      <span 
-                                        className="hover:underline hover:text-pastel-orange cursor-pointer truncate"
-                                        onClick={() => handlePlayerClick(player)}
-                                      >
-                                        {player.full_name}
-                                      </span>
-                                      <span className="text-xs text-white/55">{player.team}</span>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">{playerEligiblePositionsLabel(player, leaguePosType)}</TableCell>
-                                <TableCell className="text-center">
-                                  {player.games && player.games.length > 0 ? (
-                                    <div className="flex justify-center gap-1">
-                                      {player.games
-                                        .filter((game: NHLGame) => game && game.game_date)
-                                        .sort((a: NHLGame, b: NHLGame) => new Date(a.game_date.split('T')[0] + 'T00:00:00').getTime() - new Date(b.game_date.split('T')[0] + 'T00:00:00').getTime())
-                                        .map((game: NHLGame, idx: number) => {
-                                          const isHome = game.home_team === player.team;
-                                          const opponentAbbrev = isHome ? game.away_team : game.home_team;
-                                          return (
-                                            <div key={idx} className="flex items-center gap-0.5 bg-white/5 ring-1 ring-white/10 rounded px-1.5 py-0.5">
-                                              <span className="text-[10px] text-white/55">{isHome ? 'vs' : '@'}</span>
-                                              <img
-                                                src={`https://assets.nhle.com/logos/nhl/svg/${opponentAbbrev}_light.svg`}
-                                                alt={opponentAbbrev}
-                                                loading="lazy"
-                                                decoding="async"
-                                                className="w-5 h-5"
-                                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                              />
-                                            </div>
-                                          );
-                                        })}
-                                    </div>
-                                  ) : (
-                                    <span className="text-xs text-white/55">-</span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex flex-col items-end">
-                                    <span className="font-bold text-pastel-sage-soft">{weeklyPointsLabel(player.weeklyProjection)}</span>
-                                    <span className="text-[11px] text-white/55">{weeklyExposureLabel(player)}</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex gap-1">
-                                    <Button 
-                                      size="icon" 
-                                      variant="ghost" 
-                                      className={`h-8 w-8 ${watchlist.has(player.id) ? 'text-yellow-500' : 'text-white/55'}`}
-                                      onClick={() => toggleWatchlist(player)}
-                                    >
-                                      <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
-                                    </Button>
-                                    <Button size="sm" variant="default" className={`h-8 w-8 font-bold border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player, hasPendingClaim(player))}`} title={hasPendingClaim(player) ? 'Claim filed. Click to cancel' : player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (hasPendingClaim(player) ? '✓' : player.is_on_waivers ? 'W' : '+')}
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+                          <FreeAgentSummaryTable
+                            players={topProjected}
+                            metric={{ header: 'Proj', render: (player) => (
+                              <div className="flex flex-col items-end">
+                                <span className="font-bold text-pastel-sage-soft">{weeklyPointsLabel((player as typeof topProjected[number]).weeklyProjection)}</span>
+                                <span className="text-[11px] text-white/55">{weeklyExposureLabel(player as typeof topProjected[number])}</span>
+                              </div>
+                            ) }}
+                            positionType={leaguePosType}
+                            isWatched={(player) => watchlist.has(player.id)}
+                            addState={(player) => hasPendingClaim(player) ? 'claimed' : player.is_on_waivers ? 'claim' : 'add'}
+                            pendingPlayerId={addingPlayerId}
+                            onOpen={handlePlayerClick}
+                            onToggleWatch={toggleWatchlist}
+                            onAdd={handleAddPlayer}
+                          />
                         </div>
                       </CardContent>
                     </Card>
@@ -2336,9 +2242,7 @@ const FreeAgents = () => {
                                       <Button size="icon" variant="ghost" className="h-9 w-9 text-white/55 touch-manipulation" onClick={() => handlePlayerClick(player)}>
                                         <Info className="h-3.5 w-3.5" />
                                       </Button>
-                                      <Button size="sm" variant="default" className={`h-9 w-9 font-bold text-base border shadow-sm p-0 disabled:opacity-50 touch-manipulation ${addBtnColorCls(player, hasPendingClaim(player))}`} title={hasPendingClaim(player) ? 'Claim filed. Click to cancel' : player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                        {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (hasPendingClaim(player) ? '✓' : player.is_on_waivers ? 'W' : '+')}
-                                      </Button>
+                                      <FreeAgentAddButton state={hasPendingClaim(player) ? 'claimed' : player.is_on_waivers ? 'claim' : 'add'} playerName={player.full_name} pending={addingPlayerId === toNumericId(player.id)} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)} />
                                     </div>
                                   </TableCell>
                                 </TableRow>
@@ -2606,9 +2510,7 @@ const FreeAgents = () => {
                                    >
                                      <Star className={`h-3.5 w-3.5 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                    </Button>
-                                   <Button size="sm" variant="default" className={`h-9 px-3 text-xs font-bold border shadow-sm disabled:opacity-50 touch-manipulation ${addBtnColorCls(player, hasPendingClaim(player))}`} title={hasPendingClaim(player) ? 'Claim filed. Click to cancel' : player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                     {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+ Add'}
-                                   </Button>
+                                   <FreeAgentAddButton state={hasPendingClaim(player) ? 'claimed' : player.is_on_waivers ? 'claim' : 'add'} playerName={player.full_name} pending={addingPlayerId === toNumericId(player.id)} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)} />
                                    <Button
                                      size="sm"
                                      variant="outline"
@@ -2864,9 +2766,7 @@ const FreeAgents = () => {
                                 <Button size="icon" variant="ghost" className="h-9 w-9 text-white/55 touch-manipulation" onClick={() => handlePlayerClick(player)}>
                                   <Info className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button size="sm" variant="default" className={`h-9 w-9 font-bold text-base border shadow-sm p-0 disabled:opacity-50 touch-manipulation ${addBtnColorCls(player, hasPendingClaim(player))}`} title={hasPendingClaim(player) ? 'Claim filed. Click to cancel' : player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (hasPendingClaim(player) ? '✓' : player.is_on_waivers ? 'W' : '+')}
-                                </Button>
+                                <FreeAgentAddButton state={hasPendingClaim(player) ? 'claimed' : player.is_on_waivers ? 'claim' : 'add'} playerName={player.full_name} pending={addingPlayerId === toNumericId(player.id)} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)} />
                               </div>
                             </TableCell>
                           </TableRow>

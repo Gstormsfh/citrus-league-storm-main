@@ -1223,7 +1223,7 @@ const Profile = () => {
             </Link>
           </div>
         )}
-        {!isMobile && <main className="w-full pt-6 lg:pt-24 pb-app-chrome lg:pb-16">
+        {!isMobile && <main className="w-full pt-6 lg:pt-app-header pb-app-chrome lg:pb-16">
           <div className="container mx-auto px-3 sm:px-4">
             <div className="max-w-2xl mx-auto">
               <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_24px_60px_-16px_rgba(255,168,87,0.25)] relative overflow-hidden">
@@ -1368,7 +1368,7 @@ const Profile = () => {
           onPrefsChange={(next) => void handlePrefsChange(next)}
         />
       )}
-      {!isMobile && <main className="w-full pt-6 lg:pt-24 pb-app-chrome lg:pb-16">
+      {!isMobile && <main className="w-full pt-6 lg:pt-app-header pb-app-chrome lg:pb-16">
         <div className="container mx-auto px-3 sm:px-4">
           <div className="max-w-6xl mx-auto">
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6 lg:space-y-8">

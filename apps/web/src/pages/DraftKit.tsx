@@ -117,7 +117,7 @@ export default function DraftKit() {
     <DarkLayout>
       <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]"><PressBoxAppHeader title="Draft kit" logoSrc="/favicon.svg" /></div>
 
-      <main className="mx-auto w-full max-w-[1180px] px-4 pb-24 pt-24 sm:px-6 max-lg:pt-3 max-lg:px-3 pb-app-chrome">
+      <main className="mx-auto w-full max-w-[1180px] px-4 pb-24 pt-app-header sm:px-6 max-lg:pt-3 max-lg:px-3 pb-app-chrome">
         {/* Hero.
             ART PLACEHOLDER: the dashed panel below is where the founder's
             Draft Kit cover art goes. It is deliberately left as a labelled

@@ -671,7 +671,7 @@ const Standings = () => {
         )}
       </div>
 
-      <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
+      <main className="hidden lg:block w-full lg:pt-app-header lg:pb-8">
         <div className="w-full m-0 p-0">
           {/* Desktop: Grid / Mobile: Single column */}
           <div className={cn(

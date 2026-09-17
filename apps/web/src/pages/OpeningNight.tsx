@@ -99,7 +99,7 @@ export default function OpeningNight() {
   return (
     <DarkLayout>
       <Navbar />
-      <main className="relative pt-24 pb-20">
+      <main className="relative pt-app-header pb-20">
         <section className="max-w-[1100px] mx-auto px-6 py-12 md:py-16">
           <div className="max-w-3xl mx-auto text-center">
             <div className="flex justify-center mb-6">
