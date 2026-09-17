@@ -67,6 +67,8 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
+        // Campaign URLs must reach Hosting's redirect, not the cached SPA 404.
+        navigateFallbackDenylist: [/^\/go(?:\/|\?|$)/i],
         // Precache the app shell (JS, CSS, HTML)
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"],
         // Don't precache source maps or huge files
