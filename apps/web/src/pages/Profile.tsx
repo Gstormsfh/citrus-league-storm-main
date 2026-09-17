@@ -1,4 +1,5 @@
 import { interceptExternal } from '@/lib/openExternal';
+import { YahooAttribution } from '@/components/history/YahooAttribution';
 import { MASCOTS, type Mascot } from '@/constants/mascots';
 import { deriveAccomplishments } from '@/components/account/achievements';
 import { SITE_ORIGIN } from '@/utils/inviteShare';
@@ -2492,6 +2493,8 @@ const Profile = () => {
                         <span className="font-bold text-pastel-cream group-hover:text-pastel-orange">Terms of Service</span>
                         <ExternalLink className="h-4 w-4 text-white/55 group-hover:text-pastel-orange" />
                       </a>
+                      {/* Yahoo's attribution belongs in the app's Legal section (API Access and Use Agreement, 2026-09-17). */}
+                      <YahooAttribution className="px-3 pt-1" />
                     </CardContent>
                   </Card>
 

@@ -115,11 +115,26 @@ shows more than one season in the chain and a run imports them. If prior
 seasons answer 403, the job records them as `needs_credentials` and only the
 current season lands; that is the fallback, not the plan.
 
-### 4. Attribution
+### 4. Attribution (a condition of the signed agreement, 2026-09-17)
 
-Any screen that shows Yahoo-derived data carries "Fantasy data provided by
-Yahoo Fantasy" and the Yahoo Fantasy logo, per Yahoo's terms. The UI branch
-owns this; it is a condition of the app approval.
+The API Access and Use Agreement requires, wherever Yahoo Fantasy data is
+shown: the words "Fantasy data provided by Yahoo Fantasy" as a hyperlink to
+an official Yahoo Fantasy page, in the footer of each web page that shows the
+data; inside the app's About or Legal section for mobile; and, if Yahoo data
+is a material feature, that language (or substantially similar) in the App
+Store listing. One component carries it: `components/history/YahooAttribution`
+(link: https://sports.yahoo.com/fantasy/, opened in the system browser inside
+the native shell). It is on the trophy room footer when any season came from
+Yahoo, on the Yahoo panel of `/import`, and in Profile's Legal & Privacy card.
+For the App Store and Play listings, add this line to the description before
+Yahoo import is announced: "Fantasy data provided by Yahoo Fantasy."
+Attribution rules: https://sports.yahoo.com/developer/.
+
+The approved use case on the agreement's cover page reads "historical league
+standings, season champions, and manager names for a league history page".
+The import also reads settings, draft results, weekly scoreboards and the
+transaction log for the same page; written confirmation of that scope was
+requested from fantasyapiapplications@yahoosports.com on 2026-09-17.
 
 ## Screenshots: what is read, what is written, what to watch
 

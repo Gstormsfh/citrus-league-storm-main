@@ -27,6 +27,7 @@ import Navbar from '@/components/Navbar';
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { ImportProgress } from '@/components/history/ImportProgress';
 import { ScreenshotImport } from '@/components/history/screenshots/ScreenshotImport';
+import { YahooAttribution } from '@/components/history/YahooAttribution';
 import { seasonLabel } from '@/components/history/trophyLabels';
 import { Chip, Eyebrow, HistoryButton, Panel, inputClass } from '@/components/history/ui';
 import { isNativeShell } from '@/lib/nativeAuth';
@@ -327,7 +328,7 @@ export default function ImportLeague() {
                         <HistoryButton disabled={(!target && !founding) || startingKey != null} busy={startingKey === chain.key} onClick={() => void startYahoo(chain)}>{founding ? 'Bring it to Citrus' : 'Import'}</HistoryButton>
                       </div>
                     ))}
-                    <p className="mt-2 font-barlow text-[11px] text-white/55">Fantasy data provided by Yahoo Fantasy</p>
+                    <YahooAttribution className="mt-2" />
                   </div>
                 )}
               </Panel>
