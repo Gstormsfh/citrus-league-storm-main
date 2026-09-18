@@ -279,14 +279,26 @@ const HockeyPlayerCardContent = ({
     const xGoals = typeof data.I_F_xGoals === 'string' ? parseFloat(data.I_F_xGoals) : (data.I_F_xGoals || 0);
     // Note: Corsi/Fenwick are intentionally not shown/tracked in the app UI.
     
-    // Goalie stats (derived if present in advanced data, otherwise fallback)
-    const wins = 0; 
-    const gaa = data.icetime && parseFloat(String(data.icetime)) > 0 && data.I_F_goals 
-       ? (parseFloat(String(data.I_F_goals)) * 3600) / parseFloat(String(data.icetime)) 
-       : 0;
-    const savePct = data.I_F_shotsOnGoal && parseFloat(String(data.I_F_shotsOnGoal)) > 0
-       ? (parseFloat(String(data.I_F_shotsOnGoal)) - parseFloat(String(data.I_F_goals || 0))) / parseFloat(String(data.I_F_shotsOnGoal))
-       : 0;
+    // Goalie stats. The CitrusPuck row is skater-shaped (a goalie's own
+    // goals, shots and ice time), so the derivations below are 0 for every
+    // goalie: the roster cards read W 0 / GAA 0.00 / SV% 0.00% while the
+    // skaters beside them showed last season (desktop QA, 2026-09-18). The
+    // pipeline's goalie line on player.stats (wins, GAA, SV%) is the source;
+    // the derivations stay only as a fallback when it is absent.
+    const statWins = player.stats?.wins ?? 0;
+    const statGaa = player.stats?.gaa ?? 0;
+    const statSavePct = player.stats?.savePct ?? 0;
+    const wins = statWins;
+    const gaa = statGaa > 0
+       ? statGaa
+       : (data.icetime && parseFloat(String(data.icetime)) > 0 && data.I_F_goals
+         ? (parseFloat(String(data.I_F_goals)) * 3600) / parseFloat(String(data.icetime))
+         : 0);
+    const savePct = statSavePct > 0
+       ? statSavePct
+       : (data.I_F_shotsOnGoal && parseFloat(String(data.I_F_shotsOnGoal)) > 0
+         ? (parseFloat(String(data.I_F_shotsOnGoal)) - parseFloat(String(data.I_F_goals || 0))) / parseFloat(String(data.I_F_shotsOnGoal))
+         : 0);
     
     // Derived Advanced Goalie Stats
     const highDangerSavePct = data.I_F_highDangerShots && parseFloat(String(data.I_F_highDangerShots)) > 0
