@@ -1049,9 +1049,14 @@
   z-index: 20;
 }
 
+/* Desktop (2026-09-18, QA): the lineup column is its own scroll container
+   (Matchup.tsx, lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto) that already
+   starts under the navbar, and sticky offsets are measured against the
+   nearest scroll container. 6rem here parked the header 96px down INSIDE
+   that column, floating over the top row of player cards. */
 @media (min-width: 1024px) {
   .matchup-team-header {
-    top: 6rem;
+    top: 0;
   }
 }
 
@@ -1524,28 +1529,9 @@
   }
   }
   
-  /* Corner accent - like embroidered corner */
-  .player-unique-stats-box::before {
-  content: '';
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 6px;
-  height: 6px;
-  background: #E6A99F; /* Coral dot */
-  border-radius: 50%;
-  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.1);
-  }
-  
-  /* Larger corner accent on desktop */
-  @media (min-width: 768px) {
-  .player-unique-stats-box::before {
-    width: 7px;
-    height: 7px;
-    top: 4px;
-    right: 4px;
-  }
-  }
+  /* The "embroidered corner" dot that used to sit at top/right 3-4px is
+     gone (2026-09-18, QA): with 3-5px of padding it landed on the F PTS
+     value itself and read as a broken badge on every card in the matchup. */
   
   .unique-stat-item {
   display: flex;
