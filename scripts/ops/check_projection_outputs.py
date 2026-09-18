@@ -229,7 +229,10 @@ def check(reader, now):
         if state not in ('success', 'initial_activation'):
             raise HealthError('canonical_refresh_status_unknown')
         validate_publication_identity(active[0])
-        validate_fresh_timestamp(active[0].get('last_refresh_at'), now, 'canonical_refresh')
+        if state == 'initial_activation':
+            validate_fresh_timestamp(active[0].get('activated_at'), now, 'canonical_activation')
+        else:
+            validate_fresh_timestamp(active[0].get('last_refresh_at'), now, 'canonical_refresh')
         result['canonical_refresh'] = active[0]
     else:
         raise HealthError('no_active_canonical_run')

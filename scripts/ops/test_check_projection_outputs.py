@@ -45,6 +45,16 @@ class TestProjectionHealth(unittest.TestCase):
             f.canonical_refresh = lambda season: [{**ACTIVE, 'last_refresh_status': state}]
             self.assertEqual(check(f, NOW)['canonical_refresh']['last_refresh_status'], state)
 
+    def test_initial_activation_uses_activation_not_previous_refresh(self):
+        for previous_refresh in (None, '2026-09-05T00:00:00Z'):
+            f = Fake()
+            f.canonical_refresh = lambda season: [{**ACTIVE, 'last_refresh_status': 'initial_activation',
+                'last_refresh_at': previous_refresh}]
+            self.assertEqual(check(f, NOW)['status'], 'available_and_fresh')
+        f.canonical_refresh = lambda season: [{**ACTIVE, 'last_refresh_status': 'initial_activation',
+            'activated_at': '2026-09-05T00:00:00Z'}]
+        with self.assertRaisesRegex(HealthError, '^canonical_activation_stale$'): check(f, NOW)
+
     def test_fresh_rows_without_active_publication_are_not_healthy(self):
         f = Fake(); f.canonical_refresh = lambda season: []
         with self.assertRaisesRegex(HealthError, '^no_active_canonical_run$'): check(f, NOW)
