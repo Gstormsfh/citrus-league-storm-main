@@ -5,6 +5,7 @@ Uses standard library only so the scheduled check cannot import a legacy writer.
 """
 import json
 import argparse
+from math import isfinite
 import os
 import re
 import sys
@@ -135,10 +136,24 @@ def check_defensive_history(reader, season):
     mismatched = sorted(team for team, n in played.items() if by_team.get(team, {}).get('games_played') != n)
     missing = sorted(team for team in played if any(by_team.get(team, {}).get(k) is None
         for k in ('goals_against_avg','shots_against_avg','save_pct')))
+    invalid = []
+    for team in sorted(played):
+        for field in ('goals_against_avg', 'shots_against_avg', 'save_pct'):
+            value = by_team.get(team, {}).get(field)
+            if value is None:
+                continue  # Reported by missing_fields, not treated as zero.
+            try:
+                if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+                    raise ValueError('Not a numeric statistic')
+                number = float(value)
+                if not isfinite(number) or number < 0 or (field == 'save_pct' and number > 1):
+                    raise ValueError('Invalid defensive statistic')
+            except (ValueError, TypeError, OverflowError):
+                invalid.append({'team': team, 'field': field})
     extra = sorted(set(by_team)-set(played))
-    return {'status':'coverage_present' if played and not (mismatched or missing or extra) else 'degraded',
+    return {'status':'coverage_present' if played and not (mismatched or missing or invalid or extra) else 'degraded',
             'season':season, 'games':len(games), 'teams':len(played),
-            'coverage_mismatch':mismatched, 'missing_fields':missing, 'unscheduled_teams':extra,
+            'coverage_mismatch':mismatched, 'missing_fields':missing, 'invalid_fields':invalid, 'unscheduled_teams':extra,
             'accuracy_validated':False, 'line_matchups_validated':False}
 
 

@@ -98,6 +98,27 @@ class TestProjectionHealth(unittest.TestCase):
             def defensive_history(self, season): return [], []
         self.assertEqual(check_defensive_history(HistoryFake(), 2025)['status'], 'degraded')
 
+    def test_impossible_defensive_statistics_are_not_healthy(self):
+        class HistoryFake:
+            value = .91
+            field = 'save_pct'
+            def defensive_history(self, season):
+                rows = [dict(team_abbrev=t,games_played=1,goals_against_avg=2.5,
+                             shots_against_avg=28,save_pct=.91) for t in ('A','B')]
+                rows[0][self.field] = self.value
+                return rows, [dict(game_id=1,home_team='A',away_team='B')]
+        reader = HistoryFake()
+        for field, value in [('save_pct',1.2),('save_pct',True),('save_pct','NaN'),
+                             ('goals_against_avg',-1),('shots_against_avg','Infinity'),
+                             ('goals_against_avg',{}),('save_pct','unavailable')]:
+            with self.subTest(field=field,value=value):
+                reader.field, reader.value = field, value
+                report = check_defensive_history(reader,2025)
+                self.assertEqual(report['status'],'degraded')
+                self.assertEqual(report['invalid_fields'],[dict(team='A',field=field)])
+        reader.field, reader.value = 'save_pct', '.91'
+        self.assertEqual(check_defensive_history(reader,2025)['status'],'coverage_present')
+
     def test_fresh_flat_outputs_fail_model_capability_check(self):
         class ModelFake:
             def model_capability(self, season, today, kind):
