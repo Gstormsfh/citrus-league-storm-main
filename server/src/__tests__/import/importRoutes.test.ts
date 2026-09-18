@@ -122,6 +122,50 @@ describe('POST /api/imports/espn/discover', () => {
   });
 });
 
+describe('POST /api/imports/espn/found', () => {
+  it('one tap: creates the league from the newest season, with the commissioner team, and runs the whole import into it', async () => {
+    const db = makeDb('u-test', { profiles: [{ id: 'u-test', username: 'gs', first_name: 'Garrett', last_name: 'S', default_team_name: 'Storm Front' }] });
+    const audits: any[] = [];
+    db.rpcHandlers.log_security_event = (args) => { audits.push(args); return null; };
+    const { impl } = publicLeagueFetch();
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => impl(String(url), init));
+    const { app } = await import('../../app');
+    const res = await post(app, '/api/imports/espn/found', { externalLeagueId: '777', latestEspnSeason: 2021 });
+    expect(res.status).toBe(201);
+    const body = (await res.json()).data;
+
+    const league = db.rows('leagues').find((l) => l.id !== LEAGUE)!;
+    expect(body.league).toEqual({ id: league.id, name: 'Test League', join_code: null });
+    expect(league).toMatchObject({ commissioner_id: 'u-test', imported_from: 'espn', league_size: 4 });
+    expect(league.settings).toMatchObject({ scoringFormat: 'h2h-points', teamsCount: 4, foundedFrom: { platform: 'espn', externalLeagueId: '777' } });
+    expect(db.rows('teams').filter((t) => t.league_id === league.id)).toEqual([expect.objectContaining({ owner_id: 'u-test', team_name: 'Storm Front' })]);
+    expect(body.job).toMatchObject({ league_id: league.id, platform: 'espn', external_league_id: '777', status: 'queued' });
+    expect(body.plan).toMatchObject({ name: 'Test League', scoringFormat: 'h2h-points', teamsCount: 4 });
+    expect(body.plan).not.toHaveProperty('translated');
+
+    for (let i = 0; i < 50; i++) {
+      await new Promise((r) => setTimeout(r, 0));
+      const row = db.rows('import_jobs').find((j) => j.id === body.job.id)!;
+      if (row.status === 'done' || row.status === 'failed') break;
+    }
+    expect(db.rows('import_jobs').find((j) => j.id === body.job.id)!.status).toBe('done');
+    expect(db.rows('league_seasons').filter((s) => s.league_id === league.id).map((s) => s.season).sort()).toEqual([2019, 2020]);
+    expect(audits.map((a) => a.p_event_type)).toEqual(expect.arrayContaining(['LEAGUE_CREATE', 'LEAGUE_HISTORY_IMPORT']));
+    expect(audits.find((a) => a.p_event_type === 'LEAGUE_HISTORY_IMPORT')).toMatchObject({ p_league_id: league.id, p_details: { platform: 'espn', founded: true, jobId: body.job.id } });
+  });
+
+  it('a private league creates nothing and says how to get in', async () => {
+    const db = makeDb('u-test');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ status: 401, json: async () => null } as unknown as Response);
+    const { app } = await import('../../app');
+    const res = await post(app, '/api/imports/espn/found', { externalLeagueId: '777', latestEspnSeason: 2021 });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error.message).toMatch(/private on ESPN/);
+    expect(db.rows('leagues')).toHaveLength(1);
+    expect(db.rows('import_jobs')).toHaveLength(0);
+  });
+});
+
 describe('POST /api/leagues/:leagueId/imports/espn', () => {
   it('refuses a member who is not the commissioner, creating no job', async () => {
     const db = makeDb('someone-else');

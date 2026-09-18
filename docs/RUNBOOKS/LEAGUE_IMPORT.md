@@ -15,6 +15,23 @@ and migrations `20260914110000`, `20260914110100`, `20260914110200`.
 | Yahoo | One tap: **Connect Yahoo** opens Yahoo's sign-in in the system browser, comes back, Citrus lists their NHL leagues with season counts, they tap one. | OAuth, read-only (`fspt-r`). Refresh token sealed server-side; access tokens in memory only. Off until the Yahoo developer application clears; screenshots are the Yahoo path until then. |
 | Screenshots, any platform (Yahoo, Fantrax, CBS, ESPN, a spreadsheet) | Start with the page that lists every past champion (Yahoo and ESPN call it **League History**; Fantrax **History**; Sleeper **Trophy Room**): one screenshot gives every season, every champion and runner-up, career titles and droughts. Then the league's own awards (a spreadsheet, a chat message, a photo of the list) and, per season if wanted, standings, playoffs, draft results (**Draft Results** on Yahoo and Fantrax, **Draft Recap** on ESPN), transactions, this year's keepers and traded picks (**Draft Picks** on Fantrax and Sleeper), settings. The upload panel lists the pages in the chosen platform's own menu words. Pick them from the camera roll, tap **Read**, check the table it read, tap **Import**. Up to 12 images per read; more seasons in another go. | None. Images are scaled to 1600 px in the browser, sent once to the API, read by the same Claude model Stormy uses (`ANTHROPIC_API_KEY`, already on the API server), and never stored; the reading is kept on the job as a raw payload. |
 
+**One tap, no league first (2026-09-17).** On `/import`, the target picker's
+first choice is "A new league, set up from the import" (preselected for
+anyone who commissions nothing yet). Bring it to Citrus on an ESPN league or a
+Yahoo chain calls `POST /api/imports/espn/found` or `/yahoo/found`
+(`LeagueFoundingService`): the newest season's settings are read from the
+source, `foundingPlan` turns them into the arguments Create League takes
+(name, format, point weights or categories, roster slots, draft type and
+rounds, team count, playoff shape, keeper count at round cost until confirmed),
+the league is created through `LeagueService.createLeague` (commissioner team
+and join code included, `settings.foundedFrom` and `leagues.imported_from`
+stamped), and the ordinary background import starts on it. The response
+carries `plan.notes`: everything Citrus could not express, in plain words,
+shown on the page and kept in `settings.foundedFrom.notes`. The page then
+shows the trophy room link, league settings, and the invite link
+(`/join/<join_code>`); managers who join pick their own name from the history.
+Every choice is an ordinary league setting, editable before the draft.
+
 Then, for everyone: the trophy room opens on their own career, "which one is
 you?" attaches other managers to their history when they sign up, and the
 commissioner confirms keeper rules and scoring before starting the Citrus season.
@@ -32,6 +49,20 @@ that league on that device (localStorage); the card on the trophy room stays.
 The Yahoo endpoints answer **503 "Yahoo import is not available yet"** and
 `GET /api/imports/yahoo/connection` reports `configured: false` until the four
 variables below are set. Nothing else changes; ESPN import works regardless.
+
+### 0. Provisioning, as Yahoo actually runs it (learned 2026-09-16)
+
+Approval is not access. Yahoo's approval email (from
+fantasyapiapplications@yahoosports.com via Docusign) says access is switched on
+only after all three of: the API Access and Use Agreement is signed in
+Docusign; an app exists on developer.yahoo.com under the applying account
+(Web Application, Confidential Client, both redirect URIs, **no** other
+permission boxes: OpenID and "TW Auction" are unrelated); and Yahoo's Developer
+Application Confirmation Form is submitted with the developer's name, email and
+the app's Client ID, whether or not Fantasy Sports is listed on the app yet.
+Fantasy Sports appears on the app's permissions once Yahoo provisions it.
+Until then the app's keys exist but every Fantasy API call is refused, so set
+the secrets only after the "provisioned" email.
 
 ### 1. Apply for a Yahoo developer app (the critical path)
 
@@ -84,11 +115,26 @@ shows more than one season in the chain and a run imports them. If prior
 seasons answer 403, the job records them as `needs_credentials` and only the
 current season lands; that is the fallback, not the plan.
 
-### 4. Attribution
+### 4. Attribution (a condition of the signed agreement, 2026-09-17)
 
-Any screen that shows Yahoo-derived data carries "Fantasy data provided by
-Yahoo Fantasy" and the Yahoo Fantasy logo, per Yahoo's terms. The UI branch
-owns this; it is a condition of the app approval.
+The API Access and Use Agreement requires, wherever Yahoo Fantasy data is
+shown: the words "Fantasy data provided by Yahoo Fantasy" as a hyperlink to
+an official Yahoo Fantasy page, in the footer of each web page that shows the
+data; inside the app's About or Legal section for mobile; and, if Yahoo data
+is a material feature, that language (or substantially similar) in the App
+Store listing. One component carries it: `components/history/YahooAttribution`
+(link: https://sports.yahoo.com/fantasy/, opened in the system browser inside
+the native shell). It is on the trophy room footer when any season came from
+Yahoo, on the Yahoo panel of `/import`, and in Profile's Legal & Privacy card.
+For the App Store and Play listings, add this line to the description before
+Yahoo import is announced: "Fantasy data provided by Yahoo Fantasy."
+Attribution rules: https://sports.yahoo.com/developer/.
+
+The approved use case on the agreement's cover page reads "historical league
+standings, season champions, and manager names for a league history page".
+The import also reads settings, draft results, weekly scoreboards and the
+transaction log for the same page; written confirmation of that scope was
+requested from fantasyapiapplications@yahoosports.com on 2026-09-17.
 
 ## Screenshots: what is read, what is written, what to watch
 

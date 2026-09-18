@@ -24,6 +24,7 @@ import { TrophyRoom } from '@/components/history/TrophyRoom';
 import { CommissionerHistoryTools } from '@/components/history/CommissionerHistoryTools';
 import { EmptyState, Eyebrow, HistoryButton } from '@/components/history/ui';
 import { platformLabel, seasonLabel } from '@/components/history/trophyLabels';
+import { YahooAttribution } from '@/components/history/YahooAttribution';
 import { useToast } from '@/hooks/use-toast';
 
 const dataOf = <T,>(res: unknown): T | null => ((res as { data?: T })?.data ?? null);
@@ -135,11 +136,7 @@ export default function LeagueHistory() {
                   </div>
                 </>
               )}
-              {fromYahoo && (
-                <p className="pt-2 text-center font-barlow text-[12px] text-white/55" data-testid="yahoo-attribution">
-                  Fantasy data provided by Yahoo Fantasy
-                </p>
-              )}
+              {fromYahoo && <YahooAttribution className="pt-2 text-center" />}
             </div>
           )}
         </div>

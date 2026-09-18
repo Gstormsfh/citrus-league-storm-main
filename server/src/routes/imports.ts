@@ -53,6 +53,7 @@ import { YahooClient } from '../import/yahoo/client';
 import { YahooOAuth } from '../import/yahoo/oauth';
 import { NeedsCredentialsError, SourceThrottledError } from '../import/types';
 import { LeagueImportService } from '../services/import/LeagueImportService';
+import { LeagueFoundingService } from '../services/import/LeagueFoundingService';
 import { ScoringTranslationService } from '../services/import/ScoringTranslationService';
 import type { ImportedSettings } from '../import/types';
 import { TrophyService } from '../services/import/TrophyService';
@@ -89,6 +90,14 @@ const schemas = {
   yahooRun: z.object({
     leagueKey: z.string().regex(/^\d{1,6}\.l\.\d{1,12}$/),
     seasons: z.array(z.number().int().min(1990).max(2100)).max(40).optional(),
+  }),
+  espnFound: z.object({
+    externalLeagueId: z.string().regex(/^\d{1,12}$/),
+    latestEspnSeason: z.number().int().min(1990).max(2100).optional(),
+    credentials: espnCredentials,
+  }),
+  yahooFound: z.object({
+    leagueKey: z.string().regex(/^\d{1,6}\.l\.\d{1,12}$/),
   }),
   claim: z.object({
     memberId: z.string().uuid(),
@@ -228,6 +237,58 @@ importRoutes.get('/yahoo/leagues', async (c) => {
     if (e instanceof NeedsCredentialsError) return fail(c, AppError.conflict(e.message));
     if (e instanceof SourceThrottledError) return fail(c, AppError.serviceUnavailable('Yahoo is rate limiting requests. Try again in a minute.'));
     return handleError(c, e, 'Could not list your Yahoo leagues');
+  }
+});
+
+// ---- One tap: found a Citrus league from a source league ----------------------
+//
+// No league exists yet, so these live on the auth-only router. The service
+// creates the league through the same path Create League uses and starts the
+// ordinary background import on it; the response carries the league, the job
+// and the plan (what carried over, what the commissioner should look at).
+
+// POST /api/imports/espn/found
+importRoutes.post('/espn/found', validateBody(schemas.espnFound), async (c) => {
+  const userId = c.get('userId');
+  const body = getValidatedBody<z.infer<typeof schemas.espnFound>>(c);
+  const supabase = createUserClient(c.get('userToken'));
+  try {
+    const creds = body.credentials as EspnCredentials | undefined;
+    const found = await new LeagueFoundingService(supabase, supabaseAdmin).foundFromEspn({
+      externalLeagueId: body.externalLeagueId, userId, client: new EspnClient(), creds, importerSwid: creds?.swid ?? null, latestEspnSeason: body.latestEspnSeason,
+    });
+    const audit = new AuditService(supabase);
+    void audit.log('LEAGUE_CREATE', found.league.id, { foundedFrom: 'espn', externalLeagueId: body.externalLeagueId });
+    void audit.log('LEAGUE_HISTORY_IMPORT', found.league.id, { platform: 'espn', externalLeagueId: body.externalLeagueId, jobId: found.job.id, founded: true, withCredentials: Boolean(body.credentials) });
+    return created(c, found);
+  } catch (e) {
+    if (e instanceof NeedsCredentialsError) return fail(c, AppError.conflict('This league is private on ESPN. Sign in to ESPN, or ask your commissioner to make it viewable to the public, then try again.'));
+    if (e instanceof SourceThrottledError) return fail(c, AppError.serviceUnavailable('ESPN is rate limiting requests. Try again in a minute.'));
+    return handleError(c, e, 'Could not set up the league from ESPN');
+  }
+});
+
+// POST /api/imports/yahoo/found
+importRoutes.post('/yahoo/found', validateBody(schemas.yahooFound), async (c) => {
+  const userId = c.get('userId');
+  const body = getValidatedBody<z.infer<typeof schemas.yahooFound>>(c);
+  const supabase = createUserClient(c.get('userToken'));
+  const connection = new YahooConnectionService(supabaseAdmin);
+  if (!connection.isConfigured()) return fail(c, AppError.serviceUnavailable(YAHOO_NOT_CONFIGURED));
+  try {
+    const status = await connection.status(userId);
+    if (!status.connected) return fail(c, AppError.conflict('Connect Yahoo before bringing a league over.'));
+    const found = await new LeagueFoundingService(supabase, supabaseAdmin).foundFromYahoo({
+      leagueKey: body.leagueKey, userId, client: new YahooClient(connection.tokenProvider(userId), undefined, 250), importerGuid: status.guid,
+    });
+    const audit = new AuditService(supabase);
+    void audit.log('LEAGUE_CREATE', found.league.id, { foundedFrom: 'yahoo', leagueKey: body.leagueKey });
+    void audit.log('LEAGUE_HISTORY_IMPORT', found.league.id, { platform: 'yahoo', leagueKey: body.leagueKey, jobId: found.job.id, founded: true });
+    return created(c, found);
+  } catch (e) {
+    if (e instanceof NeedsCredentialsError) return fail(c, AppError.conflict(e.message));
+    if (e instanceof SourceThrottledError) return fail(c, AppError.serviceUnavailable('Yahoo is rate limiting requests. Try again in a minute.'));
+    return handleError(c, e, 'Could not set up the league from Yahoo');
   }
 });
 

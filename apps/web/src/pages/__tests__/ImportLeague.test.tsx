@@ -16,6 +16,8 @@ const api = vi.hoisted(() => ({
   yahooLeagues: vi.fn(),
   yahooConnectUrl: vi.fn(),
   startYahoo: vi.fn(),
+  foundEspn: vi.fn(),
+  foundYahoo: vi.fn(),
   screenshotStatus: vi.fn(),
   readScreenshots: vi.fn(),
   confirmScreenshots: vi.fn(),
@@ -30,7 +32,7 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u-1' }
 const leagueCtx = vi.hoisted(() => ({ userLeagues: [
   { id: 'l-1', name: 'The Puck Stops Here', commissioner_id: 'u-1' },
   { id: 'l-2', name: 'Someone Elses League', commissioner_id: 'u-2' },
-], loading: false }));
+], loading: false, refreshLeagues: vi.fn(async () => undefined) }));
 vi.mock('@/contexts/LeagueContext', () => ({ useLeague: () => leagueCtx }));
 
 import ImportLeague from '../ImportLeague';
@@ -60,7 +62,7 @@ describe('ImportLeague: ESPN', () => {
     mount();
     const select = await screen.findByLabelText('Citrus league') as HTMLSelectElement;
     expect(select.value).toBe('l-1');
-    expect(Array.from(select.options).map((o) => o.textContent)).toEqual(['Choose a league', 'The Puck Stops Here']);
+    expect(Array.from(select.options).map((o) => o.textContent)).toEqual(['Choose a league', 'A new league, set up from the import', 'The Puck Stops Here']);
   });
 
   it('a pasted link finds the league and one button starts the import, which is watched to done', async () => {
@@ -146,3 +148,69 @@ describe('ImportLeague: Yahoo', () => {
     expect(screen.queryByRole('button', { name: 'Connect Yahoo' })).toBeNull();
   });
 });
+
+describe('ImportLeague: one tap, a new league from the import', () => {
+  const founded = (over: Record<string, unknown> = {}) => ({
+    league: { id: 'l-new', name: 'Bay Street Hockey', join_code: 'BAY123' },
+    job: job({ id: 'job-9', league_id: 'l-new', status: 'discovering' }),
+    plan: {
+      name: 'Bay Street Hockey', scoringFormat: 'h2h-categories', scoringSettings: null, categories: ['goals', 'assists'], rosterSlots: { C: 2 },
+      rosterSize: 16, draftRounds: 16, draftType: 'snake', teamsCount: 10, playoffTeams: 6, playoffWeeks: 3, keeper: { enabled: true, count: 2 },
+      notes: ['Categories Citrus does not score were left out: faceoff wins.'],
+    },
+    ...over,
+  });
+
+  it('with no league to import into, the new-league option is preselected and ESPN sets the league up in one tap', async () => {
+    const saved = leagueCtx.userLeagues;
+    leagueCtx.userLeagues = [{ id: 'l-2', name: 'Someone Elses League', commissioner_id: 'u-2' }];
+    try {
+      api.discoverEspn.mockResolvedValue({ data: { externalLeagueId: '777', needsCredentials: false, leagueName: 'Bay Street Hockey', latestSeason: 2024, latestEspnSeason: 2025, seasons: [2019, 2024], isPublic: true, scoringType: 'h2h_categories', teamCount: 10 } });
+      api.foundEspn.mockResolvedValue({ data: founded() });
+      api.getJob.mockResolvedValue({ data: job({ id: 'job-9', league_id: 'l-new', status: 'done', seasons_discovered: [2019, 2024], seasons_imported: [2019, 2024], progress: { seasons: [] } }) });
+      mount();
+      const select = await screen.findByLabelText('Citrus league') as HTMLSelectElement;
+      expect(select.value).toBe('new');
+      expect(Array.from(select.options).map((o) => o.textContent)).toEqual(['A new league, set up from the import']);
+      fireEvent.change(screen.getByLabelText('ESPN league link'), { target: { value: '777' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Find my league' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Bring it to Citrus' }));
+      await waitFor(() => expect(api.foundEspn).toHaveBeenCalledWith({ externalLeagueId: '777', latestEspnSeason: 2025, credentials: undefined }));
+      expect(api.startEspn).not.toHaveBeenCalled();
+
+      const panel = await screen.findByTestId('founded-league');
+      expect(panel.textContent).toContain('Bay Street Hockey');
+      expect(panel.textContent).toContain('head-to-head categories · 10 teams · snake draft, 16 rounds · 6-team playoffs · 2 keepers');
+      expect(panel.textContent).toContain('faceoff wins');
+      expect(screen.getByRole('link', { name: 'Open the trophy room' })).toHaveAttribute('href', '/league/l-new/history');
+      expect(screen.getByRole('button', { name: 'Copy the invite link' })).toBeInTheDocument();
+      expect(leagueCtx.refreshLeagues).toHaveBeenCalled();
+      // The progress watcher polls the NEW league, not one the user already had.
+      await waitFor(() => expect(api.getJob).toHaveBeenCalledWith('l-new', 'job-9'), { timeout: 5000 });
+      await waitFor(() => expect(screen.getByRole('status').textContent).toBe('2 seasons imported'), { timeout: 5000 });
+    } finally {
+      leagueCtx.userLeagues = saved;
+    }
+  });
+
+  it('a Yahoo league is brought over in one tap when the new-league option is chosen', async () => {
+    api.yahooConnection.mockResolvedValue({ data: { connected: true, guid: 'G', grantedAt: 'x', revokedAt: null, configured: true } });
+    api.yahooLeagues.mockResolvedValue({ data: { guid: 'G', chains: [
+      { key: '453.l.200', name: 'Puck', latestSeason: 2024, scoringType: 'h2h_points', numTeams: 10, seasons: [{ leagueKey: '453.l.200', season: 2024, name: 'Puck', isFinished: true, scoringType: 'h2h_points', numTeams: 10 }] },
+    ] } });
+    api.foundYahoo.mockResolvedValue({ data: founded({ league: { id: 'l-new', name: 'Puck', join_code: null }, job: job({ id: 'job-9', league_id: 'l-new', platform: 'yahoo', status: 'discovering', external_league_id: '453.l.200' }) }) });
+    api.getJob.mockResolvedValue({ data: job({ id: 'job-9', league_id: 'l-new', platform: 'yahoo', status: 'done', seasons_discovered: [2024], seasons_imported: [2024] }) });
+    mount();
+    const select = await screen.findByLabelText('Citrus league');
+    fireEvent.change(select, { target: { value: 'new' } });
+    await screen.findByTestId('yahoo-leagues');
+    fireEvent.click(await screen.findByRole('button', { name: 'Bring it to Citrus' }));
+    await waitFor(() => expect(api.foundYahoo).toHaveBeenCalledWith({ leagueKey: '453.l.200' }));
+    expect(api.startYahoo).not.toHaveBeenCalled();
+    expect(await screen.findByTestId('founded-league')).toBeInTheDocument();
+    // No join code yet means no invite button, never a broken link.
+    expect(screen.queryByRole('button', { name: 'Copy the invite link' })).toBeNull();
+    expect(await screen.findByTestId('import-progress')).toBeInTheDocument();
+  });
+});
+
