@@ -37,6 +37,7 @@ import { accountRoutes } from './routes/account';
 import { publicRoutes } from './routes/public';
 import { newsRoutes } from './routes/news';
 import { draftKitRoutes } from './routes/draftKit';
+import { draftKitDeskRoutes } from './routes/draftKitDesk';
 import { demoMatchupRoutes } from './routes/demoMatchup';
 import { poolRoutes } from './routes/pools';
 import { nhlPlayoffsRoutes } from './routes/nhl-playoffs';
@@ -392,6 +393,7 @@ app.route('/api/news', newsRoutes);
 // Draft Kit — the paid analytics section. Every route is authed and the
 // entitlement gate lives in DraftKitService, ahead of payload assembly.
 app.route('/api/draft-kit', draftKitRoutes);
+app.route('/api/draft-kit/desk', draftKitDeskRoutes);
 // Chunk 11g.9 (2026-08-24): guest Matchup payload, ported off the
 // retired `demo-matchup-cache` Edge Function. Public + unauthenticated
 // by design (no authMiddleware on the route), still covered by the

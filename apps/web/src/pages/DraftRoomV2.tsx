@@ -60,6 +60,7 @@ import { DraftHistory } from '@/components/draft/DraftHistory';
 import { mugFromDirectory } from '@/components/roster/headshot';
 import { TeamRosters } from '@/components/draft/TeamRosters';
 import { DraftQueue } from '@/components/draft/DraftQueue';
+import { ConnectedDraftDesk } from '@/components/draftkit/ConnectedDraftDesk';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 // Direct file imports, not the `@/components/pressbox` barrel: the barrel
 // re-exports LeagueHeader, which reaches LeagueContext and the Supabase
@@ -1947,7 +1948,17 @@ function MainTabs({
   // sticky bar and the header timer agree frame-for-frame.
   const pickTimeLimitSec = usePickTimeLimitSec();
   const pendingActions = usePendingActions();
-  const [tab, setTab] = useState<'players' | 'queue' | 'board' | 'myteam' | 'history'>('players');
+  const [tab, setTab] = useState<'players' | 'queue' | 'board' | 'myteam' | 'history' | 'desk'>('players');
+  const [deskReadyLeague, setDeskReadyLeague] = useState<string | null>(null);
+  const roomTabsRef = useRef<HTMLDivElement>(null);
+  const returnFromDesk = () => {
+    setTab('players');
+    requestAnimationFrame(() => {
+      const playersTab = roomTabsRef.current?.querySelector<HTMLButtonElement>('[role="tab"]');
+      playersTab?.focus();
+      playersTab?.scrollIntoView?.({ block: 'nearest' });
+    });
+  };
   // THE PLAYER DRAWER (2026-09-14, Garrett): on desktop the pool lives in a
   // drawer directly under the five-round board window. Open by default;
   // a manager who folds it gets it back folded next time, per league.
@@ -2811,13 +2822,18 @@ function MainTabs({
         </button>
       )}
       <div id="draft-player-drawer" hidden={!isMobile && !drawerOpen} data-testid="draft-player-drawer">
-      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+      <Tabs ref={roomTabsRef} value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+        {deskReadyLeague === leagueId && tab !== 'desk' && <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#a8be9d] bg-[#f8f5ec] p-3 text-sm text-[#10291f]">
+          <p><strong>Your draft kit is ready.</strong> Scored for this league. Picks tracked automatically.</p>
+          <button className="rounded-md bg-[#10291f] px-4 py-2 font-bold text-[#f8f5ec]" onClick={() => setTab('desk')}>Open Draft Desk</button>
+        </div>}
         {/* PRESS BOX (2026-09-04): artboard 4a's strip — four centred
             columns in Barlow Condensed at .14em, an orange rule under the
             one you are on. Radix still owns the panes below; this is only
             the trigger row, which is why it is not a TabsList. */}
         <PressBoxTabs
           fill
+          className="overflow-x-auto [&>button]:min-w-[64px]"
           label="Draft room view"
           activeKey={tab}
           onSelect={(v) => setTab(v as typeof tab)}
@@ -2829,12 +2845,14 @@ function MainTabs({
                   { key: 'board', label: 'Board' },
                   { key: 'myteam', label: 'My team' },
                   { key: 'history', label: 'History' },
+                  { key: 'desk', label: 'Desk' },
                 ]
               : [
                   // No Board trigger: the board is rendered above this strip
                   // at every desktop width and never hides behind a tab.
                   { key: 'players', label: 'Players' },
                   { key: 'history', label: 'History' },
+                  { key: 'desk', label: 'Draft Desk' },
                 ]
           }
         />
@@ -2880,6 +2898,9 @@ function MainTabs({
           </>
         )}
 
+        <TabsContent value="desk" forceMount className="mt-4 data-[state=inactive]:hidden">
+          <ConnectedDraftDesk leagueId={leagueId} scoring={leagueScoring} scoringReady={leagueScoringContext.ready} onReady={setDeskReadyLeague} onReturnToDraft={returnFromDesk} />
+        </TabsContent>
         <TabsContent value="players" className="mt-4">
           {playersLoading ? (
             <Card className="p-4 text-muted-foreground" data-testid="pool-loading">

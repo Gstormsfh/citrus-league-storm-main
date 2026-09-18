@@ -1,0 +1,56 @@
+.citrus-connected-desk {
+  container-type: inline-size;
+  container-name: citrus-desk;
+}
+.citrus-desk-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.citrus-desk-detail { order: 1; }
+.citrus-desk-detail-projections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(64px, 100%), 1fr));
+}
+.citrus-desk-detail-projections > div { min-width: 0; overflow-wrap: anywhere; }
+.citrus-desk-header { padding: 24px; }
+.citrus-desk-body { padding: 24px; }
+.citrus-desk-options:not([open]) { display: none; }
+.citrus-desk-filters input, .citrus-desk-filters select { min-height: 44px; }
+.citrus-desk-filters input[type='checkbox'] { min-height: auto; accent-color: #10291f; }
+.citrus-desk-sheet-overlay { position: fixed; inset: 0; background: rgb(9 26 18 / 55%); }
+.citrus-desk-sheet {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  display: flex; flex-direction: column; max-height: 90dvh;
+  border-radius: 20px 20px 0 0; background: #f8f5ec; color: #10291f;
+  box-shadow: 0 -12px 48px rgb(0 0 0 / 18%); outline: none;
+}
+.citrus-desk-sheet-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 20px 16px; border-bottom: 1px solid #d4dacf; flex-shrink: 0; }
+.citrus-desk-sheet-body { padding: 16px 20px max(24px, var(--safe-area-inset-bottom,env(safe-area-inset-bottom))); overflow-y: auto; overscroll-behavior: contain; }
+.citrus-desk-sheet-footer { flex-shrink: 0; padding: 12px 20px max(12px, var(--safe-area-inset-bottom,env(safe-area-inset-bottom))); border-top: 1px solid #d4dacf; }
+.citrus-desk-row-projections { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 8px; margin: 0; }
+.citrus-desk-row-projections[data-stat-count="9"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.citrus-desk-row-projections > div { min-width: 0; }
+.citrus-desk-row-projections dt { color: #526759; font-size: 10px; line-height: 14px; }
+.citrus-desk-row-projections dd { margin: 0; color: #10291f; font-size: 12px; line-height: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+@media (max-width: 1023px) {
+  .citrus-desk-header h2 { font-size: 22px; line-height: 1.2; }
+  .citrus-desk-header button { white-space: nowrap; }
+  .citrus-desk-header { padding: 16px; }
+  .citrus-desk-body { padding: 12px; }
+  .citrus-desk-filters { gap: 4px 12px; }
+  .citrus-desk-filters > label:first-child { flex-basis: calc(100% - 90px); }
+  .citrus-desk-filters > label:nth-child(n+3) { min-height: 44px; display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .citrus-desk-board { max-height: min(560px, 65dvh); }
+  .citrus-desk-board th, .citrus-desk-board td { padding: 8px 6px; }
+  .citrus-desk-board th:first-child, .citrus-desk-board td:first-child { padding-left: 10px; width: 32px; }
+  .citrus-desk-board th:last-child, .citrus-desk-board td:last-child { padding-left: 0; padding-right: 4px; width: 48px; }
+  .citrus-desk-board td:nth-child(2) { overflow-wrap: anywhere; }
+  .citrus-desk-board td:nth-child(3) { white-space: nowrap; }
+  .citrus-desk-board tbody td { padding-top: 3px; padding-bottom: 0; }
+  .citrus-desk-board .citrus-desk-stat-row td { width: auto; padding: 0 12px 8px; }
+  .citrus-desk-count { margin-top: 0; margin-bottom: 0; line-height: 18px; }
+}
+@container citrus-desk (min-width: 800px) {
+  .citrus-desk-grid { grid-template-columns: minmax(0, 1fr) 260px; }
+  .citrus-desk-detail { order: 0; }
+}

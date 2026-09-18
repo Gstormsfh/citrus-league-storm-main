@@ -1,4 +1,5 @@
 vi.mock('@/hooks/useLeagueScoringContext', () => ({ useLeagueScoringContext: () => ({ scoring: null, ready: true }) }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
 /**
  * QUEUE-REACH (2026-08-13) — does the v2 room actually hand the queue
  * to the player pool?
