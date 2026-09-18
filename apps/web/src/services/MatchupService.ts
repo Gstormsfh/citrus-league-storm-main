@@ -330,13 +330,14 @@ export const MatchupService = {
       }
 
       // The league row, read FIRST: the week-start day (2026-09-10) and the
-      // playoff reservation below both come off it. FAIL-OPEN to the
-      // defaults (Sunday weeks, 3-week reserve) on any fetch error.
+      // playoff reservation below both come off it. Never silently build
+      // Sunday weeks when the Monday league's settings failed to load.
       let leagueRowForRules: { settings?: unknown } | null = null;
       try {
-        const { league: leagueRow } = await LeagueService.getLeague(leagueId);
+        const { league: leagueRow, error: leagueError } = await LeagueService.getLeague(leagueId);
+        if (leagueError || !leagueRow) return { error: new Error('League settings could not be loaded. Please retry before generating the schedule.') };
         leagueRowForRules = leagueRow ?? null;
-      } catch { /* fail-open */ }
+      } catch { return { error: new Error('League settings could not be loaded. Please retry before generating the schedule.') }; }
 
       // SCHEDULE-GEN (2026-08-16) — clamp the anchor to the season FIRST.
       // Every caller (draft-completion hook, Matchup-page self-heal, the

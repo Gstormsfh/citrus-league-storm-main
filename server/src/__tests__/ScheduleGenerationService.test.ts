@@ -37,6 +37,30 @@ beforeEach(() => vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-09-15T
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('ScheduleGenerationService.ensureLeagueSchedule', () => {
+  it.each([['sunday', '2026-09-27', '2026-10-03', 0, 6], ['monday', '2026-09-28', '2026-10-04', 1, 0]] as const)('keeps the configured %s calendar through both DST changes', async (weekStartDay, start, end, startDow, endDow) => {
+    const h = harness({ league: { id: LEAGUE, draft_status: 'completed', settings: {
+      draftCompletedAt: '2026-09-14T22:00:00-06:00', weekStartDay, playoffTeams: 0,
+    }, created_at: '2026-09-01T00:00:00Z' } });
+    expect((await h.service.ensureLeagueSchedule(LEAGUE)).outcome).toBe('generated');
+    const weeks = h.generate.mock.calls[0][2];
+    expect(weeks[0]).toEqual({ week_number: 1, start_date: start, end_date: end });
+    expect(weeks.length).toBeGreaterThan(27);
+    weeks.forEach((week, i) => {
+      const first = new Date(week.start_date + 'T00:00:00');
+      const last = new Date(week.end_date + 'T00:00:00');
+      expect(first.getDay()).toBe(startDow);
+      expect(last.getDay()).toBe(endDow);
+      first.setDate(first.getDate() + 6);
+      expect(first.getTime()).toBe(last.getTime());
+      if (i > 0) {
+        const previousEnd = new Date(weeks[i - 1].end_date + 'T00:00:00');
+        previousEnd.setDate(previousEnd.getDate() + 1);
+        expect(previousEnd.getTime()).toBe(new Date(week.start_date + 'T00:00:00').getTime());
+      }
+    });
+    expect(h.generate.mock.calls[0][3]).toBe(false);
+  });
+
   it('generates once for a completed-draft league with no matchups, with the same weeks the client computed', async () => {
     const h = harness();
     const result = await h.service.ensureLeagueSchedule(LEAGUE);

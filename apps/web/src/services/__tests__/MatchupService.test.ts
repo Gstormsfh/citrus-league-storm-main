@@ -46,7 +46,7 @@ vi.mock('@/utils/logger', () => ({
 
 vi.mock('../LeagueService', () => ({
   LeagueService: {
-    getLeague: vi.fn().mockResolvedValue({ league: null, error: null }),
+    getLeague: vi.fn().mockResolvedValue({ league: { settings: { weekStartDay: 'sunday' } }, error: null }),
     getLeagueTeams: vi.fn().mockResolvedValue({ teams: [] }),
   },
   Team: {},
@@ -439,6 +439,41 @@ describe('MatchupService.generateMatchupsForLeague', () => {
       ]),
       false, // forceRegenerate default
     );
+  });
+
+  it('refuses to generate on a failed league read rather than defaulting to Sunday', async () => {
+    const { LeagueService } = await import('../LeagueService');
+    vi.mocked(LeagueService.getLeague).mockResolvedValueOnce({ league: null, error: new Error('Offline') });
+    const result = await MatchupService.generateMatchupsForLeague('league-1', [makeTeam('a'), makeTeam('b')], new Date('2026-09-28T00:00:00'));
+    expect(result.error?.message).toContain('League settings could not be loaded');
+    expect(matchupApi.generateMatchups).not.toHaveBeenCalled();
+  });
+
+  it.each(['missing', 'throw'])('does not write a schedule when league settings are %s', async failure => {
+    const { LeagueService } = await import('../LeagueService');
+    if (failure === 'throw') vi.mocked(LeagueService.getLeague).mockRejectedValueOnce(new Error('Network unavailable'));
+    else vi.mocked(LeagueService.getLeague).mockResolvedValueOnce({ league: null, error: null });
+    const result = await MatchupService.generateMatchupsForLeague('league-1', [makeTeam('a'), makeTeam('b')], new Date(2026, 8, 28));
+    expect(result.error?.message).toContain('League settings could not be loaded');
+    expect(matchupApi.generateMatchups).not.toHaveBeenCalled();
+  });
+
+  it.each([['sunday', '2026-09-27', '2026-10-03'], ['monday', '2026-09-28', '2026-10-04']])('sends the configured %s scoring week to the API', async (weekStartDay, start, end) => {
+    const { LeagueService } = await import('../LeagueService');
+    const realWeeks = await vi.importActual<typeof import('@/utils/weekCalculator')>('@/utils/weekCalculator');
+    const mockedWeeks = await import('@/utils/weekCalculator');
+    vi.mocked(mockedWeeks.clampToSeasonStart).mockImplementationOnce(realWeeks.clampToSeasonStart);
+    vi.mocked(mockedWeeks.weekStartDowFor).mockImplementationOnce(realWeeks.weekStartDowFor);
+    vi.mocked(LeagueService.getLeague).mockResolvedValueOnce({ league: { settings: { weekStartDay } } as any, error: null });
+    const result = await MatchupService.generateMatchupsForLeague('league-1', [makeTeam('a'), makeTeam('b')], new Date(2026, 8, 6));
+    expect(result.error).toBeNull();
+    const weeks = vi.mocked(matchupApi.generateMatchups).mock.calls[0][2];
+    expect(weeks[0]).toEqual({ week_number: 1, start_date: start, end_date: end });
+    for (let i = 1; i < weeks.length; i++) {
+      const next = new Date(weeks[i - 1].end_date + 'T00:00:00');
+      next.setDate(next.getDate() + 1);
+      expect(new Date(weeks[i].start_date + 'T00:00:00').getTime()).toBe(next.getTime());
+    }
   });
 
   it('should return no error when 0 teams is provided (edge: caught early)', async () => {
