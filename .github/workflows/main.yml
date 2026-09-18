@@ -27,7 +27,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         shell: bash
-        run: python scripts/ops/check_projection_outputs.py 2>&1 | tee /tmp/nightly.log
+        run: python scripts/ops/check_projection_outputs.py --require-model-capabilities 2>&1 | tee /tmp/nightly.log
 
       # One row in public.ops_ci_runs (last line of the health-check output as
       # the summary) records whether this read-only projection check ran, through the
