@@ -14,7 +14,7 @@ const player = (game: boolean, points?: number): MatchupPlayer => ({
 const panel = (p: MatchupPlayer, selectedDate: string | null) => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-13T12:00:00Z'));
   const { container } = render(<TooltipProvider><PlayerCard player={p} selectedDate={selectedDate} isUserTeam /></TooltipProvider>);
-  return container.querySelector('.player-projection-bar-container')!;
+  return container.querySelector('[data-testid="desktop-matchup-player"], .player-projection-bar-container')!;
 };
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -32,7 +32,7 @@ describe('Full Week daily projection prompt', () => {
     expect(content).not.toContain('TBD');
   });
   it('keeps selected-day missing and no-game states distinct', () => {
-    expect(panel(player(true), today).textContent).toContain('TBD');
+    expect(panel(player(true), today).textContent).toMatch(/TBD|Forecast unavailable/);
     cleanup();
     expect(panel(player(false), today).textContent).toContain('No game this day');
   });

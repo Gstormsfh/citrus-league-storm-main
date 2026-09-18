@@ -31,14 +31,16 @@ export const GoalieProjectionTooltip = ({ projection, children }: GoalieProjecti
 
   if (!projection) return null;
 
-  // Goalie stats - flat array for grid
+  const format = (value: number | undefined, places: number) =>
+    typeof value === 'number' && Number.isFinite(value) ? value.toFixed(places) : 'Unavailable';
+  // Missing categories are not zero and must not crash the entire matchup.
   const stats = [
-    { label: 'GP', value: projection.projected_gp.toFixed(1) },
-    { label: 'WINS', value: projection.projected_wins.toFixed(2) },
-    { label: 'SAVES', value: projection.projected_saves.toFixed(1) },
-    { label: 'SO', value: projection.projected_shutouts.toFixed(2) },
-    { label: 'GAA', value: projection.projected_gaa.toFixed(2) },
-    { label: 'SV%', value: `${(projection.projected_save_pct * 100).toFixed(1)}%` },
+    { label: 'GP', value: format(projection.projected_gp, 1) },
+    { label: 'WINS', value: format(projection.projected_wins, 2) },
+    { label: 'SAVES', value: format(projection.projected_saves, 1) },
+    { label: 'SO', value: format(projection.projected_shutouts, 2) },
+    { label: 'GAA', value: format(projection.projected_gaa, 2) },
+    { label: 'SV%', value: typeof projection.projected_save_pct === 'number' && Number.isFinite(projection.projected_save_pct) ? `${(projection.projected_save_pct * 100).toFixed(1)}%` : 'Unavailable' },
   ];
 
   const content = (
@@ -76,7 +78,7 @@ export const GoalieProjectionTooltip = ({ projection, children }: GoalieProjecti
         <div className="px-3 pb-2">
           <div className="bg-orange-100 border border-orange-400 rounded-lg p-2 text-center">
             <span className="text-xs font-bold text-orange-600">
-              ⚠️ Probable Starter
+              Starter not confirmed
             </span>
           </div>
         </div>

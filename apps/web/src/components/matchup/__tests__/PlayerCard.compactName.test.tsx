@@ -46,7 +46,7 @@ const player = (over: Partial<MatchupPlayer> = {}): MatchupPlayer => ({
 });
 
 const render = (ui: ReactElement) => rtlRender(<TooltipProvider>{ui}</TooltipProvider>);
-const nameOf = (c: HTMLElement) => c.querySelector('.player-name') as HTMLElement;
+const nameOf = (c: HTMLElement) => c.querySelector('[data-player-name], .player-name') as HTMLElement;
 
 let originalWidth: number;
 const setWidth = (w: number) =>

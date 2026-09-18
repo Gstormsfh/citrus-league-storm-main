@@ -279,6 +279,47 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
 
   const statusTag = getStatusTag();
 
+  if (!isMobile) {
+    // Scheduled rows can carry a zero placeholder in the earned field.
+    // Actual game state takes precedence, but that placeholder is not a result.
+    const showEarned = isViewingPastDate || isGameFinal || isGameLive || gameHasStarted || (!hasGameOnDate && !isViewingFutureDate && hasDailyStats);
+    const earned = isWeekView ? weekPoints : showEarned ? dailyTotalPoints : null;
+    const forecast = !isWeekView && !showEarned && hasGameOnDate && hasProjection;
+    const game = dateGames[0];
+    const home = game?.home_team?.toUpperCase() === player.team?.toUpperCase();
+    const opponent = home ? game?.away_team : game?.home_team;
+    const value = forecast ? projectedPoints : earned;
+    const breakdown = isWeekView ? weekBreakdown : player.daily_stats_breakdown;
+    const number = <span className={cn('font-plex font-semibold text-[20px] tabular-nums',
+      isBench ? 'text-pressbox-text/60' : forecast ? 'text-pressbox-orange-soft' : 'text-pressbox-sage')}>
+      {value != null && Number.isFinite(value) ? value.toFixed(1) : '–'}
+    </span>;
+    return <div data-testid="desktop-matchup-player" data-scope={isWeekView ? 'week' : 'day'}
+      className={cn('pb-type flex items-center gap-3 min-w-0 min-h-[76px] px-3 py-3 border-b border-white/[0.08] hover:bg-white/[0.025]',
+        isUserTeam ? 'user-team' : 'opponent-team',
+        !isUserTeam && 'flex-row-reverse text-right')}>
+      <button type="button" onClick={() => onPlayerClick?.(player)} aria-label={`Open player card for ${player.name}`}
+        className={cn('focus-citrus flex items-center gap-3 min-w-0 flex-1 text-left', !isUserTeam && 'flex-row-reverse text-right')}>
+        <Mug p={player} size="xs" className="w-9 h-9 shrink-0 rounded-full" crest />
+        <span className="min-w-0">
+          <span data-player-name className="block font-barlow font-bold text-[15px] truncate text-pressbox-text">{player.name}</span>
+          <span className="block mt-1 font-plex text-[10px] text-pressbox-text/60">{player.team} · <span data-testid="matchup-player-eligibility">{playerEligiblePositionsLabel(player)}</span> · {isWeekView ? 'Week total' : isGameLive ? 'LIVE' : isGameFinal ? 'FINAL' : selectedDate || 'Today'}</span>
+          {!isWeekView && opponent && <span className={cn('block mt-1 text-[11px] font-plex', oppTint.className)} data-opponent-tier={oppTint.tier}>{home ? 'vs' : '@'} {opponent}</span>}
+          <PlayerAvailabilityBadge availability={player.availability} />
+          {player.wasDropped && <span className="font-plex text-[10px] text-pressbox-orange-soft">Dropped · earned points retained</span>}
+        </span>
+      </button>
+      <div className={cn('shrink-0 flex flex-col', isUserTeam ? 'items-end' : 'items-start')}>
+        {value != null && Number.isFinite(value) && !forecast
+          ? <PointsTooltip breakdown={breakdown} totalPoints={value}>{number}</PointsTooltip>
+          : forecast && isGoalie ? <GoalieProjectionTooltip projection={player.goalieProjection}>{number}</GoalieProjectionTooltip>
+          : forecast ? <ProjectionTooltip projection={player.daily_projection}>{number}</ProjectionTooltip> : number}
+        <span className="mt-1 font-plex text-[9px] uppercase tracking-wide text-pressbox-text/50">{isBench ? 'Bench' : forecast ? 'Projected' : isWeekView ? 'Week earned' : !showEarned ? hasGameOnDate ? 'Forecast unavailable' : 'No game this day' : 'Earned'}</span>
+        {isWeekView && <span className={cn('mt-1 max-w-[110px] font-plex text-[10px] text-pressbox-text/60', isUserTeam ? 'text-right' : 'text-left')}>Select a day for daily projections</span>}
+      </div>
+    </div>;
+  }
+
   return (
     <div
       className={cn(
