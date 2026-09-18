@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '@/api/client';
 
@@ -9,6 +9,8 @@ const PRICE = '$7.99 CAD';
 export default function DraftKitPurchase() {
   const [offer, setOffer] = useState<Offer | null>(null);
   const [busy, setBusy] = useState(false);
+  // Stable for transport retries of this click; recreated for a later, explicit attempt.
+  const checkoutAttempt = useRef(crypto.randomUUID());
   const [message, setMessage] = useState('Checking purchase availability…');
   const [error, setError] = useState('');
   useEffect(() => { void apiClient.get<Offer>('/api/draft-kit/checkout/offer', { retries: 0 })
@@ -16,7 +18,7 @@ export default function DraftKitPurchase() {
     .catch(() => { setOffer({ available: false, currency: null, amountMinor: null, accessUntil: null, termsUrl: null }); setMessage('Purchases are not open yet. Nothing has been charged.'); }); }, []);
   async function beginCheckout() {
     setBusy(true); setError('');
-    try { const result = await apiClient.post<{ url: string }>('/api/draft-kit/checkout/session', {}, { retries: 0 });
+    try { const result = await apiClient.post<{ url: string }>('/api/draft-kit/checkout/session', {}, { retries: 0, headers: { 'x-checkout-attempt': checkoutAttempt.current } });
       if (!result.data?.url || new URL(result.data.url).origin !== 'https://checkout.stripe.com') throw Error('The payment page is unavailable.');
       window.location.assign(result.data.url);
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not open checkout.'); }

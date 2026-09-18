@@ -14,7 +14,10 @@ draftKitCheckoutRoutes.get('/offer', (c) => {
     accessUntil: available ? config.accessUntil : null, updatesUntil: available ? config.updatesUntil : null, termsUrl: available ? config.termsUrl : null });
 });
 draftKitCheckoutRoutes.post('/session', authMiddleware, strictRateLimit, async (c) => {
-  try { return ok(c, await new DraftKitCheckoutService(createUserClient(c.get('userToken'))).checkout(c.get('userId'))); }
+  try {
+    const attemptId = c.req.header('x-checkout-attempt') || '';
+    return ok(c, await new DraftKitCheckoutService(createUserClient(c.get('userToken'))).checkout(c.get('userId'), attemptId));
+  }
   catch (error) { return handleError(c, error, 'Could not open checkout'); }
 });
 draftKitCheckoutRoutes.post('/webhook', async (c) => {

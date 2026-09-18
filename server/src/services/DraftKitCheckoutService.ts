@@ -47,8 +47,16 @@ export class DraftKitCheckoutService {
     if (!this.stripe) this.stripe = new Stripe(this.config.secret, { maxNetworkRetries: 2, timeout: 15_000 });
     return this.stripe;
   }
-  async checkout(userId: string) {
+  /**
+   * The browser generates one opaque key per explicit checkout attempt.  It is
+   * deliberately not a permanent user/price key: Stripe retains idempotency
+   * responses, so a cancelled or expired hosted page must not trap a customer
+   * on that old session.  Replays of the same click still resolve to one
+   * provider session.
+   */
+  async checkout(userId: string, attemptId: string) {
     if (!UUID.test(userId)) throw AppError.unauthorized();
+    if (!UUID.test(attemptId)) throw AppError.badRequest('Invalid checkout attempt.');
     if (!checkoutReady(this.config)) throw AppError.serviceUnavailable('Draft Kit purchases are not available yet. Nothing has been charged.');
     const { data, error } = await this.db.from('draft_kit_checkout_payments').select('checkout_session_id')
       .eq('user_id', userId).eq('status', 'paid').gt('access_until', new Date().toISOString()).limit(1).maybeSingle();
@@ -62,7 +70,7 @@ export class DraftKitCheckoutService {
     const session = await this.provider().checkout.sessions.create({ mode: 'payment', client_reference_id: userId,
       line_items: [{ price: this.config.priceId, quantity: 1 }], metadata, payment_intent_data: { metadata }, automatic_tax: { enabled: this.config.taxMode === 'automatic' },
       success_url: `${this.config.origin}/draft-kit?checkout=complete`, cancel_url: `${this.config.origin}/draft-kit?checkout=cancelled`,
-    }, { idempotencyKey: `draft-kit:${userId}:${this.config.priceId}:${this.config.termsVersion}` });
+    }, { idempotencyKey: `draft-kit:${userId}:${this.config.priceId}:${this.config.termsVersion}:${attemptId}` });
     if (!session.url || new URL(session.url).origin !== 'https://checkout.stripe.com') throw AppError.badGateway('The payment page could not be opened.');
     return { url: session.url };
   }
