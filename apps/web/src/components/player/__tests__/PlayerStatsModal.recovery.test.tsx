@@ -74,16 +74,17 @@ describe('player-card projection availability and request recovery', () => {
     await act(async () => { resolveOld({ data: [{ games_remaining: 40, projected_goals: 2 }] }); });
     expect(screen.getByRole('button', { name: 'PROJECTION breakdown' })).toHaveTextContent('30');
   });
-  it('preserves the upcoming table’s intentionally hidden fantasy-point column', async () => {
+  it('shows recomputed league contributions, never the cached default fantasy total', async () => {
     mocks.log.mockResolvedValue({ data: { games: [], projections: [{ projection_date: '2026-10-01', projected_goals: 2, total_projected_points: 999 }] } });
     openCard();
     fireEvent.click(screen.getByRole('tab', { name: 'Game log' }));
     await screen.findByText('Upcoming');
-    expect(screen.getByText('2.00')).toBeTruthy();
+    expect(screen.getAllByText('2.00 × 10')).toHaveLength(2);
+    expect(screen.getAllByText('20.00 FPTS')).toHaveLength(3);
     expect(screen.queryByText('PROJ', { exact: true })).toBeNull();
-    expect(screen.queryByText('999.0', { exact: true })).toBeNull();
+    expect(screen.queryByText(/999\.0/)).toBeNull();
   });
-  it('separates three team games from expected goalie starts in the rendered upcoming table', async () => {
+  it('separates three team games from expected goalie starts in the expanded game cards', async () => {
     const dates = ['2026-10-01', '2026-10-03', '2026-10-05'];
     mocks.schedule.mockResolvedValue({ games: dates.map(scheduled), error: null });
     mocks.log.mockResolvedValue({ data: { games: [], projections: dates.map(projection_date => ({
@@ -95,8 +96,8 @@ describe('player-card projection availability and request recovery', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Game log' }));
     await screen.findByText('Upcoming');
     expect(screen.getByText(/3 TEAM GAMES/)).toBeTruthy();
-    expect(screen.getByText('STARTS', { exact: true })).toBeTruthy();
-    expect(screen.getAllByText('0.20', { exact: true })).toHaveLength(3);
+    expect(screen.getAllByText('Expected starts: 0.20')).toHaveLength(3);
+    expect(screen.getAllByText('5.00', { exact: true })).toHaveLength(3);
     expect(screen.queryByText('25', { exact: true })).toBeNull();
   });
   it('keeps the ROS headline available while a failed game log can be retried', async () => {
