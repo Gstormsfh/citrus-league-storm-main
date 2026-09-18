@@ -3,6 +3,7 @@ import { PlayerAffiliationDetails } from '@/components/player/PlayerAffiliationD
 import { PlayerAvailabilityDetails } from '@/components/player/PlayerAvailabilityDetails';
 import { ProjectionProvenance } from '@/components/player/ProjectionProvenance';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
+import { SeasonProjectionCard, UpcomingProjectionCards } from '@/components/player/ProjectionBreakdown';
 import { heroMetricTile } from '@/components/player/heroMetricTile';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -54,12 +55,9 @@ import { PressBoxTabs } from '@/components/pressbox/Tabs';
 import {
   type GameLogEntry,
   playedRows,
-  upcomingRows,
   upcomingCards,
   SKATER_LOG_HEADINGS,
   GOALIE_LOG_HEADINGS,
-  SKATER_PROJ_HEADINGS,
-  GOALIE_PROJ_HEADINGS,
 } from '@/components/player/gameLogRows';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { getTeamColor } from '@/utils/teamColors';
@@ -607,7 +605,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   const scoredGameLog = useMemo(() => scoreGameLog(gameLog, leagueScoring), [gameLog, leagueScoring]);
   const leagueActualTotal = scoredGameLog.reduce((sum, entry) => sum + (entry.isPast ? entry.actualPoints ?? 0 : 0), 0);
   const playedLog = useMemo(() => playedRows(scoredGameLog, logIsGoalie), [scoredGameLog, logIsGoalie]);
-  const upcomingLog = useMemo(() => upcomingRows(scoredGameLog, logIsGoalie), [scoredGameLog, logIsGoalie]);
+  const upcomingLog = useMemo(() => scoredGameLog.filter(entry => !entry.isPast), [scoredGameLog]);
 
   // ── THE ARTBOARD'S TILES, WATCH AND SHARE (2026-09-05) ────────────────
   // Rank and the xG rate come off the shared dashboard index, already in
@@ -1424,10 +1422,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                     </div>
                   )}
 
-                  {/* UPCOMING — the next three as the artboard's cards, then
-                      every remaining game's projection in the same table
-                      with the likely range where TOI would be. The ref lands
-                      here so the auto-scroll still brings "now" into view. */}
+                  {/* Upcoming games share the league scorer with the season
+                      total. Expand a game to inspect every category without
+                      hiding stats in a narrow phone table. */}
                   {futureGames.length > 0 && (
                     <div ref={todayGameRef} className="space-y-2">
                       <PressBoxSectionHead
@@ -1436,20 +1433,15 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                         action={
                           <span className="font-plex font-medium text-[10px] tabular-nums text-pressbox-text/45 whitespace-nowrap">
                             {futureGames.length} {isGoalie ? 'TEAM ' : ''}GAME{futureGames.length === 1 ? '' : 'S'}
-                            {hasLogProjection ? ` · ${leagueProjection.points.toFixed(1)} PROJ` : ''}
                           </span>
                         }
                       />
+                      {scoringReady && logSeason === getProjectionsSeason() && <SeasonProjectionCard
+                        row={playerRos} scoring={leagueScoring} goalie={isGoalie} points={pointsFormat} />}
                       <PressBoxUpcomingCards games={upcomingCards(gameLog)} />
                       {isGoalie && <p className="text-xs text-pressbox-text/60">Expected starts and counting stats include the chance of starting. A dash means workload evidence is unavailable.</p>}
-                      <PressBoxGameLog
-                        showPoints={false}
-                        showTail={false}
-                        pointsHeading="PROJ"
-                        tail={{ heading: 'RANGE', width: 64 }}
-                        statHeadings={isGoalie ? GOALIE_PROJ_HEADINGS : SKATER_PROJ_HEADINGS}
-                        rows={showAllUpcoming ? upcomingLog : upcomingLog.slice(0, UPCOMING_ROWS)}
-                      />
+                      <UpcomingProjectionCards scoring={leagueScoring} ready={scoringReady} points={pointsFormat}
+                        entries={showAllUpcoming ? upcomingLog : upcomingLog.slice(0, UPCOMING_ROWS)} />
                       {!showAllUpcoming && upcomingLog.length > UPCOMING_ROWS && (
                         <button
                           type="button"
