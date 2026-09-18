@@ -34,8 +34,6 @@ const GUIDES = {
     { title: 'Advanced Metrics, Explained', description: 'What xG, GAR and GSAx measure, and how to use them to pick players.', icon: '📊', accent: 'orange' as Accent },
     { title: 'Dynasty League Strategy', description: 'Long-term planning for dynasty formats, including prospect evaluation and roster construction.', icon: '👑', accent: 'sage' as Accent },
     { title: 'Game Theory Applications', description: 'Using game theory concepts to gain edges in drafts, trades, and waiver wire competition.', icon: '🎮', accent: 'orange' as Accent },
-    { title: 'Bankroll Management', description: 'Advanced techniques for managing your investment across multiple leagues and contests.', icon: '💰', accent: 'sage' as Accent },
-    { title: 'Contest Selection Strategy', description: 'How to identify and select the most profitable fantasy contests based on your skill edge.', icon: '🎯', accent: 'orange' as Accent },
     { title: 'Multi-League Management', description: 'Strategies for balancing multiple teams and leagues without burning out.', icon: '⚖️', accent: 'sage' as Accent },
   ],
 };
