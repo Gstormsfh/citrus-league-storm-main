@@ -18,6 +18,8 @@ import { ProjectedVsActual } from '@/components/analytics/ProjectedVsActual';
 import { TeamAnalyticsPhone } from '@/components/analytics/TeamAnalyticsPhone';
 import type { CategoryKey, CategoryPair } from '@/utils/teamAnalytics';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import { getUpcomingSeasonStartDate } from '@citrus/shared';
+import { shortDateLabel } from '@/components/scores/scoresFormat';
 import { logger } from '@/utils/logger';
 import { Navigate, Link } from 'react-router-dom';
 import {
@@ -294,7 +296,7 @@ const TeamAnalytics = () => {
                       removed, a card whose whole content was a link to a
                       different page. This is computed from the user's own
                       roster: its season projection against what it produced. */}
-                  {analytics && analytics.measuredPlayers > 0 && (
+                  {analytics && analytics.measuredPlayers > 0 ? (
                     <>
                       <ProjectedVsActual
                         totals={analytics.totals}
@@ -305,6 +307,29 @@ const TeamAnalytics = () => {
                         players. Those with both a season projection and games played.
                       </p>
                     </>
+                  ) : (
+                    /* Before the first games the chart has nothing to measure
+                       and the column was empty screen (desktop QA, 2026-09-18).
+                       Say what fills it and when. */
+                    <div
+                      className="rounded-2xl bg-pastel-surface-tile ring-1 ring-white/10 px-6 py-10 text-center"
+                      data-testid="team-analytics-preseason"
+                    >
+                      <div className="font-jbmono text-[10px] font-bold uppercase tracking-[0.32em] text-pastel-orange-soft">
+                        Projected vs actual
+                      </div>
+                      <p className="mt-3 font-calistoga text-xl text-pastel-cream">
+                        Your roster against its own forecast.
+                      </p>
+                      <p className="mx-auto mt-2 max-w-[44ch] text-[13px] leading-relaxed text-white/60">
+                        {(() => {
+                          const opener = getUpcomingSeasonStartDate();
+                          return opener
+                            ? `Every rostered player's season projection, measured against what he produces, once the season opens ${shortDateLabel(opener)}.`
+                            : 'Every rostered player\'s season projection, measured against what he produces. It fills in as games are played.';
+                        })()}
+                      </p>
+                    </div>
                   )}
                   {/* Was a section heading over a full-width card whose entire
                       content was a paragraph explaining that the real thing is on
