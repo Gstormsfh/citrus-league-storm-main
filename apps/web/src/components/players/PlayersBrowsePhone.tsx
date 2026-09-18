@@ -31,7 +31,7 @@ import { pressBoxPositionChipClasses, positionChipKey } from '@/components/press
 import { Mug } from '@/components/roster/Mug';
 import type { MugPlayer } from '@/components/roster/headshot';
 import type { DashboardIndexEntry } from '@/hooks/usePlayerDashboardIndex';
-import { GOALIE_SORTS, SKATER_SORTS, browseStatLine, type GoalieSortKey, type SkaterSortKey } from './playersBrowse';
+import { GOALIE_SORTS, SKATER_SORTS, browseStatLine, projectedWorkloadLabel, type GoalieSortKey, type SkaterSortKey } from './playersBrowse';
 
 export const PAGE_SIZE = 50;
 
@@ -245,6 +245,11 @@ export function PlayersBrowsePhone({
                       {browseStatLine(p) && (
                         <span className="mt-0.5 block font-plex font-medium text-[10px] text-pressbox-text/55 tabular-nums whitespace-nowrap overflow-hidden text-ellipsis" data-testid="players-browse-statline">
                           {browseStatLine(p)}
+                        </span>
+                      )}
+                      {projectedWorkloadLabel(p) && (
+                        <span className="mt-0.5 block font-plex font-medium text-[10px] text-pressbox-orange-soft tabular-nums" data-testid="players-browse-projected-starts">
+                          {projectedWorkloadLabel(p)}
                         </span>
                       )}
                     </span>

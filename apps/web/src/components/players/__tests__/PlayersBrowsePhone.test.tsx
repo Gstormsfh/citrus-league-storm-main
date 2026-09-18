@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
 import { PlayersBrowsePhone, PAGE_SIZE } from '../PlayersBrowsePhone';
-import { dashboardEntryToHockeyPlayer, svp, browseStatLine } from '../playersBrowse';
+import { dashboardEntryToHockeyPlayer, svp, browseStatLine, leaderboardSortValue, projectedWorkloadLabel } from '../playersBrowse';
 import type { DashboardIndexEntry } from '@/hooks/usePlayerDashboardIndex';
 
 afterEach(() => {
@@ -176,7 +176,7 @@ describe('browseStatLine', () => {
     expect(browseStatLine(entry(1, { gp: 82, goals: 55, assists: 80, sog: 320, ppp: 40, plus_minus: 20 }))).toBe('82 GP · 55G 80A · 320 SOG · 40 PPP');
     expect(browseStatLine(entry(7, { gp: 10, plus_minus: -3 }))).toBe('10 GP · 7G 2A · 30 SOG · 3 PPP');
     expect(browseStatLine(entry(3, { gp: 0 }))).toBeNull();
-    expect(browseStatLine(entry(4, { is_goalie: true, position: 'G', gp: 58, wins: 30, save_pct: 0.912, gaa: 2.31, shutouts: 3 }))).toBe('58 GP · 30W · .912 SV% · 2.31 GAA');
+    expect(browseStatLine(entry(4, { is_goalie: true, position: 'G', gp: 58, wins: 30, save_pct: 0.912, gaa: 2.31, shutouts: 3 }))).toBe('58 actual GP · 30W · .912 SV% · 2.31 GAA');
   });
 });
 
@@ -203,5 +203,39 @@ describe('dashboardEntryToHockeyPlayer', () => {
     expect(svp(912)).toBe('.912');
     expect(svp(0)).toBe('–');
     expect(svp(null)).toBe('–');
+    expect(svp(1)).toBe('1.000');
+    expect(svp(Infinity)).toBe('–');
+    expect(svp(-0.1)).toBe('–');
   });
+});
+
+it('shows actual appearances and projected starts as separate mobile values', () => {
+  const props=mount({ group:'goalies', goalieSort:'proj_gp', rows:[entry(8, {
+    is_goalie:true,position:'G',gp:35,proj_gp:46,save_pct:916,
+  })],total:1 });
+  expect(screen.getByTestId('players-browse-statline')).toHaveTextContent('35 actual GP');
+  expect(screen.getByTestId('players-browse-statline')).toHaveTextContent('.916 SV%');
+  expect(screen.getByTestId('players-browse-projected-starts')).toHaveTextContent('46 proj. starts');
+  expect(screen.getByText('46.0')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:/SORT · PROJ STARTS/}));
+  fireEvent.click(screen.getByRole('option',{name:/PROJ STARTS/}));
+  expect(props.onGoalieSort).toHaveBeenCalledWith('proj_gp');
+});
+
+it('formats and ranks both supported save-percentage encodings consistently', () => {
+  for(const value of [0.916,916]) {
+    const p=entry(8,{is_goalie:true,save_pct:value});
+    expect(svp(value)).toBe('.916');
+    expect(browseStatLine(p)).toContain('.916 SV%');
+    expect(leaderboardSortValue(p,'save_pct')).toBe(.916);
+  }
+  expect(leaderboardSortValue(entry(8,{save_pct:1}),'save_pct')).toBe(1);
+});
+
+it('does not invent missing workload or hide a valid zero', () => {
+  expect(projectedWorkloadLabel(entry(8,{is_goalie:true,proj_gp:0}))).toBe('0 proj. starts');
+  for(const proj_gp of [null,NaN,Infinity,-1]) {
+    expect(projectedWorkloadLabel(entry(8,{is_goalie:true,proj_gp}))).toBeNull();
+  }
+  expect(projectedWorkloadLabel(entry(8,{is_goalie:false,proj_gp:46}))).toBeNull();
 });

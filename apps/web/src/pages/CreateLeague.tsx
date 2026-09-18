@@ -2199,8 +2199,8 @@ const CreateLeague = () => {
                                 : "bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/40 hover:bg-white/[0.08]"
                             )}
                           >
-                            <div className="font-semibold text-sm">F / D / G</div>
-                            <div className="text-xs text-white/55 mt-1">Forward / Defense / Goalie</div>
+                            <div className="font-semibold text-sm">Combined forwards (F / D / G)</div>
+                            <div className="text-xs text-white/55 mt-1">Centres and wings share Forward slots</div>
                           </button>
                         </div>
                       </div>

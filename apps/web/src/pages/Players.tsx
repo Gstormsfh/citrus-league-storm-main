@@ -1,5 +1,8 @@
 import { isEligibleForPosition, playerEligiblePositionsLabel } from '@citrus/shared';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
+import { actualsCohortLabel, actualsSeasonLabel } from '@citrus/shared';
+import { LeaderboardSampleFilter } from '@/components/players/LeaderboardSampleFilter';
+import { DEFAULT_MINIMUM_SAMPLE, qualifiesForLeaderboard, sampleKindFor } from '@/components/players/leaderboardSamples';
 import { citrusNoteContext } from '@/utils/sourceSeasonContext';
 import { OutlookSources } from '@/components/player/OutlookSources';
 // Players — league-wide browse + advanced-metrics dashboard section.
@@ -38,7 +41,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { PlayersBrowsePhone } from '@/components/players/PlayersBrowsePhone';
-import { dashboardEntryToHockeyPlayer, type GoalieSortKey, type SkaterSortKey } from '@/components/players/playersBrowse';
+import { dashboardEntryToHockeyPlayer, leaderboardSortValue, svp, type GoalieSortKey, type SkaterSortKey } from '@/components/players/playersBrowse';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useLeague } from '@/contexts/LeagueContext';
 import { hasUnprojectedPlusMinus, leagueDashboardProjection, usesFantasyPoints } from '@/components/player/leagueDashboardProjection';
@@ -82,8 +85,6 @@ const PlayerStatsModal = lazy(() => import('@/components/PlayerStatsModal'));
 
 const f1 = (v: number | null | undefined) => (v == null ? '-' : (Math.round(v * 10) / 10).toFixed(1));
 const f2 = (v: number | null | undefined) => (v == null ? '-' : (Math.round(v * 100) / 100).toFixed(2));
-const svp = (v: number | null | undefined) =>
-  v == null || v === 0 ? '-' : (v < 1 ? v : v / 1000).toFixed(3).replace(/^0/, '');
 
 /** Percentile of `val` within `arr` (fraction of values <= val), 0–100. */
 function percentile(arr: number[], val: number): number {
@@ -208,7 +209,8 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
         <ArrowUpRight className="h-3.5 w-3.5" />
       </Link>
 
-      <div className="mt-4 grid grid-cols-4 gap-2 text-center">
+      <p className="mt-4 text-xs text-muted-foreground">{actualsSeasonLabel(player.actuals_season)} · Games played{player.is_goalie ? ', not projected starts' : ''}</p>
+      <div className="mt-2 grid grid-cols-4 gap-2 text-center">
         {(player.is_goalie
           ? [
               { n: player.wins, l: 'Wins' },
@@ -315,7 +317,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
 
       <div className="mt-5 rounded-xl border border-dashed border-pastel-orange/50 bg-white/5 p-3.5">
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          Rolled-forward projection{player.proj_gp != null ? ` · ${player.proj_gp} proj GP` : ''}
+          Rest-of-season projection{player.proj_gp != null && Number.isFinite(Number(player.proj_gp)) ? ` · ${Number(Number(player.proj_gp).toFixed(1))} projected ${player.is_goalie ? 'starts' : 'games'}` : ''}
         </h3>
         <ProjectionProvenance className="mt-2" context={player.canonical_context} isGoalie={!!player.is_goalie} />
         {player.proj_fantasy_points == null ? (
@@ -388,6 +390,13 @@ const Players = () => {
   const [group, setGroup] = useState<'skaters' | 'goalies'>('skaters');
   const [skaterSort, setSkaterSort] = useState<SkaterSortKey>('points');
   const [goalieSort, setGoalieSort] = useState<GoalieSortKey>('wins');
+  const [minimumMinutes, setMinimumMinutes] = useState(DEFAULT_MINIMUM_SAMPLE);
+  const [minimumShots, setMinimumShots] = useState(DEFAULT_MINIMUM_SAMPLE);
+  const activeSort = group === 'skaters' ? skaterSort : goalieSort;
+  const sampleKind = sampleKindFor(activeSort);
+  const minimumSample = sampleKind === 'shotsFaced' ? minimumShots : minimumMinutes;
+  const setMinimumSample = sampleKind === 'shotsFaced' ? setMinimumShots : setMinimumMinutes;
+  const actualsLabel = actualsCohortLabel(players.map(player => player.actuals_season));
   const [selectedId, setSelectedId] = useState<number | null>(() => {
     const p = searchParams.get('player');
     return p ? parseInt(p, 10) || null : null;
@@ -418,15 +427,16 @@ const Players = () => {
       if (team !== 'ALL' && p.team !== team) return false;
       if (!isEligibleForPosition(p, position)) return false;
       if (q && !p.name.toLowerCase().includes(q)) return false;
+      if (!qualifiesForLeaderboard(p, activeSort, minimumSample, q.length > 0)) return false;
       return true;
     });
-  }, [players, group, team, position, search]);
+  }, [players, group, team, position, search, activeSort, minimumSample]);
 
   const sorted = useMemo(() => {
     const key = group === 'skaters' ? skaterSort : goalieSort;
     return [...filtered].sort((a, b) => {
-      const av = (a[key as keyof DashboardPlayer] as number | null) ?? -Infinity;
-      const bv = (b[key as keyof DashboardPlayer] as number | null) ?? -Infinity;
+      const av = leaderboardSortValue(a, key) ?? -Infinity;
+      const bv = leaderboardSortValue(b, key) ?? -Infinity;
       return bv - av;
     });
   }, [filtered, group, skaterSort, goalieSort]);
@@ -466,6 +476,7 @@ const Players = () => {
     { key: 'saves', label: 'SV' },
     { key: 'shutouts', label: 'SO' },
     { key: 'proj_wins', label: 'Proj W' },
+    { key: 'proj_gp', label: 'Proj starts' },
   ];
 
   return (
@@ -485,6 +496,8 @@ const Players = () => {
         <p className="px-4 pt-2.5 pb-1 font-plex text-[11px] text-pressbox-text/60">
           {fromLeague && activeLeague?.name ? `${activeLeague.name} · ` : ''}{scoringLabel}
         </p>
+        <p className="text-xs text-pressbox-text/60 px-3">{actualsLabel} · GP means appearances, not projected starts.</p>
+        <LeaderboardSampleFilter kind={sampleKind} minimum={minimumSample} onChange={setMinimumSample} searching={search.trim().length > 0} />
         <PlayersBrowsePhone
           className="mt-1"
           rows={sorted}
@@ -519,10 +532,11 @@ const Players = () => {
           <h1 className="text-2xl font-bold">Players</h1>
           <p className="text-sm text-muted-foreground">{scoringLabel}</p>
           <p className="text-sm text-muted-foreground">
-            Season actuals, xG shot quality, GAR/60 impact, and rolled-forward projections. Every team, every player.
+            {actualsLabel}. GP means games played; projected goalie workloads are expected starts.
           </p>
         </div>
 
+        <LeaderboardSampleFilter kind={sampleKind} minimum={minimumSample} onChange={setMinimumSample} searching={search.trim().length > 0} />
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -602,7 +616,7 @@ const Players = () => {
                           scrolls horizontally inside its container — the name
                           column must stay in view or swiped stats lose context. */}
                       <th className="sticky left-0 top-0 z-sticky-raised bg-card px-3 py-2.5">Player</th>
-                      <th className="sticky top-0 z-sticky-base bg-card px-2 py-2.5 text-right">GP</th>
+                      <th title={`${actualsLabel}: games played, not projected starts`} className="sticky top-0 z-sticky-base bg-card px-2 py-2.5 text-right">Actual GP</th>
                       {(group === 'skaters' ? skaterCols : goalieCols).map((col) => (
                         <th key={col.key} className="sticky top-0 z-sticky-base bg-card px-2 py-2.5 text-right">
                           <button
@@ -686,6 +700,7 @@ const Players = () => {
                             <td className="px-2 py-2 text-right tabular-nums">{p.saves}</td>
                             <td className="px-2 py-2 text-right tabular-nums">{p.shutouts}</td>
                             <td className="px-2 py-2 text-right tabular-nums">{f1(p.proj_wins)}</td>
+                            <td className="px-2 py-2 text-right tabular-nums text-pastel-orange">{f1(p.proj_gp)}</td>
                           </>
                         )}
                       </tr>

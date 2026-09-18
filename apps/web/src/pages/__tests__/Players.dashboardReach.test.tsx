@@ -96,10 +96,10 @@ const LEAGUE: DashboardPlayer[] = [
   entry({ id: MAKAR, name: 'Cale Makar', team: 'COL', position: 'D', jersey: 8, headshot_url: null, points: 90 }),
 ];
 
-function renderPage(initialEntry = '/players', notes: unknown[] = []) {
+function renderPage(initialEntry = '/players', notes: unknown[] = [], rows = LEAGUE) {
   apiGet.mockImplementation((path: string) =>
     path.includes('/dashboard-index')
-      ? Promise.resolve({ data: LEAGUE })
+      ? Promise.resolve({ data: rows })
       : Promise.resolve({ data: { notes } }),
   );
   return render(
@@ -122,6 +122,50 @@ const rowFor = async (name: string) => {
   const cell = await within(table).findByText(name);
   return cell.closest('tr') as HTMLElement;
 };
+
+describe('qualified leaders stay connected to the actual table', () => {
+  it('filters tiny xG samples by default, allows opt-out, and keeps name search reachable', async () => {
+    renderPage('/players', [], [
+      entry({ name: 'Established scorer', toi_seconds: 18000, xg_per_60: 1.4 }),
+      entry({ id: MAKAR, name: 'Small sample', toi_seconds: 600, xg_per_60: 8 }),
+    ]);
+    const table = await screen.findByTestId('players-table');
+    fireEvent.click(within(table).getByRole('button', { name: 'xG/60' }));
+    expect(within(table).queryByText('Small sample')).not.toBeInTheDocument();
+    expect(within(table).getByText('Established scorer')).toBeInTheDocument();
+    const desktop = within(screen.getByRole('main'));
+    const minimum = desktop.getByRole('combobox', { name: 'Minimum ice time' });
+    fireEvent.change(minimum, { target: { value: '0' } });
+    expect(within(table).getByText('Small sample')).toBeInTheDocument();
+    fireEvent.change(minimum, { target: { value: '300' } });
+    fireEvent.change(screen.getByPlaceholderText('Search players…'), { target: { value: 'Small sample' } });
+    expect(within(table).getByText('Small sample')).toBeInTheDocument();
+    expect(minimum).toBeDisabled();
+    fireEvent.change(screen.getByPlaceholderText('Search players…'), { target: { value: '' } });
+    expect(within(table).queryByText('Small sample')).not.toBeInTheDocument();
+    fireEvent.click(within(table).getByRole('button', { name: 'PTS' }));
+    expect(within(table).getByText('Small sample')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Minimum ice time' })).not.toBeInTheDocument();
+  });
+
+  it('normalizes save percentages before sorting and keeps projected starts separate', async () => {
+    renderPage('/players', [], [
+      entry({ name: 'Fraction goalie', is_goalie: true, position: 'G', save_pct: .920, saves: 920, goals_against: 80, gp: 40, proj_gp: 50 }),
+      entry({ id: MAKAR, name: 'Per-mille goalie', is_goalie: true, position: 'G', save_pct: 912, saves: 912, goals_against: 88, gp: 55, proj_gp: 24 }),
+    ]);
+    const table = await screen.findByTestId('players-table');
+    fireEvent.click(screen.getByTestId('players-group-goalies'));
+    fireEvent.click(within(table).getByRole('button', { name: 'SV%' }));
+    const rows = within(table).getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('Fraction goalie');
+    expect(rows[2]).toHaveTextContent('Per-mille goalie');
+    expect(within(screen.getByRole('main')).getByRole('combobox', { name: 'Minimum shots faced' })).toHaveValue('300');
+    fireEvent.click(within(table).getByRole('button', { name: 'Proj starts' }));
+    expect(within(table).getByRole('columnheader', { name: 'Actual GP' })).toBeInTheDocument();
+    expect(within(rows[1]).getByText('40')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('50.0')).toBeInTheDocument();
+  });
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
