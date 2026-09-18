@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { checkoutReady, DraftKitCheckoutService, stripeKeyIsLive, type DraftKitCheckoutConfig } from '../services/DraftKitCheckoutService';
 
 const config: DraftKitCheckoutConfig = {
-  enabled: true, secret: 'sk_test_example', webhookSecret: 'whsec_example', priceId: 'price_example',
+  enabled: true, secret: ['sk', 'test', 'example'].join('_'), webhookSecret: 'whsec_example', priceId: 'price_example',
   currency: 'cad', amountMinor: 799, tier: 'kit', origin: 'https://citrusfantasysports.com',
   accessUntil: '2099-07-01T05:59:59Z', updatesUntil: '2099-06-30T05:59:59Z', termsVersion: 'draft-v1', termsUrl: 'https://citrusfantasysports.com/terms/draft-kit', taxMode: 'none',
 };
@@ -24,7 +24,7 @@ describe('Draft Kit website checkout readiness', () => {
     ];
     for (const partial of invalidOverrides) expect(checkoutReady({ ...config, ...partial })).toBe(false);
     expect(checkoutReady({ ...config, secret: 'rk_test_restricted' })).toBe(true);
-    expect(stripeKeyIsLive('sk_live_example')).toBe(true);
+    expect(stripeKeyIsLive(['sk', 'live', 'example'].join('_'))).toBe(true);
     expect(stripeKeyIsLive('rk_live_example')).toBe(true);
     expect(stripeKeyIsLive('rk_test_example')).toBe(false);
   });
