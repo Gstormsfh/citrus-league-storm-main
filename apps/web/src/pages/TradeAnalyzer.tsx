@@ -649,7 +649,13 @@ const TradeAnalyzer = () => {
       </div>
       <main className="hidden lg:block w-full lg:pt-app-header lg:pb-8">
         <div className="w-full m-0 p-0">
-          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          {/* DESKTOP WIDTH (2026-09-18, QA): three panes (my roster, the
+              proposal, their roster) split what is left after two rails. At
+              1512 that left each roster pane about 200px: names cut mid-word,
+              the info button off the card. The "trade tips" rail is three
+              bullets; it yields below 2xl so the panes get the width. League
+              activity stays. */}
+          <div className="flex flex-col lg:grid lg:grid-cols-[1fr_260px] xl:grid-cols-[1fr_280px] 2xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
               {/* Loading State */}
               {loading && (
@@ -809,9 +815,17 @@ const TradeAnalyzer = () => {
             ALL widths, but the 12-col layout only exists at lg+. Below lg the
             three stacked cards overflowed the fixed-height grid and painted
             straight through the translucent footer. Height is now lg-scoped so
-            mobile/tablet flows naturally. */}
+            mobile/tablet flows naturally.
+
+            DESKTOP (2026-09-18, QA): that height only capped the GRID. Its
+            one implicit row is auto-sized, so a card holding a 19-man roster
+            made the row 1642px, `h-full` on the card followed the row, and
+            the list painted straight through the footer. The row is pinned
+            to the container (grid-rows minmax(0,1fr)) and every flex link
+            down to the ScrollArea can shrink (min-h-0), so each column
+            scrolls inside its card as designed. */}
         {viewMode === 'list' ? (
-        <div className="grid lg:grid-cols-12 gap-6 lg:h-[calc(100vh-240px)] lg:min-h-[600px]">
+        <div className="grid lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)] gap-6 lg:h-[calc(100vh-240px)] lg:min-h-[600px]">
           {/*
             * MOBILE ORDER: my roster, their roster, then the proposal.
             *
@@ -823,7 +837,7 @@ const TradeAnalyzer = () => {
             * reach the players you were filling it with.
             */}
           {/* Left Column: My Team */}
-          <Card className="order-1 lg:order-none lg:col-span-3 flex flex-col h-full bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+          <Card className="order-1 lg:order-none lg:col-span-3 flex flex-col h-full min-h-0 bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2 font-calistoga text-pastel-cream">
                 <Badge className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold border-0">You</Badge>
@@ -839,8 +853,8 @@ const TradeAnalyzer = () => {
                 />
               </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-hidden p-0">
-              <ScrollArea className="h-full px-4 pb-4">
+            <CardContent className="flex-1 min-h-0 overflow-hidden p-0">
+              <ScrollArea className="h-full px-4 pb-4 [&_[data-radix-scroll-area-viewport]>div]:!block [&_[data-radix-scroll-area-viewport]>div]:!min-w-0">
                 <div className="space-y-2">
                   {filteredMyTeam.map(player => {
                     const isSelected = mySelectedPlayers.includes(player.id);
@@ -893,7 +907,7 @@ const TradeAnalyzer = () => {
           </Card>
 
           {/* Middle Column: Trade Deck */}
-          <div className="order-3 lg:order-none lg:col-span-6 flex flex-col gap-6 h-full overflow-y-auto">
+          <div className="order-3 lg:order-none lg:col-span-6 flex flex-col gap-6 h-full min-h-0 overflow-y-auto">
             {/* Trade Area */}
             <Card className="flex-1 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/20 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden">
               <CardHeader className="border-b border-white/10 bg-white/[0.03] pb-4">
@@ -1056,7 +1070,7 @@ const TradeAnalyzer = () => {
           </div>
 
           {/* Right Column: Their Team */}
-          <Card className={`order-2 lg:order-none lg:col-span-3 flex flex-col h-full bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] transition-opacity ${!selectedPartnerTeam ? 'opacity-60 pointer-events-none' : ''}`}>
+          <Card className={`order-2 lg:order-none lg:col-span-3 flex flex-col h-full min-h-0 bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] transition-opacity ${!selectedPartnerTeam ? 'opacity-60 pointer-events-none' : ''}`}>
             <CardHeader className="pb-3">
                <CardTitle className="text-lg flex items-center gap-2 font-calistoga text-pastel-cream">
                 {selectedPartnerTeam ? (
@@ -1079,9 +1093,9 @@ const TradeAnalyzer = () => {
                 />
               </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-hidden p-0">
+            <CardContent className="flex-1 min-h-0 overflow-hidden p-0">
                {selectedPartnerTeam ? (
-                  <ScrollArea className="h-full px-4 pb-4">
+                  <ScrollArea className="h-full px-4 pb-4 [&_[data-radix-scroll-area-viewport]>div]:!block [&_[data-radix-scroll-area-viewport]>div]:!min-w-0">
                     <div className="space-y-2">
                       {filteredTheirTeam.map(player => {
                         const isSelected = theirSelectedPlayers.includes(player.id);
@@ -1378,7 +1392,7 @@ const TradeAnalyzer = () => {
               </div>
 
             {/* Left Sidebar - At bottom on mobile, left on desktop */}
-            <aside className="w-full lg:w-auto order-2 lg:order-1">
+            <aside className="w-full lg:w-auto order-2 lg:order-1 lg:hidden 2xl:block">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
                 {/* Sleeper-style trade tips tile — replaces legacy AdSpace */}
                 <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl p-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
