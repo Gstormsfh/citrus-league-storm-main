@@ -765,11 +765,21 @@ async joinLeagueByCode(
     // Round 1: 1 -> 10
     // Round 2: 10 -> 1
     let round = 0;
-    // We continue until all teams are full or we run out of players
-    while (true) {
+    // We continue until all teams are full or we run out of players.
+    //
+    // HANG (2026-09-18, desktop QA): this loop had no exit once every
+    // team sat at 20. A roster that reaches the position minimums lands on
+    // exactly 20 (4+4+4+5+3), is then skipped below as "complete and near
+    // max", never reaches the 21 the exit condition waited for, and a pool
+    // of a thousand players never empties. Three of four loads of the
+    // trade analyzer froze the tab for good. A round in which nobody
+    // picked now ends the draft, and a hard cap on rounds backs that up.
+    const MAX_ROUNDS = MAX_ROSTER_SIZE * 2;
+    while (round < MAX_ROUNDS) {
       const isEvenRound = round % 2 === 0; // 0, 2, 4... (1->10)
       
       let teamsProcessedInRound = 0;
+      let picksThisRound = 0;
 
       for (let i = 0; i < teamsCount; i++) {
         const teamId = isEvenRound ? (i + 1) : (teamsCount - i);
@@ -884,6 +894,7 @@ async joinLeagueByCode(
           availablePlayers.splice(pickedIndex, 1);
           // Add to roster
           currentRoster.push(pickedPlayer);
+          picksThisRound++;
         }
         
         teamsProcessedInRound++;
@@ -892,7 +903,7 @@ async joinLeagueByCode(
       // Check if all teams have reached maximum roster size or run out of players
       const allAtMax = Object.values(leagueRosters).every(roster => roster.length >= MAX_ROSTER_SIZE);
       
-      if (allAtMax || availablePlayers.length === 0) break;
+      if (allAtMax || availablePlayers.length === 0 || picksThisRound === 0) break;
 
       round++;
     }
