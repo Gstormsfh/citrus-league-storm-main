@@ -220,14 +220,15 @@ describe('the row components carry no second palette', () => {
   });
 
   it('PlayerCard renders the mug once, before the score stack, mobile only, badge to the gutter', () => {
-    const mug = playerCard.search(/<Mug\b/);
+    // The desktop branch returns its own row before this mobile branch.
+    const mug = playerCard.lastIndexOf('<Mug');
     const stack = playerCard.indexOf('player-mobile-score');
     expect(mug).toBeGreaterThan(-1);
     expect(mug).toBeLessThan(stack);
     const tag = playerCard.slice(mug, playerCard.indexOf('/>', mug));
     expect(tag).toMatch(/lg:hidden/);
     expect(tag).toMatch(/crestSide=\{isUserTeam \? 'right' : 'left'\}/);
-    expect((playerCard.match(/<Mug\b/g) || []).length).toBe(1);
+    expect((playerCard.slice(mug).match(/<Mug\b/g) || []).length).toBe(1);
   });
 });
 

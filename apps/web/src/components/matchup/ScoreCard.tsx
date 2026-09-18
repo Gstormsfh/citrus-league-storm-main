@@ -226,7 +226,7 @@ export const ScoreCard = ({
   const oppBadgeShell = 'bg-white/5 ring-1 ring-white/10';
 
   return (
-    <div className="mb-4 md:mb-6 rounded-xl md:rounded-[2rem] bg-[#1A2A20] ring-1 ring-white/10 md:ring-2 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.4)] overflow-hidden relative">
+    <div className="mb-4 rounded-xl bg-pressbox-tile border border-white/10 md:border-t-2 md:border-t-pressbox-orange overflow-hidden relative">
       {/* Floating Citrus Decorations - Hidden on mobile */}
       <CitrusSlice className="hidden md:block absolute top-3 right-3 w-8 h-8 text-pastel-sage/10 rotate-12" aria-hidden="true" />
       <CitrusBurst className="hidden md:block absolute bottom-3 left-3 w-10 h-10 text-pastel-sage/10" aria-hidden="true" />
@@ -298,79 +298,37 @@ export const ScoreCard = ({
         />}
       </div>
 
-      {/* Desktop: Full layout */}
-      <div className="hidden md:block relative px-4 py-4 md:px-6 md:py-5 border-b border-white/10">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          {/* Team 1 Badge - Embroidered patch */}
-          <div className={`flex items-center gap-3 p-3 rounded-2xl ${myBadgeShell}`}>
-            <TeamDisc size="lg" name={myTeamName} avatarUrl={myTeamAvatarUrl} own={isOwnTeam} />
-            <div>
-              <div className="flex items-center gap-2">
-                <div className={`font-varsity text-sm uppercase ${myNameText}`}>{myTeamName}</div>
-                {isOwnTeam && <YouPill className="text-[9px] px-1.5 py-0.5 tracking-wider" />}
+      {/* Desktop scoreboard shares the roster's typography and restrained surface. */}
+      <div className="hidden md:block pb-type px-5 py-5 border-b border-white/10" data-testid="desktop-matchup-scoreboard">
+        <div className="flex items-center justify-between mb-5">
+          <span className="font-condensed font-bold text-[18px] uppercase tracking-wider text-pressbox-text">Head-to-head</span>
+          <span className="font-plex text-[10px] uppercase tracking-wider text-pressbox-text/50">Matchup points</span>
+        </div>
+        <div className="grid grid-cols-2 gap-6">
+          {[
+            { name: myTeamName, record: myTeamRecord, points: myTeamPoints, final: myTeamExpectedFinal, games: myTeamGamesRemaining, avatar: myTeamAvatarUrl, own: isOwnTeam, winning: isWinning, nameClass: myNameText },
+            { name: opponentTeamName, record: opponentTeamRecord, points: opponentTeamPoints, final: opponentTeamExpectedFinal, games: opponentTeamGamesRemaining, avatar: opponentTeamAvatarUrl, own: false, winning: isLosing, nameClass: 'text-pastel-cream' },
+          ].map((side, index) => (
+            <div key={index} className={`min-w-0 ${index === 1 ? 'border-l border-white/10 pl-6' : ''}`}>
+              <div className="flex items-center gap-3 min-w-0">
+                <TeamDisc size="lg" name={side.name} avatarUrl={side.avatar} own={side.own} />
+                <div className="min-w-0">
+                  <div className={`font-barlow font-bold text-[17px] truncate ${side.nameClass}`}>{side.name}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    {side.own && <YouPill className="text-[9px] px-1.5 py-0.5 tracking-wider" />}
+                    <span className="font-plex text-xs text-pressbox-text/55">{side.record.wins}-{side.record.losses}</span>
+                  </div>
+                </div>
               </div>
-              <div className="font-mono text-xs text-white/55">{myTeamRecord.wins}-{myTeamRecord.losses}</div>
-              {showsGamesLeft(myTeamGamesRemaining) && (
-                <div className="flex flex-col gap-0.5 mt-1">
-                  {/* Games Remaining */}
-                  <div className={`flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-md ring-1 ${isOwnTeam ? 'ring-pastel-orange/30' : 'ring-white/10'}`}>
-                    <Calendar className={`w-2.5 h-2.5 ${isOwnTeam ? 'text-pastel-orange' : 'text-pastel-sage'}`} aria-hidden="true" />
-                    <span className="text-[9px] font-varsity font-bold text-pastel-cream tabular-nums">
-                      {myTeamGamesRemaining}
-                    </span>
-                    <span className="text-[8px] font-display text-white/55">
-                      left
-                    </span>
-                    <CitrusWedge className={`w-2 h-2 opacity-60 ${isOwnTeam ? 'text-pastel-orange' : 'text-pastel-sage'}`} />
-                  </div>
-                </div>
-              )}
+              <div className={`mt-4 font-plex font-semibold text-[clamp(32px,3.5vw,52px)] tracking-tight tabular-nums ${side.winning ? 'text-pastel-sage' : 'text-white/70'}`}>{side.points}</div>
+              <div className="flex items-center justify-between gap-2 mt-2">
+                {hasExpectedFinals
+                  ? <ProjectedFinal value={side.final!} className="text-[11px]" />
+                  : expectedFinalsPending && <ProjectedFinalSlot className="text-[11px]" />}
+                {showsGamesLeft(side.games) && <span className="font-plex text-[11px] text-pressbox-text/60"><span>{side.games}</span> <span>left</span></span>}
+              </div>
             </div>
-          </div>
-
-          {/* Center scores with stitched divider */}
-          <div className="flex items-center gap-6 relative">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-cream font-condensed font-bold uppercase text-lg px-3 py-1 rounded-varsity shadow-patch">
-              vs
-            </div>
-            <div className="text-center">
-              <div className={`font-varsity text-6xl tabular-nums ${isWinning ? 'text-pastel-sage' : 'text-white/70'}`}>{myTeamPoints}</div>
-              {hasExpectedFinals
-                ? <ProjectedFinal value={myTeamExpectedFinal} className="mt-1 text-[11px]" />
-                : expectedFinalsPending && <ProjectedFinalSlot className="mt-1 text-[11px]" />}
-            </div>
-            <div className="w-1 h-20 border-l-2 border-dashed border-white/10"></div>
-            <div className="text-center">
-              <div className={`font-varsity text-6xl tabular-nums ${isLosing ? 'text-pastel-sage' : 'text-white/70'}`}>{opponentTeamPoints}</div>
-              {hasExpectedFinals
-                ? <ProjectedFinal value={opponentTeamExpectedFinal} className="mt-1 text-[11px]" />
-                : expectedFinalsPending && <ProjectedFinalSlot className="mt-1 text-[11px]" />}
-            </div>
-          </div>
-
-          {/* Team 2 Badge */}
-          <div className={`flex items-center gap-3 p-3 rounded-2xl ${oppBadgeShell}`}>
-            <div>
-              <div className="font-varsity text-sm text-pastel-cream uppercase text-right">{opponentTeamName}</div>
-              <div className="font-mono text-xs text-white/55 text-right">{opponentTeamRecord.wins}-{opponentTeamRecord.losses}</div>
-              {showsGamesLeft(opponentTeamGamesRemaining) && (
-                <div className="flex flex-col gap-0.5 mt-1 items-end">
-                  {/* Games Remaining */}
-                  <div className="flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-md ring-1 ring-white/10">
-                    <CitrusWedge className="w-2 h-2 text-pastel-sage opacity-60" />
-                    <span className="text-[8px] font-display text-white/55">
-                      left
-                    </span>
-                    <span className="text-[9px] font-varsity font-bold text-pastel-cream tabular-nums">
-                      {opponentTeamGamesRemaining}
-                    </span>
-                    <Calendar className="w-2.5 h-2.5 text-pastel-sage" aria-hidden="true" />
-                  </div>
-                </div>
-              )}
-            </div>
-            <TeamDisc size="lg" name={opponentTeamName} avatarUrl={opponentTeamAvatarUrl} />
-          </div>
+          ))}
         </div>
       </div>
 

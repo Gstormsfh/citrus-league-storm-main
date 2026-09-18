@@ -280,13 +280,13 @@ export const MatchupComparison = ({
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full lg:rounded-xl lg:bg-pressbox-tile lg:border lg:border-white/10 pb-type">
       {/* Sticky team header — the only place below the fold that answers
           "which column is mine". Mirrors the grid's 47%/6%/47% columns so
           each label sits over its own side. Orange + YOU on the left is the
           same identity signal used in Standings and the ScoreCard. */}
       {(userTeamName || opponentTeamName) && (
-        <div className="matchup-team-header bg-[#1A2A20]/95 backdrop-blur-sm border-b border-white/10 mb-1">
+        <div className="matchup-team-header bg-pressbox-tile/95 backdrop-blur-sm border-b border-white/10 mb-1">
           <div className="matchup-team-header-side matchup-team-header-user">
             {isOwnTeam && (
               <span className="inline-flex items-center bg-pastel-orange/20 text-pastel-orange-soft ring-1 ring-pastel-orange/40 rounded-md font-jbmono uppercase font-bold text-[8px] px-1 py-0 tracking-wide flex-shrink-0">

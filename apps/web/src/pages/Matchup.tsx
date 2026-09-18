@@ -4909,7 +4909,7 @@ const Matchup = () => {
   }
 
   return (
-    <div ref={loadTiming.rootRef} className="min-h-screen bg-pastel-surface relative w-full">
+    <div ref={loadTiming.rootRef} className="min-h-screen bg-pressbox-surface text-pressbox-text relative w-full">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />
@@ -4946,13 +4946,13 @@ const Matchup = () => {
         <div className="w-full m-0 p-0">
           {/* Desktop: 3-column grid / Mobile: Single column, content only */}
           <div className={cn(
-            "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
+            "flex flex-col lg:grid lg:gap-5 lg:px-5 lg:mx-auto lg:max-w-[1760px]",
             userLeagueState === 'active-user' && league?.id
-              ? "lg:grid-cols-[200px_1fr_280px] xl:grid-cols-[220px_1fr_340px]"
-              : "lg:grid-cols-[200px_1fr] xl:grid-cols-[220px_1fr]"
+              ? "lg:grid-cols-[200px_minmax(0,1fr)] 2xl:grid-cols-[220px_minmax(0,1fr)_280px]"
+              : "lg:grid-cols-[200px_minmax(0,1fr)] 2xl:grid-cols-[220px_minmax(0,1fr)]"
           )}>
             {/* Main Content - MOBILE: Full width, full height / DESKTOP: Scrollable panel */}
-            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto scrollbar-pressbox px-0 lg:px-4 order-1 lg:order-2">
+            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto scrollbar-pressbox px-0 order-1 lg:order-2">
               {/* Playoff status banner — only for fantasy leagues with a generated bracket */}
               {(league?.id || activeLeagueId) && playoffChampion.status === 'completed' && (
                 <Card className="mb-4 border-amber-700/60 bg-gradient-to-br from-amber-950/40 via-yellow-950/40 to-orange-950/40">
@@ -5467,7 +5467,7 @@ const Matchup = () => {
 
             {/* Notifications Panel - Right side on desktop, hidden on mobile */}
             {userLeagueState === 'active-user' && league?.id && (
-              <aside className="hidden lg:block order-3">
+              <aside className="hidden lg:block lg:col-start-2 2xl:col-start-auto order-3">
                 <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={league.id} />
                 </div>

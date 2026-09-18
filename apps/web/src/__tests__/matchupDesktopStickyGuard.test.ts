@@ -21,6 +21,7 @@ import { resolve } from 'node:path';
 const SRC = resolve(__dirname, '..');
 const CSS = readFileSync(resolve(SRC, 'index.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 const MATCHUP = readFileSync(resolve(SRC, 'pages/Matchup.tsx'), 'utf8');
+const COMPARISON = readFileSync(resolve(SRC, 'components/matchup/MatchupComparison.tsx'), 'utf8');
 
 function desktopHeaderRule(): string {
   const re = /@media\s*\(min-width:\s*1024px\)\s*\{\s*\.matchup-team-header\s*\{([^}]*)\}/g;
@@ -38,6 +39,9 @@ describe('index.css desktop matchup — sticky header offset', () => {
 
   it('the lineup column is still the scroll container the offset is measured against', () => {
     expect(MATCHUP).toMatch(/lg:max-h-\[calc\(100vh-7rem\)\]\s+lg:overflow-y-auto/);
+    // Rounded board chrome must not introduce a nearer non-scrolling ancestor
+    // that captures sticky positioning away from the scrolling lineup column.
+    expect(COMPARISON).not.toContain('lg:overflow-hidden');
   });
 
   it('the stats box has no corner dot over its values', () => {
