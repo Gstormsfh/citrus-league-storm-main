@@ -16,7 +16,8 @@ import { DraftService } from '@/services/DraftService';
 import { PlayerService } from '@/services/PlayerService';
 import { DemoLeagueService, DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { MatchupService } from '@/services/MatchupService';
-import { getCurrentSeason } from '@/utils/seasonConstants';
+import { getCurrentSeason, getSeasonYearForDate } from '@/utils/seasonConstants';
+import { getUpcomingSeasonStartDate } from '@citrus/shared';
 import { RefreshCw } from 'lucide-react';
 import {
   type ScoringFormat,
@@ -65,7 +66,19 @@ const Standings = () => {
   const { userLeagueState, activeLeagueId, activeLeague, isChangingLeague, loading: leaguesLoading } = useLeague();
   const { status: seasonStatus } = useSeasonStatus();
   const { toast } = useToast();
-  const [season, setSeason] = useState(String(getCurrentSeason()));
+  // The season the league is about to play, not the one that just ended:
+  // between the Cup and the opener getCurrentSeason() still says the old
+  // year, and the selector read "2025 Season" over a league whose first
+  // matchup is 2026-09-29 (desktop QA, 2026-09-18).
+  const [season, setSeason] = useState(() => {
+    const opener = getUpcomingSeasonStartDate();
+    return String(opener ? getSeasonYearForDate(new Date(`${opener}T12:00:00`)) : getCurrentSeason());
+  });
+  const seasonOptions = useMemo(() => {
+    const base = Number(season);
+    return [base - 1, base].filter((y) => y >= 2020);
+  }, [season]);
+  const seasonLabel = (y: number) => `${y}-${String(y + 1).slice(2)}`;
   const [loading, setLoading] = useState(true);
   const [leagues, setLeagues] = useState<League[]>([]);
   const [teams, setTeams] = useState<StandingsTeam[]>([]);
@@ -757,8 +770,8 @@ const Standings = () => {
                     <SelectValue placeholder="Select Season" />
                   </SelectTrigger>
                   <SelectContent className="z-[9999]">
-                    {Array.from({ length: 3 }, (_, i) => getCurrentSeason() - 2 + i).map(year => (
-                      <SelectItem key={year} value={String(year)}>{year} Season</SelectItem>
+                    {seasonOptions.map(year => (
+                      <SelectItem key={year} value={String(year)}>{seasonLabel(year)} Season</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

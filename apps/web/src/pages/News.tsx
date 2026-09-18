@@ -153,6 +153,30 @@ function useWireRoom(enabled: boolean) {
   };
 }
 
+/**
+ * A story image that falls back to the newspaper mark when the URL exists
+ * but the file does not load (desktop QA, 2026-09-18: three of four cards
+ * showed an empty black band because the source's image was gone or
+ * hotlink-blocked, and the fallback only covered a MISSING url).
+ */
+function NewsImage({ src, alt, className, loading, fallbackClassName, iconClassName }: {
+  src?: string | null; alt: string; className: string; loading: 'eager' | 'lazy'; fallbackClassName: string; iconClassName: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return (
+      <div className={fallbackClassName} data-testid="news-image-fallback">
+        <Newspaper className={iconClassName} />
+      </div>
+    );
+  }
+  return (
+    <div className={className}>
+      <img src={src} alt={alt} className="w-full h-full object-cover" loading={loading} onError={() => setFailed(true)} />
+    </div>
+  );
+}
+
 const News = () => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -325,20 +349,14 @@ const News = () => {
           >
             <Card className="overflow-hidden bg-pastel-surface-tile border-2 border-white/10 hover:border-pastel-orange/40 transition-all">
               <div className="md:flex">
-                {featured.imageUrl ? (
-                  <div className="md:w-2/5 h-48 md:h-auto bg-black/40">
-                    <img
-                      src={featured.imageUrl}
-                      alt={featured.title}
-                      className="w-full h-full object-cover"
-                      loading="eager"
-                    />
-                  </div>
-                ) : (
-                  <div className="md:w-2/5 h-48 md:h-auto bg-gradient-to-br from-pastel-sage/15 to-pastel-orange/10 flex items-center justify-center">
-                    <Newspaper className="h-16 w-16 text-pastel-sage/40" />
-                  </div>
-                )}
+                <NewsImage
+                  src={featured.imageUrl}
+                  alt={featured.title}
+                  loading="eager"
+                  className="md:w-2/5 h-48 md:h-auto bg-black/40"
+                  fallbackClassName="md:w-2/5 h-48 md:h-auto bg-gradient-to-br from-pastel-sage/15 to-pastel-orange/10 flex items-center justify-center"
+                  iconClassName="h-16 w-16 text-pastel-sage/40"
+                />
                 <CardContent className="md:w-3/5 p-6 md:p-8 flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-3">
                     <Badge variant="outline" className={cn('text-[10px] gap-1', categoryColors[featured.category])}>
@@ -377,20 +395,14 @@ const News = () => {
                 className="group"
               >
                 <Card className="h-full overflow-hidden bg-pastel-surface-tile border border-white/10 hover:border-pastel-orange/40 hover:-translate-y-0.5 transition-all">
-                  {article.imageUrl ? (
-                    <div className="h-40 bg-black/40">
-                      <img
-                        src={article.imageUrl}
-                        alt={article.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-40 bg-gradient-to-br from-pastel-sage/10 to-pastel-orange/5 flex items-center justify-center">
-                      <Newspaper className="h-10 w-10 text-pastel-sage/30" />
-                    </div>
-                  )}
+                  <NewsImage
+                    src={article.imageUrl}
+                    alt={article.title}
+                    loading="lazy"
+                    className="h-40 bg-black/40"
+                    fallbackClassName="h-40 bg-gradient-to-br from-pastel-sage/10 to-pastel-orange/5 flex items-center justify-center"
+                    iconClassName="h-10 w-10 text-pastel-sage/30"
+                  />
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant="outline" className={cn('text-[10px] gap-1', categoryColors[article.category])}>

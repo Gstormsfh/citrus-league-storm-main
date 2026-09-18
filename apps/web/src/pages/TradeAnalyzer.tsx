@@ -47,6 +47,7 @@ import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
+import { summaryShortName } from '@/components/freeagents/FreeAgentSummaryTable';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 
@@ -884,9 +885,10 @@ const TradeAnalyzer = () => {
                           <div className="min-w-0">
                             <div
                               className="font-bold text-sm text-pastel-cream hover:text-pastel-orange cursor-pointer truncate"
+                              title={player.full_name}
                               onClick={(e) => handlePlayerClick(e, player)}
                             >
-                              {player.full_name}
+                              {summaryShortName(player.full_name)}
                             </div>
                             <div className="text-xs text-white/55 tabular-nums">{player.position} · {player.points} pts</div>
                           </div>
@@ -1125,9 +1127,10 @@ const TradeAnalyzer = () => {
                               <div className="min-w-0">
                                 <div
                                   className="font-bold text-sm text-pastel-cream hover:text-pastel-orange cursor-pointer truncate"
+                                  title={player.full_name}
                                   onClick={(e) => handlePlayerClick(e, player)}
                                 >
-                                  {player.full_name}
+                                  {summaryShortName(player.full_name)}
                                 </div>
                                 <div className="text-xs text-white/55 tabular-nums">{player.position} · {player.points} pts</div>
                               </div>
