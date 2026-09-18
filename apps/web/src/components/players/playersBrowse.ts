@@ -11,9 +11,10 @@ import { playerEligiblePositions } from '@citrus/shared';
  */
 import type { DashboardIndexEntry } from '@/hooks/usePlayerDashboardIndex';
 import type { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { normalizeSavePctValue } from '@citrus/shared';
 
 export type SkaterSortKey = 'points' | 'goals' | 'assists' | 'sog' | 'xg_per_60' | 'gar_per_60' | 'proj_fantasy_points';
-export type GoalieSortKey = 'wins' | 'save_pct' | 'saves' | 'shutouts' | 'proj_wins';
+export type GoalieSortKey = 'wins' | 'save_pct' | 'saves' | 'shutouts' | 'proj_wins' | 'proj_gp';
 
 export interface SortOption<K extends string> {
   key: K;
@@ -31,11 +32,25 @@ const f1 = (v: number | null | undefined) => (v == null ? '–' : (Math.round(v 
 const f2 = (v: number | null | undefined) => (v == null ? '–' : (Math.round(v * 100) / 100).toFixed(2));
 const int = (v: number | null | undefined) => (v == null ? '–' : String(v));
 /** `.912` — the artboard's spelling for a save percentage. */
-export const svp = (v: number | null | undefined) =>
-  v == null || v === 0 ? '–' : (v < 1 ? v : v / 1000).toFixed(3).replace(/^0/, '');
+export const svp = (v: number | null | undefined) => {
+  const rate = normalizeSavePctValue(v);
+  return rate == null ? '–' : rate.toFixed(3).replace(/^0/, '');
+};
+
+/** Normalize before ranking too: .920 must rank above per-mille 912. */
+export function leaderboardSortValue(p: DashboardIndexEntry, key: SkaterSortKey | GoalieSortKey): number | null {
+  if (key === 'save_pct') return normalizeSavePctValue(p.save_pct);
+  const value = p[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+export function projectedWorkloadLabel(p: DashboardIndexEntry): string | null {
+  return p.is_goalie && typeof p.proj_gp === 'number' && Number.isFinite(p.proj_gp) && p.proj_gp >= 0
+    ? `${Number(p.proj_gp.toFixed(1))} proj. starts` : null;
+}
 
 export const SKATER_SORTS: SortOption<SkaterSortKey>[] = [
-  { key: 'points', label: 'PTS', help: 'Points this season', figure: (p) => int(p.points) },
+  { key: 'points', label: 'PTS', help: 'Actual points in the displayed source season', figure: (p) => int(p.points) },
   { key: 'goals', label: 'G', help: 'Goals', figure: (p) => int(p.goals) },
   { key: 'assists', label: 'A', help: 'Assists', figure: (p) => int(p.assists) },
   { key: 'sog', label: 'SOG', help: 'Shots on goal', figure: (p) => int(p.sog) },
@@ -45,11 +60,12 @@ export const SKATER_SORTS: SortOption<SkaterSortKey>[] = [
 ];
 
 export const GOALIE_SORTS: SortOption<GoalieSortKey>[] = [
-  { key: 'wins', label: 'W', help: 'Wins this season', figure: (p) => int(p.wins) },
+  { key: 'wins', label: 'W', help: 'Actual wins in the displayed source season', figure: (p) => int(p.wins) },
   { key: 'save_pct', label: 'SV%', help: 'Save percentage', figure: (p) => svp(p.save_pct) },
   { key: 'saves', label: 'SV', help: 'Saves', figure: (p) => int(p.saves) },
   { key: 'shutouts', label: 'SO', help: 'Shutouts', figure: (p) => int(p.shutouts) },
   { key: 'proj_wins', label: 'PROJ W', help: 'Rolled-forward wins, rest of season', figure: (p) => f1(p.proj_wins), tone: 'orange' },
+  { key: 'proj_gp', label: 'PROJ STARTS', help: 'Expected remaining starts, not past appearances or confirmed starters', figure: (p) => f1(p.proj_gp), tone: 'orange' },
 ];
 
 /** The shared card's shape, from what the index holds and nothing more. */
@@ -71,8 +87,8 @@ export function toiPerGame(seasonSeconds: number, gp: number): string {
 export function browseStatLine(p: DashboardIndexEntry): string | null {
   if (!p.gp) return null;
   if (p.is_goalie) {
-    const sv = p.save_pct > 0 ? (p.save_pct > 1 ? (p.save_pct / 100).toFixed(3) : p.save_pct.toFixed(3)).replace(/^0/, '') : null;
-    return [`${p.gp} GP`, `${p.wins}W`, sv ? `${sv} SV%` : null, p.gaa > 0 ? `${p.gaa.toFixed(2)} GAA` : null]
+    const sv = svp(p.save_pct);
+    return [`${p.gp} actual GP`, `${p.wins}W`, sv !== '–' ? `${sv} SV%` : null, p.gaa > 0 ? `${p.gaa.toFixed(2)} GAA` : null]
       .filter(Boolean)
       .join(' · ');
   }

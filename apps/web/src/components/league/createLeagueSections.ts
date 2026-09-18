@@ -225,7 +225,7 @@ const SURVIVOR_LIVES = opts([['1', '1 life', 'Classic: one wrong pick and out'],
 const MIN_GOALIE_GAMES = opts([['0', 'None'], ['2', '2 games'], ['3', '3 games'], ['5', '5 games']]);
 const POSITION_FORMATS = opts([
   ['individual', 'C / LW / RW / D / G', 'Individual positions'],
-  ['forward', 'F / D / G', 'Forwards together'],
+  ['forward', 'Combined forwards (F / D / G)', 'Centres and wings share Forward slots'],
 ]);
 const BRACKET_MODES = opts([
   ['round-by-round', 'Round by round', 'Pick each round as it starts. Forgiving'],

@@ -22,6 +22,24 @@ const leagueWith = (settings: Record<string, unknown>, draftCompletedAt = '2026-
   } as unknown as League);
 
 describe('the week-start day is a league setting (2026-09-10)', () => {
+  it.each(['sunday', 'monday'])('%s weeks stay seven calendar days with no gaps or overlaps through DST', (day) => {
+    const anchor = fantasyWeekAnchorFor(leagueWith({ weekStartDay: day }))!;
+    let lastEnd: Date | undefined;
+    for (let week = 1; week <= 28; week++) {
+      const start = getWeekStartDate(week, anchor);
+      const end = getWeekEndDate(week, anchor);
+      expect(start.getDay()).toBe(day === 'sunday' ? 0 : 1);
+      expect(end.getDay()).toBe(day === 'sunday' ? 6 : 0);
+      const expectedEnd = new Date(start);
+      expectedEnd.setDate(expectedEnd.getDate() + 6);
+      expect(end.toDateString()).toBe(expectedEnd.toDateString());
+      if (lastEnd) {
+        lastEnd.setDate(lastEnd.getDate() + 1);
+        expect(start.toDateString()).toBe(lastEnd.toDateString());
+      }
+      lastEnd = end;
+    }
+  });
   it('reads settings.weekStartDay, Sunday by default', () => {
     expect(weekStartDayFor(leagueWith({}))).toBe('sunday');
     expect(weekStartDayFor(leagueWith({ weekStartDay: 'monday' }))).toBe('monday');
