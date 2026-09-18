@@ -154,12 +154,19 @@ export default function DraftRoomV2() {
   const [searchParams] = useSearchParams();
   const [mockLeague, setMockLeague] = useState<{ practiceOf: string | null } | null>(null);
   const isMock = searchParams.get('mock') === '1' || mockLeague !== null;
+  // COLD LOAD WITHOUT ?mock=1 (2026-09-18, prod QA). The league row is what
+  // says "practice", and it arrives on its own fetch below. Claiming before
+  // it lands raced that fetch: the room claimed the practice league,
+  // LeagueContext could not find it in the user's leagues (practice leagues
+  // are filtered out of that list by design) and bounced the manager out of
+  // a live room into the join flow. The claim now waits for the row.
+  const [leagueRowSettled, setLeagueRowSettled] = useState(false);
   useEffect(() => {
-    if (!leagueId || leaguesLoading || isMock) return;
+    if (!leagueId || leaguesLoading || isMock || !leagueRowSettled) return;
     if (activeLeagueId === leagueId || claimedLeagueRef.current === leagueId) return;
     claimedLeagueRef.current = leagueId;
     setActiveLeagueId(leagueId);
-  }, [leagueId, activeLeagueId, leaguesLoading, setActiveLeagueId, isMock]);
+  }, [leagueId, activeLeagueId, leaguesLoading, setActiveLeagueId, isMock, leagueRowSettled]);
   const { offsetMs: clockOffsetMs, updateOffset } = useClockOffsetEstimator();
 
   // DR-2 (2026-07-29) — fetch the caller's teamId. Non-fatal on
@@ -593,6 +600,8 @@ export default function DraftRoomV2() {
         }
       } catch {
         // The header keeps its generic title.
+      } finally {
+        if (!cancelled) setLeagueRowSettled(true);
       }
     })();
     return () => { cancelled = true; };
