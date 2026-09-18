@@ -131,6 +131,7 @@ jobs:
             SUPABASE_ANON_KEY=SUPABASE_ANON_KEY:latest
             SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest
             STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest
+            STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest
           env_vars: |
             NODE_ENV=production
             DEPLOYMENT_ENV=staging
