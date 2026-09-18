@@ -65,12 +65,12 @@ credential.
 
 ## Minimum permissions for the restricted test key
 
-Set **Prices: Read** and **Checkout Sessions: Write**. Checkout Sessions Write
-also includes Read, which this service uses to retrieve a completed session in
-the webhook handler. The service does not directly call the Payment Intents,
-Charges, Refunds, Customers, Products, or Stripe Tax APIs; expanded
-`payment_intent` and line-item price data are returned as part of the Checkout
-Session retrieval. Local webhook signature verification uses
+Set **Prices: Read**, **Checkout Sessions: Write**, and **Payment Intents:
+Read**. Checkout Sessions Write also includes Read, which this service uses to
+retrieve a completed session in the webhook handler. Payment Intents Read
+authorizes the expanded intent status validation; the service does not create
+or update Payment Intents. It does not directly call Charges, Refunds,
+Customers, Products, or Stripe Tax APIs. Local webhook signature verification uses
 `STRIPE_WEBHOOK_SECRET`, not an API permission.
 
 After the sandbox test is complete, review the restricted key's request logs
