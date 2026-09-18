@@ -47,7 +47,7 @@ export interface PressBoxRosterSlotRow {
 
 export interface PressBoxRosterListProps {
   /**
-   * `THU FRI SAT WEEK`. Empty renders no toggles at all — a surface that
+   * Seven scoring days in league order, followed by WEEK. Empty renders no toggles — a surface that
    * already carries a day control (the roster page's `TodayStrip`) must not
    * grow a second one that can disagree with it.
    */
@@ -134,12 +134,12 @@ export function PressBoxRosterList({
     <div className={cn(PB_TYPE, 'bg-pressbox-surface border-t border-white/[0.08] px-3 pt-2.5', className)}>
       {teamCard}
 
-      <div className="flex items-center justify-between mt-3 px-0.5">
+      <div className="flex flex-col gap-2 mt-3 px-0.5">
         <h2 className={SECTION}>
           Starters <span className={COUNT}>· {startersFilled}/{startersRequired}</span>
         </h2>
         {days.length > 0 && (
-        <div role="tablist" aria-label="Lineup day" className="flex gap-1">
+        <div role="tablist" aria-label="Lineup day" className="grid grid-cols-4 min-[360px]:grid-cols-8 gap-1 w-full">
           {days.map((d) => (
             <button
               key={d}
@@ -148,7 +148,7 @@ export function PressBoxRosterList({
               aria-selected={d === activeDay}
               onClick={() => onDayChange?.(d)}
               className={cn(
-                'font-plex font-semibold text-[10px] px-2 py-[3px] rounded-[4px]',
+                'font-plex font-semibold text-[10px] min-h-11 px-1 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-pressbox-orange',
                 d === activeDay ? 'bg-pressbox-tile text-pressbox-text' : 'text-pressbox-text/50',
               )}
             >
