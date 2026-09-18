@@ -21,6 +21,7 @@ import { rosterApi } from '@/api/rosters';
 import { waiverApi } from '@/api/waivers';
 import { logger } from '@/utils/logger';
 import { calculateStrength, depthPositionsFor, isForward } from './teamIntelDepth';
+import { WeekStrip } from './WeekStrip';
 
 interface PositionDepth {
   position: string;
@@ -319,12 +320,6 @@ export const TeamIntelHub = () => {
   };
 
   // Get heat map color for game count
-  const getHeatMapColor = (count: number): string => {
-    if (count >= 4) return 'hsl(142, 52%, 45%)'; // Green - good day
-    if (count >= 2) return 'hsl(45, 85%, 55%)'; // Amber - moderate day
-    return 'hsl(0, 72%, 58%)'; // Red - off-night
-  };
-
   // Generate 7-day calendar (must be before useEffect that uses it)
   const calendarDays = useMemo(() => {
     if (!weekStart || !weekEnd) return [];
@@ -665,45 +660,7 @@ export const TeamIntelHub = () => {
                   </div>
                 </div>
               ) : (
-              <div className="grid grid-cols-7 gap-1">
-                {calendarDays.map((day, idx) => {
-                const isOffNight = day.totalGames <= 3;
-                const heatColor = getHeatMapColor(day.totalGames);
-                const isToday = day.dateStr === new Date().toISOString().split('T')[0];
-
-                return (
-                  <div
-                    key={idx}
-                    className={`
-                      text-center py-1.5 px-0.5 rounded-md border transition-all
-                      ${isToday ? 'ring-2 ring-citrus-orange/50 shadow-sm' : ''}
-                      ${isOffNight
-                        ? 'bg-red-950/20 border-red-800/40'
-                        : 'bg-muted/30 border-border hover:bg-muted/50'
-                      }
-                    `}
-                  >
-                    <div className="text-[9px] font-semibold text-muted-foreground uppercase leading-none mb-1">
-                      {day.dayLabel.slice(0, 3)}
-                    </div>
-                    <div
-                      className="text-lg font-bold leading-none"
-                      style={{ color: heatColor }}
-                    >
-                      {day.totalGames}
-                    </div>
-                    <div className="text-[9px] text-muted-foreground mt-0.5 leading-none">
-                      {day.rosterGames} yours
-                    </div>
-                    {isOffNight && (
-                      <div className="text-[8px] font-bold text-red-500 uppercase mt-0.5 leading-none">
-                        Off
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              </div>
+              <WeekStrip days={calendarDays} todayStr={new Date().toISOString().split('T')[0]} />
               )}
           </div>
           )}
@@ -719,16 +676,17 @@ export const TeamIntelHub = () => {
                 {actionableInsights.slice(0, 4).map((insight, idx) => (
                   <div
                     key={idx}
-                    className="flex items-start gap-2 p-2 rounded-lg bg-citrus-sage/5 border border-citrus-sage/20"
+                    className="flex flex-col gap-1.5 p-2 rounded-lg bg-citrus-sage/5 border border-citrus-sage/20"
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] leading-snug text-foreground/80">{insight.message}</p>
-                    </div>
+                    {/* Stacked, not side by side: in the 200px sidebar the
+                        button left the message a 60px column, five lines
+                        deep for one sentence. */}
+                    <p className="text-[11px] leading-snug text-foreground/80">{insight.message}</p>
                     {insight.action && insight.actionUrl && (
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-6 px-2 text-[10px] shrink-0"
+                        className="h-6 self-end px-2 text-[10px]"
                         onClick={() => navigate(insight.actionUrl!)}
                       >
                         {insight.action}

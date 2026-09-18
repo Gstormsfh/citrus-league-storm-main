@@ -20,6 +20,7 @@ npx vite --config harness/vite.config.ts
 | `/harness/cards.html` | HockeyPlayerCard gallery + MobileRosterList |
 | `/harness/draft.html` | DraftRoomV2, live clock, scripted picks |
 | `/harness/pool.html` | The desktop draft pool (`PlayerPool`) on its own with 20 fixture rows and projections, at the room's real column width; `?w=NNN` sets it (default 1040). Added 2026-09-14 to look at the sticky column seams and the header sort |
+| `/harness/intel.html` | The Team Intel week strip (`WeekStrip`) at the three sidebar widths it lives in, 200 / 240 / 340; `?w=200,240` picks them. Added 2026-09-18 after the seven-column grid came out unreadable at 200px |
 | `/harness/tabs.html` | Roster tab bars |
 | `/harness/scores.html` | Scores page, real components, fixture days |
 | `/harness/slot.html` | MobileRosterList + Line Change sheet, page-shaped wiring |
