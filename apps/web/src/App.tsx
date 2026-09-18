@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { LeagueProvider } from "@/contexts/LeagueContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { WebsiteOnlyProduct } from '@/components/WebsiteOnlyProduct';
 import { StormyChatBubble } from "./components/StormyChatBubble";
 import MobileBottomNav from "./components/MobileBottomNav";
 import { LeagueLoadErrorBanner } from "./components/LeagueLoadErrorBanner";
@@ -71,6 +72,12 @@ const Matchup = lazyWithErrorHandling(() => import("./pages/Matchup"));
 const PlayoffBracket = lazyWithErrorHandling(() => import("./pages/PlayoffBracket"));
 const FreeAgents = lazyWithErrorHandling(() => import("./pages/FreeAgents"));
 const Players = lazyWithErrorHandling(() => import("./pages/Players"));
+const DraftKit = import.meta.env.VITE_NATIVE === '1'
+  ? () => null
+  : lazyWithErrorHandling(() => import('./pages/DraftKit'));
+const DraftKitPurchase = import.meta.env.VITE_NATIVE === '1'
+  ? () => null
+  : lazyWithErrorHandling(() => import('./pages/DraftKitPurchase'));
 const GMOffice = lazyWithErrorHandling(() => import("./pages/GMOffice"));
 const StormyAssistant = lazyWithErrorHandling(() => import("./pages/StormyAssistant"));
 const News = lazyWithErrorHandling(() => import("./pages/News"));
@@ -203,6 +210,8 @@ const App = () => {
                     <Route path="/league/:leagueId/playoffs" element={<ProtectedRoute><ErrorBoundary><PlayoffBracket /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/free-agents" element={<ErrorBoundary><FreeAgents /></ErrorBoundary>} />
                 <Route path="/players" element={<ProtectedRoute><ErrorBoundary><Players /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/draft-kit/buy" element={<WebsiteOnlyProduct><ErrorBoundary><DraftKitPurchase /></ErrorBoundary></WebsiteOnlyProduct>} />
+                <Route path="/draft-kit/*" element={<WebsiteOnlyProduct><ProtectedRoute><ErrorBoundary><DraftKit /></ErrorBoundary></ProtectedRoute></WebsiteOnlyProduct>} />
                 <Route path="/gm-office" element={<ProtectedRoute><ErrorBoundary><GMOffice /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office/stormy" element={<ProtectedRoute><ErrorBoundary><StormyAssistant /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/news" element={<News />} />

@@ -75,6 +75,18 @@ export function getCurrentSeason(): number {
 }
 
 /**
+ * The season described by rest-of-season projections. During the July through
+ * September pre-season window, projections are keyed to the coming season;
+ * once an explicitly early opener has passed, the current-season result wins.
+ */
+export function getProjectionsSeason(d: Date = new Date()): number {
+  const current = _deriveNhlSeasonYear(d);
+  const calendarSeason = d.getMonth() >= 9 ? d.getFullYear() : d.getFullYear() - 1;
+  if (current > calendarSeason) return current;
+  return d.getMonth() >= 6 && d.getMonth() <= 8 ? current + 1 : current;
+}
+
+/**
  * The NHL season year for an arbitrary date.
  *
  * Exported so the rule can be tested at a specific date. Until 2026-08-11
