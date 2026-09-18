@@ -56,6 +56,7 @@ export interface PressBoxRosterListProps {
   onDayChange?: (day: string) => void;
   /** The day column's heading: `Today` unless another day is up (2026-09-05). */
   dayHeading?: string;
+  desktopHeading?: string;
   starters: PressBoxRosterSlotRow[];
   bench: PressBoxRosterSlotRow[];
   startersFilled: number;
@@ -93,6 +94,7 @@ export function PressBoxRosterList({
   activeDay,
   onDayChange,
   dayHeading = 'Today',
+  desktopHeading,
   starters,
   bench,
   startersFilled,
@@ -109,8 +111,8 @@ export function PressBoxRosterList({
   className,
 }: PressBoxRosterListProps) {
   const grid = showWeek
-    ? 'grid-cols-[30px_30px_1fr_52px_44px]'
-    : 'grid-cols-[30px_30px_1fr_52px]';
+    ? 'grid-cols-[30px_30px_1fr_52px_44px] lg:grid-cols-[38px_38px_minmax(130px,1fr)_minmax(100px,0.7fr)_76px_64px]'
+    : 'grid-cols-[30px_30px_1fr_52px] lg:grid-cols-[38px_38px_minmax(130px,1fr)_minmax(100px,0.7fr)_76px]';
 
   const renderRow = (row: PressBoxRosterSlotRow, isBench: boolean) => (
     <PressBoxRosterRow
@@ -160,11 +162,12 @@ export function PressBoxRosterList({
       </div>
 
       {/* The row's own grid, so every label lands over its column. */}
-      <div aria-hidden="true" className={cn('grid gap-2 pt-2 pb-1 px-0.5', grid, COLHEAD)}>
+      <div aria-hidden="true" className={cn('grid gap-2 lg:gap-3 pt-2 pb-1 px-0.5', grid, COLHEAD)}>
         <span />
         <span />
         <span>Player{showOwnership && ' · Ros% / Start%'}</span>
-        <span className="text-right">{dayHeading}</span>
+        <span className="hidden lg:block">Game / production</span>
+        <span className="text-right"><span className={desktopHeading ? 'lg:hidden' : undefined}>{dayHeading}</span>{desktopHeading && <span className="hidden lg:inline">{desktopHeading}</span>}</span>
         {showWeek && <span className="text-right">Wk</span>}
       </div>
 

@@ -61,6 +61,7 @@ import {
   positionChipKey,
 } from './positionChip';
 import { PB_TYPE, PB_ROW_HEADLINE, PB_ROW_HEADLINE_LABEL, PB_ROW_META, PB_ROW_NAME } from './rowScale';
+import type { RosterStatSummary } from '@/components/roster/statViews';
 
 /** Everything the row draws. Flat on purpose: no service types reach here. */
 export interface PressBoxRosterRowPlayer extends MugPlayer {
@@ -75,6 +76,9 @@ export interface PressBoxRosterRowPlayer extends MugPlayer {
   gameLabel?: string;
   /** `1G 2A 4 SOG` — only once something has happened. */
   statLine?: string;
+  /** Explicitly labelled season/ROS totals, never substituted for daily points. */
+  desktopStatLine?: string;
+  desktopSummary?: RosterStatSummary;
   isLiveOrFinal?: boolean;
   todayActual?: number | null;
   todayProjection?: number | null;
@@ -140,10 +144,14 @@ export function PressBoxRosterRow({
   const grid = showWeek
     ? 'grid-cols-[30px_30px_1fr_52px_44px]'
     : 'grid-cols-[30px_30px_1fr_52px]';
+  const desktopGrid = showWeek
+    ? 'lg:grid-cols-[38px_38px_minmax(130px,1fr)_minmax(100px,0.7fr)_76px_64px]'
+    : 'lg:grid-cols-[38px_38px_minmax(130px,1fr)_minmax(100px,0.7fr)_76px]';
   const frame = cn(
     PB_TYPE,
-    'grid items-center gap-2 border-t border-white/[0.06]',
+    'grid items-center gap-2 lg:gap-3 border-t border-white/[0.06] lg:hover:bg-white/[0.025]',
     grid,
+    desktopGrid,
     bench ? 'min-h-[52px]' : 'min-h-[56px]',
   );
 
@@ -160,7 +168,8 @@ export function PressBoxRosterRow({
           className="w-[30px] h-[30px] rounded-full border border-dashed border-white/20"
           aria-hidden="true"
         />
-        <span className={cn(PB_ROW_META, 'text-pressbox-text/45')}>Tap to fill</span>
+        <span className={cn(PB_ROW_META, 'text-pressbox-text/45')}>Select to fill</span>
+        <span className="hidden lg:block" />
         <span />
         {showWeek && <span />}
       </div>
@@ -268,22 +277,31 @@ export function PressBoxRosterRow({
               {(player.gameLabel || player.statLine) && (
                 <>
                   {' '}
-                  <span className="text-pressbox-text/25">|</span>{' '}
+                  <span className="text-pressbox-text/25 lg:hidden">|</span>{' '}
                 </>
               )}
             </>
           )}
-          <span className={cn(happened && !dtd && 'text-pressbox-sage')}>
+          <span className={cn('lg:hidden', happened && !dtd && 'text-pressbox-sage')}>
             {[player.gameLabel, player.statLine].filter(Boolean).join(' · ')}
           </span>
         </span>
       </button>
 
+      <span className="hidden lg:block min-w-0 font-plex text-[11px] text-pressbox-text/60">
+        <span className="block truncate">{player.gameLabel || 'No game listed'}</span>
+        {(player.desktopSummary?.detail || player.desktopStatLine || player.statLine) && <span className="block mt-1 leading-relaxed">{player.desktopSummary?.detail || player.desktopStatLine || player.statLine}</span>}
+      </span>
+
       {/* 4 — TODAY. The number the row exists to show. */}
-      <span className="text-right">
+      <span className={cn('text-right', player.desktopSummary && 'lg:hidden')}>
         <span className={cn(PB_ROW_HEADLINE, 'block', tone)}>{fig(value)}</span>
         {unit && <span className={cn(PB_ROW_HEADLINE_LABEL, 'block text-pressbox-text/45')}>{unit}</span>}
       </span>
+      {player.desktopSummary && <span className="hidden lg:block text-right">
+        <span className={cn(PB_ROW_HEADLINE, 'block', player.desktopSummary.projected ? 'text-pressbox-orange-soft' : 'text-pressbox-sage')}>{fig(player.desktopSummary.points)}</span>
+        <span className={cn(PB_ROW_HEADLINE_LABEL, 'block text-pressbox-text/45')}>{player.desktopSummary.projected ? 'PROJ FPTS' : 'FPTS'}</span>
+      </span>}
 
       {/* 5 — the week, and which way it is going. */}
       {showWeek && (
