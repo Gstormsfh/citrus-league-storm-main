@@ -153,7 +153,9 @@ describe('the phone has no week/day row; the day toggles ride on the list', () =
     const list = ROSTER.slice(listAt, ROSTER.indexOf('starters={rows.starters}', listAt));
     expect(list).toContain('days={[...pressBoxDays.map((d) => d.label)');
     expect(list).toContain("['WEEK']");
-    expect(list).toContain('showWeek={rosterWeek.ready && !weekView}');
+    // Mobile keeps its WK column; the desktop Week scope must not repeat
+    // the identical total in an adjacent second column.
+    expect(list).toContain("showWeek={rosterWeek.ready && !weekView && (isMobile || statView !== 'week')}");
     expect(list).toContain('showOwnership={ownership.size > 0}');
     expect(ROSTER).toContain('extras: rowExtras,');
   });
@@ -184,9 +186,16 @@ describe('the Lineup heading and the stat-view toggle are desktop-only', () => {
     expect(ROSTER.slice(h2, rowEnd)).toContain('<ToggleGroup');
   });
 
-  it('the toggle still drives the desktop cards — statView is not dead code', () => {
+  it('the toggle drives explicit desktop sources without overwriting mobile day figures', () => {
     expect(ROSTER).toContain("value={statView}");
-    expect(ROSTER).toMatch(/starters: prev\.starters\.map\(p => \(\{ \.\.\.p, statView \}\)\)/);
+    expect(ROSTER).toMatch(/desktopSummary = rosterStatSummary\(\s*statView, rosterSeasonSources/);
+    expect(ROSTER).toContain('leagueScoring, rosterStatsSeason,');
+    expect(ROSTER).toContain('rosterWeek.entries.get(String(row.player.id))');
+    expect(ROSTER).toContain('desktopHeading={ROSTER_STAT_VIEWS.find(([key]) => key === statView)?.[1]}');
+    expect(ROSTER).not.toMatch(/starters: prev\.starters\.map\(p => \(\{ \.\.\.p, statView \}\)\)/);
+    const row = code(read('components/pressbox/RosterRow.tsx'));
+    expect(row).toContain("player.desktopSummary && 'lg:hidden'");
+    expect(row).toContain('player.desktopSummary && <span className="hidden lg:block text-right">');
   });
 });
 

@@ -2,6 +2,8 @@ import { useLoadTiming } from '@/hooks/useLoadTiming';
 import { isEligibleForPosition, playerEligiblePositions } from '@citrus/shared';
 import { useFantasyIrEligibility } from '@/hooks/useFantasyIrEligibility';
 import { indexRosterRosStats } from '@/components/roster/rosStats';
+import { ROSTER_STAT_VIEWS, rosterStatSummary, type RosterStatView } from '@/components/roster/statViews';
+import { useRosterSeasonSources } from '@/hooks/useRosterSeasonSources';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { expectedDailyProjection } from '@citrus/shared';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -35,7 +37,6 @@ import {
 } from '@/utils/teamGrades';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
-import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
 import { PressBoxRosterList, PressBoxSkeletonRoster, PressBoxTeamCard } from '@/components/pressbox';
 import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import { buildRosterRows, type RosterRowExtras } from '@/components/pressbox/rosterRows';
@@ -75,7 +76,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { getTodayMST, getTodayMSTDate, formatWaiverProcessTime, formatMoment, computeNextWaiverProcessMoment } from '@/utils/timezoneUtils';
-import { getCurrentSeason } from '@/utils/seasonConstants';
+import { getCurrentSeason, getProjectionsSeason } from '@/utils/seasonConstants';
 import { fantasyWeekAnchorFor, weekStartDowFor, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';
@@ -322,7 +323,7 @@ const Roster = () => {
     previousLeagueIdRef.current = activeLeagueId;
   }, [activeLeagueId]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [statView, setStatView] = useState<'seasonToDate' | 'restOfSeason'>('seasonToDate');
+  const [statView, setStatView] = useState<RosterStatView>('actuals');
   const [analyticsLoaded, setAnalyticsLoaded] = useState(false);
   const [userTeamId, setUserTeamId] = useState<string | number | null>(null);
   const [userTeam, setUserTeam] = useState<{ id: string; league_id: string; team_name: string } | null>(null);
@@ -2174,7 +2175,7 @@ const Roster = () => {
   // same week hook; no starters on file means no bar, not a 50% one.
   // See components/pressbox/rosterWeek.ts.
   // ===========================================================================
-  const pressBoxOn = isMobile && userLeagueState === 'active-user';
+  const pressBoxOn = userLeagueState === 'active-user';
   const weekPlayers = useMemo(
     () =>
       [...roster.starters, ...roster.bench, ...roster.ir].map((p) => ({
@@ -2193,6 +2194,12 @@ const Roster = () => {
     scoring: leagueScoring,
   });
   const ownership = useOwnership(pressBoxOn);
+  const rosterStatsSeason = getProjectionsSeason();
+  const rosterSeasonSources = useRosterSeasonSources(
+    [...displayRoster.starters, ...displayRoster.bench, ...displayRoster.ir].map(p => String(p.id)),
+    rosterStatsSeason,
+    pressBoxOn && !isMobile,
+  );
 
   const rowExtras = useMemo(() => {
     const m = new Map<string, RosterRowExtras>();
@@ -2381,15 +2388,6 @@ const Roster = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- roster arrays would cause re-renders; starters.length is sufficient trigger
   }, [loading, analyticsLoaded, roster.starters.length, toast]);
 
-  // Update statView on players when it changes
-  useEffect(() => {
-    setRoster(prev => ({
-        ...prev,
-        starters: prev.starters.map(p => ({ ...p, statView })),
-        bench: prev.bench.map(p => ({ ...p, statView })),
-        ir: prev.ir.map(p => ({ ...p, statView }))
-    }));
-  }, [statView]);
 
   // Handle addPlayer query parameter (from FreeAgents when roster is full)
   useEffect(() => {
@@ -3757,23 +3755,21 @@ const Roster = () => {
                     }
                   />
                 )}
-                {/* "Lineup" + Season / Rest-of-Season: desktop only (audit R4).
-                    The toggle drives HockeyPlayerCard's season stat block,
-                    which the phone rows do not render — their one number is
-                    the day's projection (or live/final points), the same
-                    figure the game-day strip, the Line Change sheet and the
-                    Fill sheet quote, so swapping it for a season PPG under a
-                    toggle whose default is "Season" would break the game-day
-                    reading of every row. Season and rest-of-season stats stay
-                    a name-tap away in the player card. The heading itself
-                    labels nothing the section headers do not. */}
-                <div className="hidden lg:flex justify-between items-center mb-4">
+                {/* Desktop comparison scopes do not change mobile game-day scoring. */}
+                <div className="hidden lg:flex flex-wrap gap-3 justify-between items-center mb-2">
                     <h2 className="text-xl font-bold">Lineup</h2>
-                    <ToggleGroup type="single" value={statView} onValueChange={(v) => v && setStatView(v as any)} className="bg-white/5 p-1 rounded-lg">
-                        <ToggleGroupItem value="seasonToDate" size="sm" className="text-xs">Season</ToggleGroupItem>
-                        <ToggleGroupItem value="restOfSeason" size="sm" className="text-xs">Rest of Season</ToggleGroupItem>
+                    <ToggleGroup aria-label="Roster stat period" type="single" value={statView} onValueChange={(v) => {
+                      if (ROSTER_STAT_VIEWS.some(([key]) => key === v)) setStatView(v as RosterStatView);
+                    }} className="bg-white/5 p-1 rounded-lg">
+                        {ROSTER_STAT_VIEWS.map(([key, label]) => <ToggleGroupItem key={key} value={key} size="sm" className="text-xs min-h-11 data-[state=on]:bg-pressbox-orange data-[state=on]:text-pressbox-surface">{label}</ToggleGroupItem>)}
                     </ToggleGroup>
                 </div>
+                <p className="hidden lg:block text-xs text-pressbox-text/60 mb-4">
+                  {statView === 'actuals' ? 'Current-season player totals, scored with your league settings.'
+                    : statView === 'week' ? 'Selected week: points earned plus the remaining forecast.'
+                    : statView === 'seasonProjection' ? 'Full-season outlook: current-season actuals plus the remaining Citrus projection.'
+                    : 'Previous-season player totals, scored with your current league settings.'}
+                </p>
 
                 {(() => {
                   // Apply minimum display time to prevent flash
@@ -3859,13 +3855,13 @@ const Roster = () => {
                     // state, so by this point the only values left are 'guest'
                     // and 'active-user'. Comparing against it was dead code.
                     const canEdit = !(userLeagueState === 'guest' || (userTeam && isDemoLeague(userTeam.league_id)));
-                    return isMobile ? (
-                    <div>
+                    return (
+                    <div data-testid="responsive-roster-board">
                       {/* Tap-to-swap cancel bar */}
                       {tapSelectedPlayerId && (
                         <div className="flex items-center justify-between bg-pastel-orange/15 border border-pastel-orange/30 rounded-lg px-3 py-2 mb-3">
                           <span className="text-sm font-jbmono font-semibold text-pastel-cream">
-                            Tap a highlighted position to move
+                            Select a highlighted position to move
                           </span>
                           <button
                             onClick={() => setTapSelectedPlayerId(null)}
@@ -3916,17 +3912,31 @@ const Roster = () => {
                           // projection, and the WK column steps aside.
                           weekView,
                         });
+                        for (const row of [...rows.starters, ...rows.bench, ...rows.ir]) {
+                          if (!row.player) continue;
+                          const p = [...displayRoster.starters, ...displayRoster.bench, ...displayRoster.ir].find(player => String(player.id) === String(row.player!.id));
+                          row.player.desktopSummary = rosterStatSummary(
+                            statView, rosterSeasonSources?.get(String(row.player.id)),
+                            p?.position === 'G' || p?.position === 'Goalie', leagueScoring, rosterStatsSeason,
+                            rosterWeek.entries.get(String(row.player.id)),
+                          );
+                        }
                         return (
                           <PressBoxRosterList
+                            desktopHeading={ROSTER_STAT_VIEWS.find(([key]) => key === statView)?.[1]}
                             days={[...pressBoxDays.map((d) => d.label), ...(pressBoxDays.length > 0 ? ['WEEK'] : [])]}
                             activeDay={activePressBoxDay}
                             onDayChange={(label) => {
-                              if (label === 'WEEK') { setWeekView(true); return; }
+                              if (label === 'WEEK') {
+                                setWeekView(true);
+                                if (!isMobile) setStatView('week');
+                                return;
+                              }
                               const day = pressBoxDays.find((d) => d.label === label);
                               if (day) { setWeekView(false); setSelectedDate(day.date); }
                             }}
                             dayHeading={weekView ? 'Week' : pressBoxDays.find(d => d.label === activePressBoxDay)?.date === getTodayMST() ? 'Today' : (activePressBoxDay ?? 'Today')}
-                            showWeek={rosterWeek.ready && !weekView}
+                            showWeek={rosterWeek.ready && !weekView && (isMobile || statView !== 'week')}
                             showOwnership={ownership.size > 0}
                             starters={rows.starters}
                             bench={rows.bench}
@@ -3936,12 +3946,13 @@ const Roster = () => {
                             startersRequired={rows.startersRequired}
                             benchPlayingCount={rows.benchPlayingCount}
                             onSlotPress={(slotId) => {
+                              if (!canEdit) return;
                               // A held slot selects its player; an empty one
                               // is a move target with a player already picked
                               // and the Fill trigger otherwise. One gesture,
                               // read against the page's state — the rule the
                               // list this replaces established (audit R2).
-                              const held = rows.starters.find((r) => r.slotId === slotId)?.player;
+                              const held = [...rows.starters, ...rows.ir].find((r) => r.slotId === slotId)?.player;
                               const bench = rows.bench.find((r) => r.slotId === slotId)?.player;
                               const p = [...displayRoster.starters, ...displayRoster.bench, ...displayRoster.ir]
                                 .find((x) => String(x.id) === String(held?.id ?? bench?.id ?? ''));
@@ -3955,6 +3966,7 @@ const Roster = () => {
                               if (p) handlePlayerClick(p);
                             }}
                             onEmptyPress={(slotId) => {
+                              if (!canEdit) return;
                               if (tapSelectedPlayerId != null) handleMobileTapSlot(slotId);
                               else handleFillSlot(slotId);
                             }}
@@ -3971,57 +3983,6 @@ const Roster = () => {
                         open={fillSlotId != null}
                         onOpenChange={(next) => { if (!next) setFillSlotId(null); }}
                         onPick={handleFillPick}
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      {/* Tap-to-swap cancel bar — same affordance as mobile */}
-                      {canEdit && tapSelectedPlayerId && (
-                        <div className="flex items-center justify-between bg-pastel-orange/15 border border-pastel-orange/30 rounded-lg px-3 py-2">
-                          <span className="text-sm font-jbmono font-semibold text-pastel-cream">
-                            Click a highlighted slot to move this player
-                          </span>
-                          <button
-                            onClick={() => setTapSelectedPlayerId(null)}
-                            className="text-xs font-bold text-pastel-orange bg-pastel-orange/10 hover:bg-pastel-orange/20 rounded-lg px-3 py-1 transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )}
-                      <StartersGrid
-                        players={displayRoster.starters}
-                        slotAssignments={displayRoster.slotAssignments}
-                        onPlayerClick={handlePlayerClick}
-                        onPlayerTap={canEdit ? handleMobileTapPlayer : undefined}
-                        lockedPlayerIds={lockedPlayerIds}
-                        tapSelectedPlayerId={canEdit ? tapSelectedPlayerId : null}
-                        tapEligibleSlots={canEdit ? tapEligibleSlots : new Set()}
-                        onSlotTap={canEdit ? handleMobileTapSlot : undefined}
-                        positionType={leaguePositionType}
-                        rosterSlots={leagueRosterSlots}
-                      />
-
-                      <BenchGrid
-                        players={displayRoster.bench}
-                        onPlayerClick={handlePlayerClick}
-                        onPlayerTap={canEdit ? handleMobileTapPlayer : undefined}
-                        lockedPlayerIds={lockedPlayerIds}
-                        tapSelectedPlayerId={canEdit ? tapSelectedPlayerId : null}
-                        tapEligibleSlots={canEdit ? tapEligibleSlots : new Set()}
-                        onBenchTap={canEdit ? handleMobileTapBench : undefined}
-                      />
-
-                      <IRSlot
-                        irSlotCount={irSlotCount}
-                        players={displayRoster.ir}
-                        slotAssignments={displayRoster.slotAssignments}
-                        onPlayerClick={handlePlayerClick}
-                        onPlayerTap={canEdit ? handleMobileTapPlayer : undefined}
-                        lockedPlayerIds={lockedPlayerIds}
-                        tapSelectedPlayerId={canEdit ? tapSelectedPlayerId : null}
-                        tapEligibleSlots={canEdit ? tapEligibleSlots : new Set()}
-                        onSlotTap={canEdit ? handleMobileTapSlot : undefined}
                       />
                     </div>
                   );
