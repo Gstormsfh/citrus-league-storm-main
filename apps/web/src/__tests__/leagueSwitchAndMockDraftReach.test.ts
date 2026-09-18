@@ -176,7 +176,10 @@ describe('a manager inside a league can still reach a mock draft', () => {
     const line = app.split('\n').find((l) => l.includes('"/mock-draft"')) ?? '';
     expect(line).toContain('ProtectedRoute');
     const room = read('../pages/DraftRoomV2.tsx');
-    expect(room).toMatch(/if \(!leagueId \|\| leaguesLoading \|\| isMock\) return;/);
+    // The claim also waits for the league row (2026-09-18): "practice" is
+    // known only once the row lands, and claiming before it did bounced
+    // managers out of practice rooms opened without ?mock=1.
+    expect(room).toMatch(/if \(!leagueId \|\| leaguesLoading \|\| isMock \|\| !leagueRowSettled\) return;/);
   });
 
   it('the guest simulator route is still public and still ungated', () => {

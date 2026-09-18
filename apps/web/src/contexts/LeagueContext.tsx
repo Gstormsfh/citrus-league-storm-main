@@ -357,6 +357,13 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
                 setActiveLeague(refreshedLeague);
                 return;
               }
+              // A member of a league the list hides on purpose (a practice
+              // league: mock drafts and the draft canary). Not an outsider,
+              // so never the join flow, and never the active league either:
+              // the switcher, the home list and every league-scoped page
+              // are built on that list. Leave things as they are.
+              logger.warn('[LeagueContext] Member of a league hidden from the league list; leaving the active league unchanged:', urlLeagueId);
+              return;
             }
             
             // Not a member. Instead of slamming them with "Access Denied",
