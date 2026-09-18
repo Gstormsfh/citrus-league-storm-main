@@ -41,7 +41,8 @@ describe('Draft Kit website checkout readiness', () => {
   });
   it('creates only a fixed-price, server-identified checkout session', async () => {
     const db = database(); const provider = { prices: { retrieve: vi.fn().mockResolvedValue({ active: true, type: 'one_time', currency: 'cad', unit_amount: 799 }) }, checkout: { sessions: { create: vi.fn().mockResolvedValue({ id: 'cs_test', url: 'https://checkout.stripe.com/c/pay/test' }) } } };
-    await expect(new DraftKitCheckoutService(db as any, config, provider as any).checkout(USER, '22222222-2222-4222-8222-222222222222')).resolves.toEqual({ url: 'https://checkout.stripe.com/c/pay/test' });
+    db.rpc.mockResolvedValue({ data: [{ attempt_id: '22222222-2222-4222-8222-222222222222', checkout_session_id: null }], error: null });
+    await expect(new DraftKitCheckoutService(db as any, config, provider as any, db as any).checkout(USER, '22222222-2222-4222-8222-222222222222')).resolves.toEqual({ url: 'https://checkout.stripe.com/c/pay/test' });
     expect(provider.checkout.sessions.create).toHaveBeenCalledWith(expect.objectContaining({ client_reference_id: USER, line_items: [{ price: config.priceId, quantity: 1 }], mode: 'payment' }), expect.any(Object));
     expect(provider.checkout.sessions.create.mock.calls[0][1].idempotencyKey).toContain('22222222-2222-4222-8222-222222222222');
   });
