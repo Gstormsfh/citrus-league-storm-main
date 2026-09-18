@@ -67,7 +67,7 @@ const getPositionColor = (position: string): string => {
 const TradeAnalyzer = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId, activeLeagueFormat } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeagueFormat, loading: leaguesLoading } = useLeague();
   const { toast } = useToast();
   
   const [selectedTeamId, setSelectedTeamId] = useState<string | number>("");
@@ -135,6 +135,14 @@ const TradeAnalyzer = () => {
   useEffect(() => {
     // Guard: Don't run if user is still loading or league context is not ready
     if (user === undefined || activeLeagueId === undefined) {
+      return;
+    }
+    // A signed-in manager whose leagues are still loading has activeLeagueId
+    // null for a moment. That used to fall into the demo branch below and
+    // run the demo league's draft simulation for every member on every
+    // visit (2026-09-18, desktop QA: the simulation could not finish and
+    // froze the tab). The demo is for guests; members wait for their league.
+    if (user && leaguesLoading) {
       return;
     }
 
@@ -226,7 +234,7 @@ const TradeAnalyzer = () => {
               };
             });
           setOpponentTeams(opponents);
-        } else {
+        } else if (!user) {
           // Demo/guest mode: use static demo data
           const teams = await LeagueService.getAllTeamsWithRosters(allPlayers);
           if (!isMounted) return;
@@ -257,7 +265,7 @@ const TradeAnalyzer = () => {
       isMounted = false;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchData is inline with isMounted guard; service calls are stable module imports
-  }, [user?.id, activeLeagueId, loadTradeOffers, toast]);
+  }, [user?.id, activeLeagueId, leaguesLoading, loadTradeOffers, toast]);
 
   const handleProposeTrade = async () => {
     if (!myTeamId || !activeLeagueId || !selectedTeamId || 
