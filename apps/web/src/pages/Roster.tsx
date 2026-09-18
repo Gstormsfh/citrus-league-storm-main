@@ -2270,11 +2270,9 @@ const Roster = () => {
     return { winPct: Math.round(probability * 100), yourScore: yourScore ?? null, theirScore: theirScore ?? null };
   }, [currentMatchup, userTeamId, rosterWeek.ready, rosterWeek.entries, opponentWeek.ready, opponentWeek.entries, opponentStarters, roster.starters]);
 
-  // The day toggles: today and the next two days of the week, then WEEK.
+  // Preserve every date in the league's scoring week, including past days.
   const pressBoxDays = useMemo(() => {
-    const today = getTodayMST();
-    const upcoming = matchupWeekDates.filter((d) => d >= today).slice(0, 3);
-    return upcoming.map((date) => ({ date, label: dayLabelFor(date).slice(0, 3).toUpperCase() }));
+    return matchupWeekDates.map((date) => ({ date, label: dayLabelFor(date).slice(0, 3).toUpperCase() }));
   }, [matchupWeekDates]);
   const [weekView, setWeekView] = useState(false);
   const activePressBoxDay = weekView
@@ -3927,7 +3925,7 @@ const Roster = () => {
                               const day = pressBoxDays.find((d) => d.label === label);
                               if (day) { setWeekView(false); setSelectedDate(day.date); }
                             }}
-                            dayHeading={weekView ? 'Week' : pressBoxDays[0]?.date === getTodayMST() && activePressBoxDay === pressBoxDays[0]?.label ? 'Today' : (activePressBoxDay ?? 'Today')}
+                            dayHeading={weekView ? 'Week' : pressBoxDays.find(d => d.label === activePressBoxDay)?.date === getTodayMST() ? 'Today' : (activePressBoxDay ?? 'Today')}
                             showWeek={rosterWeek.ready && !weekView}
                             showOwnership={ownership.size > 0}
                             starters={rows.starters}
