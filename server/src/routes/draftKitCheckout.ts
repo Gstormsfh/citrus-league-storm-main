@@ -3,6 +3,7 @@ import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { strictRateLimit } from '../middleware/rateLimit';
 import { createUserClient, getSupabaseAdmin } from '../lib/supabase';
+import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { handleError, ok } from '../lib/responses';
 import { DraftKitCheckoutService, checkoutConfig, checkoutReady } from '../services/DraftKitCheckoutService';
@@ -16,7 +17,10 @@ draftKitCheckoutRoutes.get('/offer', (c) => {
 draftKitCheckoutRoutes.post('/session', authMiddleware, strictRateLimit, async (c) => {
   try {
     const attemptId = c.req.header('x-checkout-attempt') || '';
-    return ok(c, await new DraftKitCheckoutService(createUserClient(c.get('userToken'))).checkout(c.get('userId'), attemptId));
+    const userDb = createUserClient(c.get('userToken'));
+    const result = await new DraftKitCheckoutService(userDb, undefined, undefined, getSupabaseAdmin()).checkout(c.get('userId'), attemptId);
+    void new AuditService(userDb).log('ADMIN_ACTION', null, { action: 'draft_kit_checkout_attempt' });
+    return ok(c, result);
   }
   catch (error) { return handleError(c, error, 'Could not open checkout'); }
 });

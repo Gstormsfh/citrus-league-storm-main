@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { randomUUID } from 'node:crypto';
 import { AppError } from '../lib/errors';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -42,7 +43,7 @@ export function checkoutReady(c: DraftKitCheckoutConfig, now = Date.now()): bool
 }
 
 export class DraftKitCheckoutService {
-  constructor(private db: SupabaseClient, private config = checkoutConfig(), private stripe?: Stripe) {}
+  constructor(private db: SupabaseClient, private config = checkoutConfig(), private stripe?: Stripe, private admin?: SupabaseClient) {}
   private provider() {
     if (!this.stripe) this.stripe = new Stripe(this.config.secret, { maxNetworkRetries: 2, timeout: 15_000 });
     return this.stripe;
@@ -65,14 +66,32 @@ export class DraftKitCheckoutService {
     const price = await this.provider().prices.retrieve(this.config.priceId);
     if (!price.active || price.type !== 'one_time' || price.currency !== this.config.currency || price.unit_amount !== this.config.amountMinor)
       throw AppError.serviceUnavailable('The Draft Kit price needs review. Nothing has been charged.');
+    if (!this.admin) throw AppError.serviceUnavailable('Checkout attempt storage is unavailable. Nothing has been charged.');
+    const attempt = await this.reserveAttempt(attemptId, userId);
+    if (attempt.checkout_session_id) {
+      const existing = await this.provider().checkout.sessions.retrieve(attempt.checkout_session_id);
+      if (existing.status === 'open' && existing.url && new URL(existing.url).origin === 'https://checkout.stripe.com') return { url: existing.url };
+      await this.admin.rpc('expire_draft_kit_checkout_attempt', { p_attempt: attempt.attempt_id });
+      return this.checkout(userId, randomUUID());
+    }
     const metadata = { product: 'seasonal_draft_kit', user_id: userId, tier: this.config.tier,
       access_until: this.config.accessUntil, updates_until: this.config.updatesUntil, terms_version: this.config.termsVersion };
     const session = await this.provider().checkout.sessions.create({ mode: 'payment', client_reference_id: userId,
       line_items: [{ price: this.config.priceId, quantity: 1 }], metadata, payment_intent_data: { metadata }, automatic_tax: { enabled: this.config.taxMode === 'automatic' },
       success_url: `${this.config.origin}/draft-kit?checkout=complete`, cancel_url: `${this.config.origin}/draft-kit?checkout=cancelled`,
-    }, { idempotencyKey: `draft-kit:${userId}:${this.config.priceId}:${this.config.termsVersion}:${attemptId}` });
+    }, { idempotencyKey: `draft-kit:${userId}:${this.config.priceId}:${this.config.termsVersion}:${attempt.attempt_id}` });
     if (!session.url || new URL(session.url).origin !== 'https://checkout.stripe.com') throw AppError.badGateway('The payment page could not be opened.');
+    const { error: attemptError } = await this.admin.rpc('record_draft_kit_checkout_session', { p_attempt: attempt.attempt_id, p_session: session.id });
+    if (attemptError) throw AppError.serviceUnavailable('The payment page could not be recorded. Nothing has been charged.');
     return { url: session.url };
+  }
+  private async reserveAttempt(attemptId: string, userId: string): Promise<{ attempt_id: string; checkout_session_id: string | null }> {
+    const { data, error } = await this.admin!.rpc('get_or_create_draft_kit_checkout_attempt', {
+      p_attempt: attemptId, p_user: userId, p_price: this.config.priceId, p_terms: this.config.termsVersion,
+    });
+    const attempt = Array.isArray(data) ? data[0] : data;
+    if (error || !attempt || !UUID.test(attempt.attempt_id)) throw AppError.serviceUnavailable('Could not reserve secure checkout. Nothing has been charged.');
+    return attempt;
   }
   async webhook(raw: string, signature: string) {
     let event: Stripe.Event;
