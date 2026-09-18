@@ -782,7 +782,7 @@ export default function PlayerDashboard() {
           `showLink={false}` because the card's "Full dashboard →" link
           points at this page and we are already on it.
           ──────────────────────────────────────────────────────────── */}
-      <div className="mx-auto mb-8 max-w-[1280px] px-4 sm:px-6">
+      <div className="mx-auto mb-8 max-w-[1100px] px-4 sm:px-6">
         <div className="max-w-[380px]">
           <PlayerAdvancedCard playerId={playerId} variant="compact" showLink={false} />
         </div>
@@ -794,10 +794,17 @@ export default function PlayerDashboard() {
       </div>
 
       <section aria-label="Player overview" className="relative px-4 sm:px-6">
-        <PlayerAvailabilityBadge availability={indexEntry?.availability} className="mb-2" />
+        {/* The availability, affiliation and provenance chips sit in the
+            rink's own column. They used to render at the section's left
+            edge, so on a wide desktop "MODEL FORECAST" floated alone at the
+            viewport's edge, 200px left of anything else (desktop QA,
+            2026-09-18). Same 1100px column and radius as the rink below. */}
+        <div className="mx-auto w-full max-w-[1100px]">
+          <PlayerAvailabilityBadge availability={indexEntry?.availability} className="mb-2" />
           <PlayerAffiliationDetails affiliation={indexEntry?.current_affiliation} projectionTeam={indexEntry?.projection_team} />
-        <PlayerAvailabilityDetails playerId={playerId} name={indexEntry?.name ?? ""} context={indexEntry?.canonical_context} availability={indexEntry?.availability} />
-        <ProjectionProvenance context={indexEntry?.canonical_context} isGoalie={!!indexEntry?.is_goalie} />
+          <PlayerAvailabilityDetails playerId={playerId} name={indexEntry?.name ?? ""} context={indexEntry?.canonical_context} availability={indexEntry?.availability} />
+          <ProjectionProvenance context={indexEntry?.canonical_context} isGoalie={!!indexEntry?.is_goalie} />
+        </div>
         {showRink ? (
           <>
             <RinkHeatmap
