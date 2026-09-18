@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { Player } from '@/services/PlayerService';
 import { FreeAgentAddButton } from '../FreeAgentAddButton';
-import { FreeAgentSummaryTable } from '../FreeAgentSummaryTable';
+import { FreeAgentSummaryTable, summaryShortName } from '../FreeAgentSummaryTable';
 
 afterEach(cleanup);
 
@@ -42,16 +42,31 @@ function renderTable(players: Player[], metricHeader = 'Adds', pending: number |
 }
 
 describe('FreeAgentSummaryTable — the two summary cards share one shape', () => {
-  it('renders the fixed five columns with the metric header the caller names', () => {
+  it('renders the fixed four columns with the metric header the caller names, position on the player line', () => {
     renderTable([mkPlayer({ id: '1' })], 'Proj');
     const heads = screen.getAllByRole('columnheader').map((h) => h.textContent);
-    expect(heads).toEqual(['Player', 'Pos', 'Schedule', 'Proj', '']);
+    expect(heads).toEqual(['Player', 'Schedule', 'Proj', '']);
+    const row = screen.getAllByRole('row')[1];
+    expect(within(row).getByTestId('fa-summary-pos').textContent).toBe('C');
+    expect(within(row).getAllByRole('cell')[0]).toHaveTextContent('EDM · C');
+  });
+
+  it('shows the short name in the cell and the full name in the title', () => {
+    renderTable([mkPlayer({ id: '1', full_name: 'Aleksander Barkov' })]);
+    const row = screen.getAllByRole('row')[1];
+    const name = within(row).getByText('A. Barkov');
+    expect(name.getAttribute('title')).toBe('Aleksander Barkov');
+    expect(summaryShortName('Pierre-Luc Dubois')).toBe('P. Dubois');
+    expect(summaryShortName('Juuse Saros')).toBe('J. Saros');
+    expect(summaryShortName('Jean-Gabriel Pageau')).toBe('J. Pageau');
+    expect(summaryShortName('Nils Hoglander')).toBe('N. Hoglander');
+    expect(summaryShortName('Pelé')).toBe('Pelé');
   });
 
   it('orders the schedule chips by date, away as @ and home as vs', () => {
     renderTable([mkPlayer({ id: '1' })]);
     const row = screen.getAllByRole('row')[1];
-    const scheduleCell = within(row).getAllByRole('cell')[2];
+    const scheduleCell = within(row).getAllByRole('cell')[1];
     const chips = within(scheduleCell).getAllByRole('img');
     expect(chips.map((c) => c.getAttribute('alt'))).toEqual(['VAN', 'CGY']);
     expect(within(row).getByText('@')).toBeTruthy();
@@ -88,7 +103,7 @@ describe('FreeAgentSummaryTable — the two summary cards share one shape', () =
 
   it('opens the player from the name', () => {
     const { onOpen } = renderTable([mkPlayer({ id: '1' })]);
-    fireEvent.click(screen.getByText('Player 1'));
+    fireEvent.click(screen.getByText('P. 1'));
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 });
