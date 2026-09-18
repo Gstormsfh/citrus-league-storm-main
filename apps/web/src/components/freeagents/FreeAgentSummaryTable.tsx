@@ -22,6 +22,13 @@ import { FreeAgentAddButton, type FreeAgentAddState } from './FreeAgentAddButton
  *
  * Column widths are fixed so the two tables align row for row: the player
  * cell takes the slack, the rest are pinned.
+ *
+ * WIDTH (2026-09-18, desktop QA). At the desktop width these cards get
+ * (about 430px each, side by side between the two rails) the pinned
+ * columns left the player cell 60px: every name truncated to one letter.
+ * Position now rides on the player's second line ("NYR · LW") instead of
+ * its own column, the schedule and metric columns are as narrow as their
+ * content, and the metric cell never wraps.
  */
 export interface FreeAgentSummaryMetric {
   header: string;
@@ -44,6 +51,17 @@ export interface FreeAgentSummaryTableProps<P extends Player & { games?: NHLGame
 
 const numericId = (id: string | number) => (typeof id === 'string' ? parseInt(id, 10) : id);
 
+/**
+ * "A. Barkov" for the summary cards: the name cell is about 60px wide at
+ * the desktop card width and a full name truncated to one letter there.
+ * The full name stays in the title and on the tap-through.
+ */
+export function summaryShortName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return fullName;
+  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
+}
+
 /** This week's games as opponent chips, in date order. Shared by both cards. */
 export function FreeAgentScheduleChips({ games, team }: { games?: NHLGame[] | null; team?: string | null }) {
   const sorted = (games ?? [])
@@ -56,7 +74,7 @@ export function FreeAgentScheduleChips({ games, team }: { games?: NHLGame[] | nu
         const isHome = game.home_team === team;
         const opponent = isHome ? game.away_team : game.home_team;
         return (
-          <div key={idx} className="flex items-center gap-0.5 bg-white/5 ring-1 ring-white/10 rounded px-1.5 py-0.5">
+          <div key={idx} className="flex items-center gap-0.5 bg-white/5 ring-1 ring-white/10 rounded px-1 py-0.5">
             <span className="text-[10px] text-white/55">{isHome ? 'vs' : '@'}</span>
             <img
               src={`https://assets.nhle.com/logos/nhl/svg/${opponent}_light.svg`}
@@ -77,13 +95,12 @@ export function FreeAgentSummaryTable<P extends Player & { games?: NHLGame[] }>(
   players, metric, positionType, isWatched, addState, pendingPlayerId, onOpen, onToggleWatch, onAdd,
 }: FreeAgentSummaryTableProps<P>) {
   return (
-    <Table className="table-fixed [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums" data-testid="fa-summary-table">
+    <Table className="table-fixed [&_th]:px-1.5 [&_th]:py-2 [&_th]:text-xs [&_td]:px-1.5 [&_td]:py-1.5 [&_td]:tabular-nums" data-testid="fa-summary-table">
       <TableHeader>
         <TableRow>
           <TableHead>Player</TableHead>
-          <TableHead className="w-[56px] text-right whitespace-nowrap">Pos</TableHead>
-          <TableHead className="w-[132px] text-center whitespace-nowrap">Schedule</TableHead>
-          <TableHead className="w-[76px] text-right whitespace-nowrap">{metric.header}</TableHead>
+          <TableHead className="w-[100px] text-center whitespace-nowrap">Schedule</TableHead>
+          <TableHead className="w-[64px] text-right whitespace-nowrap">{metric.header}</TableHead>
           <TableHead className="w-[84px]"></TableHead>
         </TableRow>
       </TableHeader>
@@ -93,28 +110,30 @@ export function FreeAgentSummaryTable<P extends Player & { games?: NHLGame[] }>(
           return (
             <TableRow key={player.id} className="h-[52px]">
               <TableCell className="font-medium">
-                <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
                   <Mug p={mugFromDirectory(player)} size="xs" />
                   <div className="flex flex-col min-w-0">
                     <span
-                      className="hover:underline hover:text-pastel-orange cursor-pointer truncate"
+                      className="hover:underline hover:text-pastel-orange cursor-pointer truncate text-[13px]"
+                      title={player.full_name}
                       onClick={() => onOpen(player)}
                     >
-                      {player.full_name}
+                      {summaryShortName(player.full_name)}
                     </span>
-                    <span className="text-xs text-white/55">{player.team}</span>
+                    <span className="text-xs text-white/55 whitespace-nowrap">
+                      {player.team} · <span data-testid="fa-summary-pos">{playerEligiblePositionsLabel(player, positionType)}</span>
+                    </span>
                   </div>
                 </div>
               </TableCell>
-              <TableCell className="text-right">{playerEligiblePositionsLabel(player, positionType)}</TableCell>
               <TableCell className="text-center"><FreeAgentScheduleChips games={player.games} team={player.team} /></TableCell>
-              <TableCell className="text-right">{metric.render(player)}</TableCell>
+              <TableCell className="text-right whitespace-nowrap">{metric.render(player)}</TableCell>
               <TableCell>
                 <div className="flex items-center justify-end gap-1">
                   <Button
                     size="icon"
                     variant="ghost"
-                    className={`h-9 w-9 ${watched ? 'text-yellow-500' : 'text-white/55'}`}
+                    className={`h-8 w-8 ${watched ? 'text-yellow-500' : 'text-white/55'}`}
                     aria-label={watched ? `Remove ${player.full_name} from watch list` : `Add ${player.full_name} to watch list`}
                     aria-pressed={watched}
                     onClick={() => onToggleWatch(player)}

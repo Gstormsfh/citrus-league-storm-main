@@ -1981,7 +1981,7 @@ const FreeAgents = () => {
                             metric={{ header: 'Proj', render: (player) => (
                               <div className="flex flex-col items-end">
                                 <span className="font-bold text-pastel-sage-soft">{weeklyPointsLabel((player as typeof topProjected[number]).weeklyProjection)}</span>
-                                <span className="text-[11px] text-white/55">{weeklyExposureLabel(player as typeof topProjected[number])}</span>
+                                <span className="text-[10px] text-white/55 whitespace-nowrap">{weeklyExposureLabel(player as typeof topProjected[number], true)}</span>
                               </div>
                             ) }}
                             positionType={leaguePosType}
