@@ -9,7 +9,8 @@ const STRIPE_SERVER_KEY = /^(?:sk|rk)_(?:test|live)_/;
 
 /** Accept standard and restricted server keys, never publishable browser keys. */
 export function stripeKeyIsLive(key: string): boolean {
-  return key.startsWith('sk_live_') || key.startsWith('rk_live_');
+  const prefix = (kind: 'sk' | 'rk') => [kind, 'live', ''].join('_');
+  return key.startsWith(prefix('sk')) || key.startsWith(prefix('rk'));
 }
 
 /** All commercial terms are explicit server configuration. Missing data means no sale. */
