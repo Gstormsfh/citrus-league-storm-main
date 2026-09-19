@@ -207,3 +207,47 @@ Validation for the navigation revision: 20 focused web tests passed, web
 typecheck (`tsc --noEmit -p tsconfig.app.json`) and targeted ESLint passed.
 The preceding source-parser commit `8a7cd9c4` passed all PR CI checks. These
 navigation changes do not constitute a deployed browser acceptance test.
+
+## Opt-in DOM bridge implementation and real reader tests
+
+Added `apps/draft-bridge-extension` as a separate desktop-only development
+preview. No production source flag, checkout flag, native bundle or provider
+account setting was changed. The extension is not published or installed yet.
+
+Real ESPN isolated practice: `300751171`, launched from disposable league
+`609963081`, four teams, 22 rounds, automated opponents. No real league changed.
+
+The same self-contained `captureEspnDraft` function used by the extension was
+run as read-only DOM inspection against the real room:
+
+1. Read all 18 confirmed picks while paused at pick 19. Verified provider player
+   IDs, team IDs, roster slots and every displayed scoring field, including OTL.
+2. Used ESPN's League Manager UI to undo Kyle Connor at pick 18. Initial strict
+   coverage check correctly refused the stale card. Inspection showed ESPN keeps
+   that card with `is-rolled-back` and the displayed text `Rolled back`.
+3. Added the explicit rollback handling and verified 17 picks remained, ending
+   with Tage Thompson at pick 17. Added regression tests from this DOM contract.
+4. Reloaded the practice room. ESPN restored the draft but not the Picks message
+   feed. The reader correctly refused to infer an empty draft from that feed.
+5. Opened Pick History / All Rounds. Its player rows include ESPN headshot IDs,
+   overall picks and fantasy-team names. Added full-ledger recovery and verified
+   all 17 picks, then returned to Players and verified the same full capture.
+6. Resumed the isolated practice. Subsequent reads captured 23 and 78 confirmed
+   picks. The last read returned **88 picks and `finished`**, ending with Igor
+   Shesterkin at pick 88. A screenshot of the completed room was shown in task.
+   No practice draft remains paused.
+
+Automated validation: 40 tests passed across reader, worker message-boundary and
+receiver tests. Included in the existing web CI job. Checks cover incomplete
+history, rollback, duplicate/conflicting identity, changed league/rules, source
+failure, expiry, disconnect, unauthorized origins/frames/tabs, stale snapshots,
+and inert rendering of markup-like names. These are unit tests, not an installed
+extension or customer acceptance result.
+
+**Outstanding:** Chrome's browser-control URL policy blocks extension management.
+The operator was asked to load the generated local preview folder manually.
+Until that happens, actual service-worker injection, permission lifetime and
+extension-to-web message delivery remain unverified. The local receiver is a
+connection review, not the paid Draft Desk. Server-authorized player-ID mapping,
+canonical scoring compatibility, Yahoo, real-league/keeper/auction coverage and
+extension distribution remain release gates. Do not market live Yahoo/ESPN sync.

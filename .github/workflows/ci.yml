@@ -539,6 +539,9 @@ jobs:
         shell: bash
         run: npm run test --workspace=apps/web 2>&1 | tee /tmp/test-web.log
 
+      - name: Test opt-in draft bridge preview
+        run: node --test apps/draft-bridge-extension/*.test.mjs
+
       - name: Report run
         if: always()
         continue-on-error: true
