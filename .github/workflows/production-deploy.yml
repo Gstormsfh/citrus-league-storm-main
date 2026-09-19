@@ -480,6 +480,7 @@ jobs:
             DRAFT_WS_PORT=443
             DRAFT_CANARY_LEAGUE_ID=8c715c23-d3a8-4bd9-86cc-6265083c3e72
             DRAFT_CANARY_USER_ID=39040c29-f860-430a-802e-4ca6e4fa0a7d
+            DRAFT_KIT_CHECKOUT_ENABLED=false
           # ── SECRETS FROM SECRET MANAGER, NOT FROM env_vars ───────────
           # (2026-09-16 outage.) SUPABASE_JWT_SECRET signs every draft
           # token and SCHEDULED_TRIGGER_SECRET gates every cron route. Both
