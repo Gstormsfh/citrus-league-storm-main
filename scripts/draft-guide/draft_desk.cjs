@@ -80,20 +80,22 @@
   }
   function renderComparison() {
     if(!$('compare'))return;
-    const players=compareIds.map(id=>kit.players.find(p=>p.key===id)).filter(Boolean);
+    const players=compareIds.flatMap((id,colorSlot)=>{const p=kit.players.find(p=>p.key===id);return p?[{...p,colorSlot}]:[];});
     const results=filterPlayers(kit.players,new Map(),{search:$('compare-search').value,hide:false,targets:false}).filter(p=>!compareIds.includes(p.key)).slice(0,8);
-    $('compare-results').replaceChildren();$('compare-search').disabled=players.length>=4;
-    if(players.length<4)for(const p of results){
+    $('compare-results').replaceChildren();$('compare-search').disabled=players.length>=10;
+    if(players.length<10)for(const p of results){
       const add=node('button',p.name+' · '+p.team);add.setAttribute('aria-label','Compare '+p.name);
-      add.onclick=()=>{if(compareIds.length>=4||compareIds.includes(p.key))return;compareIds.push(p.key);$('compare-search').value='';renderComparison();$('compare-search').focus();};
+      add.onclick=()=>{if(compareIds.filter(Boolean).length>=10||compareIds.includes(p.key))return;const free=compareIds.indexOf(null);if(free>=0)compareIds[free]=p.key;else compareIds.push(p.key);$('compare-search').value='';renderComparison();$('compare-search').focus();};
       $('compare-results').append(add);
     }
-    $('compare-status').textContent=players.length>=4?'Four players selected. Remove one to add another.':players.length<2?'Choose at least two players.':players.length+' players selected.';
+    $('compare-status').textContent=players.length>=10?'Ten players selected. Remove one to add another.':players.length<2?'Choose at least two players.':players.length+' players selected.';
+    const charts=globalThis.CitrusCompareCharts;
+    if(charts)charts.render($('compare-charts'),{players:players.map(p=>({...p,id:p.key,stats:p.totals})),stats:comparisonRows(players,kit.weights,false).map(s=>({...s,group:['wins','saves','goals_against','shutouts'].includes(s.key)?'goalie':'skater'})),impact:$('compare-impact').checked});
     const wrap=$('compare-table');wrap.replaceChildren();if(!players.length)return;
     const table=node('table'),head=node('thead'),tr=node('tr');tr.append(node('th','Season projections'));
-    for(const p of players){const th=node('th');th.style.minWidth='145px';th.scope='col';
-      th.append(node('div',p.name),node('div',p.team+' / '+p.position+' / #'+p.rank),node('div',state.get(p.key)?.drafted?'Drafted':'Available'));
-      const remove=node('button','Remove');remove.setAttribute('aria-label','Remove '+p.name+' from comparison');remove.onclick=()=>{compareIds=compareIds.filter(id=>id!==p.key);renderComparison();$('compare-search').focus();};th.append(remove);tr.append(th);}
+    for(const p of players){const th=node('th');th.style.minWidth='145px';th.scope='col';if(charts)th.style.borderTop='5px solid '+charts.COLORS[p.colorSlot];
+      th.append(node('div',(p.colorSlot+1)+'. '+p.name),node('div',p.team+' / '+p.position+' / #'+p.rank),node('div',state.get(p.key)?.drafted?'Drafted':'Available'));
+      const remove=node('button','Remove');remove.setAttribute('aria-label','Remove '+p.name+' from comparison');remove.onclick=()=>{compareIds=compareIds.map(id=>id===p.key?null:id);renderComparison();$('compare-search').focus();};th.append(remove);tr.append(th);}
     head.append(tr);table.append(head);const body=node('tbody');
     const facts=[{label:'Projected FPTS',values:players.map(p=>p.points),orange:true},{label:'Games / goalie starts',values:players.map(p=>p.games)},
       {label:'FPTS / game or start',values:players.map(p=>p.games>0?p.points/p.games:null)},...comparisonRows(players,kit.weights,$('compare-impact').checked)];

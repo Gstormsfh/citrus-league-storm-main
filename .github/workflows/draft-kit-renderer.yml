@@ -41,6 +41,10 @@ jobs:
           test_canonical_import test_preseason_horizon test_offline_portraits
           test_photo_rights test_pdf_navigation
           test_editorial_bundle_isolation
+      - name: Offline comparison and delivery contracts
+        run: |
+          node --test scripts/draft-guide/test_compare.cjs scripts/ops/draft-kit-runtime/deploy-contract.test.mjs
+          python -m unittest discover -s scripts/ops/draft-kit-runtime -p 'test_*.py'
       # Private authored editions and licensed photographs are deliberately
       # absent. Full five-format acceptance runs against a separately supplied,
       # immutable private bundle before deployment; CI cannot approve an edition.

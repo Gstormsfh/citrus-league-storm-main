@@ -240,7 +240,7 @@ const supabaseRef = refs[0];
 const dbIsProd = supabaseRef === PRODUCTION_SUPABASE_REF;
 
 // Website-only commercial tools must not ship as dormant native chunks.
-if (/draft-kit\/desk\/league|draft-kit\/checkout\/session|Your draft-kit downloads|THE SIDE-BY-SIDE/.test(blob))
+if (/draft-kit\/desk\/league|draft-kit\/checkout\/session|draft-kit\/external\/|Your draft-kit downloads|THE SIDE-BY-SIDE|relative category area map/.test(blob))
   fail('website-only draft-kit purchase, paid desk or comparison code reached the native bundle.');
 
 // --- 2. The API origin actually reached api/client, not just the bundle ----

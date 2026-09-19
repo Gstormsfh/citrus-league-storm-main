@@ -14,6 +14,7 @@ import { deskScoringDifferences, liveDeskProgress, MAX_DESK_FILE_BYTES, readDesk
   validateDeskProgress, type DeskFile, type DeskPlayer, type DeskProgress, type DeskRow } from './deskConnection';
 
 export interface DeskLiveState {
+  sourceLabel?: 'Yahoo' | 'ESPN';
   status: 'live' | 'catching-up' | 'disconnected' | 'finished' | 'waiting' | 'denied';
   unavailableIds: ReadonlySet<string>;
   sequence: number | null;
@@ -56,6 +57,7 @@ export function DraftDeskPanel({ live, scoring, scoringReady, initialFile, cloud
   live: DeskLiveState; scoring: ScoringSettings; scoringReady: boolean;
   initialFile?: DeskFile; cloud?: { onEdit: (key: string, patch: { note?: string; target?: boolean }) => void; status: string }; onReturnToDraft?: () => void;
 }) {
+  const connectionText = live.sourceLabel && live.status === 'live' ? `${live.sourceLabel} source snapshots (15-second checks)` : statusText[live.status];
   const [file, setFile] = useState<DeskFile | null>(initialFile ?? null), [pendingFile, setPendingFile] = useState<DeskFile | null>(null);
   const [error, setError] = useState(''), [search, setSearch] = useState(''), [position, setPosition] = useState('');
   const [hideTaken, setHideTaken] = useState(true), [onlyTargets, setOnlyTargets] = useState(false);
@@ -164,7 +166,7 @@ export function DraftDeskPanel({ live, scoring, scoringReady, initialFile, cloud
         <h2 className="mt-1 font-barlow text-3xl font-black uppercase lg:text-4xl">Citrus Draft Desk</h2>
       </div>{file && <button aria-expanded={optionsOpen} aria-controls={settingsId} className="min-h-11 rounded-lg border border-white/30 px-3 text-xs font-bold" onClick={() => setOptionsOpen(!optionsOpen)}>Desk options</button>}</div>
       {!mobile && <p className="mt-2 max-w-xl text-sm text-[#d5ded2]">Your custom board, with picks tracked for you. Keep a shortlist and your own notes. Make your picks in the Players tab.</p>}
-      <p role="status" className="mt-3 text-xs font-bold text-[#d5ded2]">{statusText[live.status]}{!mobile && lastUpdate && !unavailable ? <span className="ml-2 font-normal">Last draft update {lastUpdate}</span> : null}</p>
+      <p role="status" className="mt-3 text-xs font-bold text-[#d5ded2]">{connectionText}{!mobile && lastUpdate && !unavailable ? <span className="ml-2 font-normal">Last draft update {lastUpdate}</span> : null}</p>
     </header>
     <div className="citrus-desk-body space-y-3">
       {!cloud && !file && fileInput}
@@ -184,7 +186,7 @@ export function DraftDeskPanel({ live, scoring, scoringReady, initialFile, cloud
         </div>
         {(!scoringReady || differences.length > 0) && <p role="alert" className="rounded-lg border border-[#d78a3a] bg-[#fff1d8] p-3 text-sm">
           {!scoringReady ? 'League scoring has not been verified.' : `This kit differs from the room’s scoring: ${differences.join(', ')}.`} {cloud ? 'Save any pending notes, then reload the room to update your board.' : 'Rankings and FPTS below still use the imported kit. Generate a matching kit to change them.'}</p>}
-        <PlayerCompare key={file.kit.fingerprint} players={deskComparePlayers(file.kit,live.unavailableIds,live.status)} stats={weightedCompareStats(file.kit.weights)} context={`${remaining?'Remaining-season':'Season'} projections · ${file.kit.projectionDate} · ${file.kit.league}. Uses this desk’s scoring and edition.`} availability={statusText[live.status]} />
+        <PlayerCompare key={file.kit.fingerprint} players={deskComparePlayers(file.kit,live.unavailableIds,live.status)} stats={weightedCompareStats(file.kit.weights)} context={`${remaining?'Remaining-season':'Season'} projections · ${file.kit.projectionDate} · ${file.kit.league}. Uses this desk’s scoring and edition.`} availability={connectionText} />
         <details id={settingsId} open={optionsOpen} onToggle={e => setOptionsOpen(e.currentTarget.open)} className="citrus-desk-options rounded-lg border border-[#d4dacf] p-3 text-xs"><summary className="cursor-pointer font-bold">Scoring, edition & backups</summary><div className="mt-3 space-y-3">
         <p>{cloud ? 'Published Citrus projections' : 'Imported kit'} / Projections {file.kit.projectionDate}</p>
         {scoringReady && differences.length === 0 && <p className="text-xs text-[#526759]">{cloud ? 'Scored for your league from published Citrus projections. Picks update live; ranks stay fixed while this desk is open.' : 'Points weights match this room. Ranks and forecasts stay fixed to your imported edition; this is not a live projection or eligibility refresh.'}</p>}
@@ -229,7 +231,7 @@ export function DraftDeskPanel({ live, scoring, scoringReady, initialFile, cloud
       <Dialog.Overlay className="citrus-desk-sheet-overlay z-sheet" />
       <Dialog.Content className="citrus-desk-sheet z-sheet" onOpenAutoFocus={e => { e.preventDefault(); sheetHeading.current?.focus(); }} onCloseAutoFocus={e => { e.preventDefault(); if (returningToDraft.current) { returningToDraft.current = false; return; } const target = selectedTrigger.current; (target?.isConnected ? target : searchInput.current)?.focus({ preventScroll: true }); }}>
         <div className="citrus-desk-sheet-heading"><div><Dialog.Description className="text-xs font-bold uppercase tracking-widest text-[#526759]">Your player notebook</Dialog.Description><Dialog.Title ref={sheetHeading} tabIndex={-1} className="mt-1 font-barlow text-3xl font-bold uppercase text-[#10291f] outline-none">{player?.name}</Dialog.Title></div><Dialog.Close className={`${control} min-h-11 shrink-0 font-bold`}>Done</Dialog.Close></div>
-        <div className="citrus-desk-sheet-body"><p role="status" className="text-xs font-bold text-[#526759]">{statusText[live.status]}</p>{playerDetails}{cloud && <p role="status" className="mt-3 text-xs font-bold">{cloud.status}</p>}</div>
+        <div className="citrus-desk-sheet-body"><p role="status" className="text-xs font-bold text-[#526759]">{connectionText}</p>{playerDetails}{cloud && <p role="status" className="mt-3 text-xs font-bold">{cloud.status}</p>}</div>
         {onReturnToDraft && <div className="citrus-desk-sheet-footer"><button className="min-h-11 w-full rounded-lg bg-[#10291f] px-4 py-3 text-sm font-bold text-[#f8f5ec]" onClick={returnToDraft}>Back to draft · Players</button></div>}
       </Dialog.Content>
     </Dialog.Portal></Dialog.Root>}

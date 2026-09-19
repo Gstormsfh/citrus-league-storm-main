@@ -40,6 +40,7 @@ import { draftKitRoutes } from './routes/draftKit';
 import { draftKitDeskRoutes } from './routes/draftKitDesk';
 import { draftKitPdfRoutes } from './routes/draftKitPdf';
 import { draftKitCheckoutRoutes } from './routes/draftKitCheckout';
+import { draftKitExternalRoutes } from './routes/draftKitExternal';
 import { websiteDraftKit } from './middleware/websiteDraftKit';
 import { demoMatchupRoutes } from './routes/demoMatchup';
 import { poolRoutes } from './routes/pools';
@@ -400,6 +401,7 @@ app.route('/api/draft-kit', draftKitRoutes);
 app.route('/api/draft-kit/desk', draftKitDeskRoutes);
 app.route('/api/draft-kit/pdf', draftKitPdfRoutes);
 app.route('/api/draft-kit/checkout', draftKitCheckoutRoutes);
+app.route('/api/draft-kit/external', draftKitExternalRoutes);
 // Chunk 11g.9 (2026-08-24): guest Matchup payload, ported off the
 // retired `demo-matchup-cache` Edge Function. Public + unauthenticated
 // by design (no authMiddleware on the route), still covered by the

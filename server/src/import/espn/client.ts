@@ -111,7 +111,7 @@ export class EspnClient {
       // Do not re-encode espn_s2: it arrives percent-encoded and ESPN expects it that way.
       headers.Cookie = creds.swid ? `espn_s2=${creds.espnS2}; SWID=${creds.swid}` : `espn_s2=${creds.espnS2}`;
     }
-    const res = await this.fetchImpl(url, { headers, redirect: 'manual' });
+    const res = await this.fetchImpl(url, { headers, redirect: 'manual', signal: AbortSignal.timeout(20_000) });
     let body: unknown = null;
     if (res.status === 200) {
       body = await res.json();

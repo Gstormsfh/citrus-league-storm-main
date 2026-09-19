@@ -10,22 +10,30 @@ const fixture=():ComparePlayer[]=>[
   ...deskComparePlayers(kit,new Set(),'live'),
   {id:'3',name:'Goalie One',team:'AAA',position:'G',goalie:true,games:50,points:510,stats:{saves:1400,goals_against:130,wins:30}},
   {id:'4',name:'Goalie Two',team:'BBB',position:'G',goalie:true,games:50,points:550,stats:{saves:1400,goals_against:110,wins:30}},
+  ...Array.from({length:6},(_,i)=>({id:'extra'+i,name:'Extra Player '+i,team:'ABC',position:'C',goalie:false,games:80,points:100,stats:{goals:10+i,assists:20+i,shots_on_goal:180+i}})),
   {id:'5',name:'Missing Sample',team:'CCC',position:'D',goalie:false,games:0,points:null,stats:{goals:0}},
 ];
 const stats=weightedCompareStats(kit.weights);
 function mount(players=fixture()) {const view=render(<PlayerCompare players={players} stats={stats} context="Test league · season projections"/>);fireEvent.click(screen.getByRole('button',{name:'Compare players'}));return view;}
-function add(name:string){fireEvent.click(screen.getByRole('button',{name:`Compare ${name}`}));}
+function add(name:string){fireEvent.change(screen.getByRole('searchbox'),{target:{value:name}});fireEvent.click(screen.getByRole('button',{name:`Compare ${name}`}));}
 beforeEach(()=>{native.enabled=false;});afterEach(cleanup);
 describe('Citrus player comparison',()=>{
-  it('selects by identity, caps at four, removes and clears without changing the player inputs',()=>{
+  it('selects by identity, caps at ten, removes and clears without changing the player inputs',()=>{
     const players=fixture(),before=JSON.stringify(players);mount(players);
-    for(const p of players.slice(0,4))add(p.name);
+    for(const p of players.slice(0,10))add(p.name);
     expect(screen.getByRole('searchbox')).toBeDisabled();
     expect(screen.queryByRole('button',{name:'Compare Missing Sample'})).toBeNull();
     fireEvent.click(screen.getByRole('button',{name:'Remove Connor McDavid from comparison'}));
     expect(screen.getByRole('searchbox')).not.toBeDisabled();add('Missing Sample');
     fireEvent.click(screen.getByRole('button',{name:'Clear comparison'}));expect(screen.queryByRole('table')).toBeNull();
     expect(JSON.stringify(players)).toBe(before);
+  });
+  it('keeps existing player colours when removing a different player and adding another',()=>{
+    mount();add('Connor McDavid');add('Tim Stützle');
+    const header=()=>screen.getByRole('columnheader',{name:/Tim Stützle/});
+    const before=header().style.borderTop;
+    fireEvent.click(screen.getByRole('button',{name:'Remove Connor McDavid from comparison'}));add('Goalie One');
+    expect(header().style.borderTop).toBe(before);
   });
   it('searches accented names and keeps selection while the search changes',()=>{
     mount();fireEvent.change(screen.getByRole('searchbox'),{target:{value:'stutzle'}});add('Tim Stützle');

@@ -21,9 +21,10 @@ def desk_html(data,weights,league,*,source_root=None):
     encoded=json.dumps(payload,ensure_ascii=True).replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')
     template=(ROOT/'draft_desk.html').read_text()
     script=(ROOT/'draft_desk.cjs').read_text()
+    charts=(ROOT.parents[1]/'packages/shared/src/draftCompare/charts.js').read_text()
     font=base64.b64encode((ASSETS/'BarlowCondensed-Bold.ttf').read_bytes()).decode()
     # Insert untrusted data last so a league name cannot be interpreted as a template token.
-    return template.replace('__DISPLAY_FONT__',font).replace('__DESK_SCRIPT__',script).replace('__KIT_DATA__',encoded).encode()
+    return template.replace('__DISPLAY_FONT__',font).replace('__DESK_SCRIPT__',charts+'\n'+script).replace('__KIT_DATA__',encoded).encode()
 
 if __name__ == '__main__':
     import argparse

@@ -7,8 +7,9 @@ import assert from 'node:assert/strict';
 import {createClient} from '@supabase/supabase-js';
 import Stripe from 'stripe';
 const project='citrus-fantasy-staging';
-const api='https://citrus-api-3azzwszd2q-uc.a.run.app';
 const [phase,folder]=process.argv.slice(2);
+// Delivery acceptance goes through Firebase Hosting, including its timeout.
+const api=phase==='downloads'?'https://citrus-fantasy-staging.web.app':'https://citrus-api-3azzwszd2q-uc.a.run.app';
 assert.ok(folder?.startsWith('/tmp/citrus-'));
 const secret=name=>execFileSync('gcloud',['secrets','versions','access','latest','--secret='+name,'--project='+project],{encoding:'utf8'}).trim();
 const url=secret('SUPABASE_URL');assert.equal(new URL(url).hostname,'jjgspcpvqaiitloglxbb.supabase.co');
@@ -19,8 +20,8 @@ const stripe=new Stripe(stripeKey,{maxNetworkRetries:0});
 const statePath=folder+'/private-state.json';
 const save=(name,data)=>writeFileSync(folder+'/'+name,JSON.stringify(data,null,2),{mode:0o600});
 let state=existsSync(statePath)?JSON.parse(readFileSync(statePath,'utf8')):{};
-async function request(path,user,body,headers={}){
- const result=await fetch(api+path,{method:body===undefined?'GET':'POST',headers:{...headers,...(user?{Authorization:'Bearer '+user.token}:{}),'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(200000)});
+async function request(path,user,body,headers={},origin=api){
+ const result=await fetch(origin+path,{method:body===undefined?'GET':'POST',headers:{...headers,...(user?{Authorization:'Bearer '+user.token}:{}),'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(200000)});
  return {status:result.status,body:await result.json()};
 }
 if(phase==='prepare'){
@@ -52,9 +53,10 @@ if(phase==='prepare'){
  const access=await request('/api/draft-kit/pdf/access',buyer);assert.equal(access.body.data.active,true,JSON.stringify(access));
  const configuration=await request('/api/draft-kit/pdf/configuration',buyer);assert.equal(configuration.status,200);
  const config=configuration.body.data,files=[];
+ assert.equal(config.downloadOrigin,'https://citrus-api-3azzwszd2q-uc.a.run.app');
  const denied=await request('/api/draft-kit/pdf/configuration',nonbuyer);assert.equal(denied.status,403);
  for(const format of ['csv','desk','tracker','cheatsheet','pdf']){
-  const started=Date.now(),result=await request('/api/draft-kit/pdf/download',buyer,{format,league:'Citrus paid staging acceptance',weights:config.weights});
+  const started=Date.now(),result=await request('/api/draft-kit/pdf/download',buyer,{format,league:'Citrus paid staging acceptance',weights:config.weights},{Origin:'https://citrus-fantasy-staging.web.app'},config.downloadOrigin);
   assert.equal(result.status,200,JSON.stringify(result.body));
   const data=result.body.data,bytes=Buffer.from(data.base64,'base64');
   assert.ok(!data.filename.includes('/'));writeFileSync(folder+'/'+data.filename,bytes,{mode:0o600,flag:'wx'});

@@ -2,7 +2,7 @@
 
 ## Scope
 
-Two to four players, side by side in the browser draft room, connected Draft Desk,
+Two to ten players, side by side in the browser draft room, connected Draft Desk,
 unlocked kit board and downloaded offline desk. Existing projections, league
 weights and confirmed draft state remain authoritative. No projection model or
 pick-submission changes. The historical advanced metrics in the kit board are
@@ -11,6 +11,12 @@ dated and explicitly distinguished from projected totals.
 Missing and inapplicable values display as N/A. Negative scoring weights are
 respected. A comparison selection does not draft, queue or target a player.
 Mobile keeps readable columns with horizontal scrolling and sticky stat labels.
+Each selection keeps its own colour slot. Shared browser/offline charts provide
+selectable X/Y stat maps and radar areas, with separate skater/goalie groups.
+Fantasy-impact radar spokes share one FPTS domain, preserving the magnitude of
+league weights. Raw profiles are explicitly relative to the selected players,
+not NHL percentiles. Disabled categories and missing observations are not invented.
+Legend spotlighting has a readable values summary and preserves keyboard focus.
 
 ## Native isolation
 
@@ -26,12 +32,13 @@ not a new release artifact or an App Store approval guarantee.
 
 ## Acceptance evidence
 
-- Web: 414 test files, 5,235 tests passed.
-- Server: 174 test files, 2,688 tests passed; existing skips unchanged.
-- Offline comparison and deployment contract: 5 tests passed.
+- Web: 415 test files, 5,246 tests passed.
+- Server: 177 test files, 2,717 tests passed; existing skips unchanged.
+- Offline comparison and deployment contract: 6 tests passed.
 - Private edition bootstrap: 9 tests passed.
 - Web and server TypeScript checks passed.
-- Phone comparison inspected at 390 CSS pixels with four selections.
+- Phone comparison inspected at 390 CSS pixels with ten selections, including
+  weighted stat maps and radar areas. The harness clearly labels layout-test data.
 - Production freeze preflight: no current draft or draft scheduled within 24 hours.
 
 Stripe sandbox transaction `pi_3UHIVCKzkJQAEbwj20WpIKVh` succeeded for CAD 7.99
@@ -45,6 +52,16 @@ the private canonical edition. Full guide: 109 pages. Checklist: 6 pages.
 Compact sheet: 4 pages. The guide and checklist each have 300 PDF checkboxes.
 The first API PDF render took 42.9 seconds. These checks establish data parity,
 not a new claim about forecast accuracy or independent editorial approval.
+
+A second sandbox purchase exposed the website gateway's roughly 60-second limit:
+four smaller files succeeded, but the full PDF timed out. Download requests now
+use the server-configured, explicitly allowlisted owned API origin, preserving
+JWT and entitlement verification. Website CSP allows only the two named Citrus
+API origins. Arbitrary origin overrides are rejected before sending credentials.
+The repeated five-format acceptance succeeded; the full PDF took 67.992 seconds.
+Receipts: `/tmp/citrus-compare-final-acceptance-20260919`. All 300 identities and
+2,550 raw values matched, and no review-label page remained. A real browser check
+of the updated deployed website's direct-origin download is still required.
 
 Private receipts and credentials are outside the repository. Do not commit them.
 
@@ -60,3 +77,13 @@ all downloads including the revised offline comparison, live Stripe configuratio
 and the deployed browser offer. Then enable checkout in both declarative release
 configurations, through the normal guarded production workflow. Do not bypass the
 draft freeze. A sandbox success alone is not evidence of a live launch.
+
+## External platforms: work in progress, default off
+
+The user explicitly expanded scope to Yahoo/ESPN after initially pausing at Citrus.
+Existing league-history import was not live draft syncing. New read-only provider
+snapshot adapters, authenticated paid routes, scoring translation, and browser
+polling are implemented behind `DRAFT_KIT_YAHOO_SYNC_ENABLED` and
+`DRAFT_KIT_ESPN_SYNC_ENABLED`. Neither switch is enabled in deployment config.
+See `EXTERNAL_DRAFT_SYNC_ACCEPTANCE_2026_09_19.md` for the remaining release gates.
+Do not list either as a supported paid feature based on fixture tests alone.

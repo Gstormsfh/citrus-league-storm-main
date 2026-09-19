@@ -14,7 +14,8 @@
     "./playerPercentiles": "./src/playerPercentiles/index.ts",
     "./leagueProjection": "./src/leagueProjection/index.ts",
     "./playerWriteup/fromIndex": "./src/playerWriteup/fromIndex.ts",
-    "./editorial": "./src/editorial/index.ts"
+    "./editorial": "./src/editorial/index.ts",
+    "./draftCompare/charts.js": "./src/draftCompare/charts.js"
   },
   "scripts": {
     "build": "tsc --noEmit",

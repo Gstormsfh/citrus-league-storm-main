@@ -5,6 +5,7 @@ const api=vi.hoisted(()=>({get:vi.fn(),post:vi.fn()}));
 const platform=vi.hoisted(()=>({isNativePlatform:vi.fn(()=>false)}));
 vi.mock('@capacitor/core',()=>({Capacitor:platform}));
 vi.mock('@/api/client',()=>({apiClient:api}));
+vi.mock('../ExternalDraftCompanion',()=>({default:()=>null}));
 const available={available:true,deliveryReady:true,accessUntil:'2027-07-01',updatesUntil:'2027-06-30',termsUrl:'https://citrusfantasysports.com/terms'};
 beforeEach(()=>{vi.clearAllMocks();platform.isNativePlatform.mockReturnValue(false);window.localStorage.clear();window.history.replaceState({},'','/');});
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});

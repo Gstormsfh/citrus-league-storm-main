@@ -484,6 +484,7 @@ jobs:
             DRAFT_CANARY_USER_ID=39040c29-f860-430a-802e-4ca6e4fa0a7d
             DRAFT_KIT_CHECKOUT_ENABLED=false
             DRAFT_KIT_PDF_READY=true
+            DRAFT_KIT_DOWNLOAD_ORIGIN=https://citrus-api-gb5jc2sd5q-nn.a.run.app
             DRAFT_KIT_BUNDLE_URI=gs://citrus-fantasy-prod-research-evidence/draft-kit/review/20260919/2a12d68a25f0fd45134a9ca457e3c7a8c4ab81d61239f46f2f183a608e234883/delivery-bundle.tar.gz
             DRAFT_KIT_BUNDLE_SHA256=1686e19c9029106d50019dda7d014a1ff7d60d82f811c9cf78203f66ca61fb0f
             DRAFT_KIT_BUNDLE_REVISION=2a12d68a25f0fd45134a9ca457e3c7a8c4ab81d61239f46f2f183a608e234883
