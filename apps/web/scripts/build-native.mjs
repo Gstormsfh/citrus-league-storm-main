@@ -239,6 +239,10 @@ if (refs.length > 1)
 const supabaseRef = refs[0];
 const dbIsProd = supabaseRef === PRODUCTION_SUPABASE_REF;
 
+// Website-only commercial tools must not ship as dormant native chunks.
+if (/draft-kit\/desk\/league|draft-kit\/checkout\/session|Your draft-kit downloads|THE SIDE-BY-SIDE/.test(blob))
+  fail('website-only draft-kit purchase, paid desk or comparison code reached the native bundle.');
+
 // --- 2. The API origin actually reached api/client, not just the bundle ----
 // `blob.includes(apiUrl)` on its own is NOT sufficient: openExternal resolves
 // relative links against the same origin, so that literal sits in the bundle

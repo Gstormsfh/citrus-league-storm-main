@@ -21,11 +21,26 @@
   function connectionFile(kit, progress) {
     return {kind:'citrus-connected-desk',version:1,kit,progress:validateProgress(progress,kit)};
   }
-  if (typeof module !== 'undefined') module.exports={validateProgress,filterPlayers,connectionFile};
+  const compareLabels={goals:'Goals',assists:'Assists',shots_on_goal:'Shots',power_play_points:'Power-play points',short_handed_points:'Short-handed points',hits:'Hits',blocks:'Blocks',penalty_minutes:'Penalty minutes',plus_minus:'Plus/minus',wins:'Wins',saves:'Saves',goals_against:'Goals against',shutouts:'Shutouts'};
+  function comparisonRows(players,weights,impact) {
+    const finite=v=>typeof v==='number'&&Number.isFinite(v);
+    return Object.entries(compareLabels).flatMap(([key,label])=>{
+      const group=['wins','saves','goals_against','shutouts'].includes(key)?'goalie':'skater';
+      if(!players.some(p=>(p.goalie?'goalie':'skater')===group))return [];
+      const weight=weights[group]?.[key]??0;
+      const values=players.map(p=>(p.goalie?'goalie':'skater')===group&&finite(p.totals[key])?p.totals[key]:null);
+      const contributions=values.map(v=>v===null?null:v*weight);
+      const comparable=contributions.filter(finite);
+      const best=comparable.length>1&&new Set(comparable).size>1?Math.max(...comparable):null;
+      return [{key,label,weight,values:impact?contributions:values,edges:contributions.map(v=>best!==null&&v===best)}];
+    });
+  }
+  if (typeof module !== 'undefined') module.exports={validateProgress,filterPlayers,connectionFile,comparisonRows};
   if (typeof document === 'undefined') return;
   const kit=JSON.parse(document.getElementById('kit-data').textContent), $=id=>document.getElementById(id);
   const storeKey='citrus-draft-desk:'+kit.fingerprint;
   let state=new Map(),last=null,selected=null,storageAvailable=true;
+  let compareIds=[];
   const labels={goals:'G',assists:'A',shots_on_goal:'SOG',power_play_points:'PPP',short_handed_points:'SHP',hits:'HIT',blocks:'BLK',penalty_minutes:'PIM',plus_minus:'+/-',wins:'W',saves:'SV',goals_against:'GA',shutouts:'SO'};
   const number=n=>n==null?'N/A':Number(n).toLocaleString('en-CA',{maximumFractionDigits:1});
   const empty=key=>({key,drafted:false,target:false,note:''});
@@ -44,6 +59,7 @@
   }
   function node(tag,text,cls){const n=document.createElement(tag);if(text!=null)n.textContent=text;if(cls)n.className=cls;return n;}
   function render() {
+    renderComparison();
     const visible=filterPlayers(kit.players,state,{search:$('search').value,position:$('position').value,hide:$('hide').checked,targets:$('targets-only').checked});
     $('rows').replaceChildren();
     for(const p of visible){
@@ -61,6 +77,30 @@
     $('drafted').textContent=drafted;$('remaining').textContent=kit.players.length-drafted;
     $('targets').textContent=[...state.values()].filter(p=>p.target&&!p.drafted).length;
     if(storageAvailable)status(visible.length+' players shown. Original ranks stay fixed as picks are marked.');
+  }
+  function renderComparison() {
+    if(!$('compare'))return;
+    const players=compareIds.map(id=>kit.players.find(p=>p.key===id)).filter(Boolean);
+    const results=filterPlayers(kit.players,new Map(),{search:$('compare-search').value,hide:false,targets:false}).filter(p=>!compareIds.includes(p.key)).slice(0,8);
+    $('compare-results').replaceChildren();$('compare-search').disabled=players.length>=4;
+    if(players.length<4)for(const p of results){
+      const add=node('button',p.name+' · '+p.team);add.setAttribute('aria-label','Compare '+p.name);
+      add.onclick=()=>{if(compareIds.length>=4||compareIds.includes(p.key))return;compareIds.push(p.key);$('compare-search').value='';renderComparison();$('compare-search').focus();};
+      $('compare-results').append(add);
+    }
+    $('compare-status').textContent=players.length>=4?'Four players selected. Remove one to add another.':players.length<2?'Choose at least two players.':players.length+' players selected.';
+    const wrap=$('compare-table');wrap.replaceChildren();if(!players.length)return;
+    const table=node('table'),head=node('thead'),tr=node('tr');tr.append(node('th','Season projections'));
+    for(const p of players){const th=node('th');th.style.minWidth='145px';th.scope='col';
+      th.append(node('div',p.name),node('div',p.team+' / '+p.position+' / #'+p.rank),node('div',state.get(p.key)?.drafted?'Drafted':'Available'));
+      const remove=node('button','Remove');remove.setAttribute('aria-label','Remove '+p.name+' from comparison');remove.onclick=()=>{compareIds=compareIds.filter(id=>id!==p.key);renderComparison();$('compare-search').focus();};th.append(remove);tr.append(th);}
+    head.append(tr);table.append(head);const body=node('tbody');
+    const facts=[{label:'Projected FPTS',values:players.map(p=>p.points),orange:true},{label:'Games / goalie starts',values:players.map(p=>p.games)},
+      {label:'FPTS / game or start',values:players.map(p=>p.games>0?p.points/p.games:null)},...comparisonRows(players,kit.weights,$('compare-impact').checked)];
+    for(const row of facts){const tr=node('tr'),th=node('th',row.label+(row.weight!==undefined?' ('+row.weight+' FPTS each)':''));th.scope='row';th.style.minWidth='140px';tr.append(th);
+      row.values.forEach((v,i)=>{const td=node('td',number(v));if(row.orange){td.style.background='#ffead7';td.style.color='#a83c00';td.style.fontSize='23px';td.style.fontWeight='800';}
+        if(row.edges?.[i]){td.style.background='#e0e9d8';td.append(node('span','Scoring edge','sub'));}tr.append(td);});body.append(tr);}
+    table.append(body);wrap.append(table);
   }
   function showDetails(p) {
     const panel=$('detail');panel.replaceChildren(node('h2',p.name.toUpperCase()),node('p','#'+p.rank+' / '+p.team+' / '+p.position+' / '+number(p.points)+' FPTS'));
@@ -94,5 +134,10 @@
     }catch(e){status(e.message||'Could not restore progress. Current picks are unchanged.',true);}finally{$('restore-file').value='';}
   };
   $('undo').onclick=()=>{if(!last)return;state=new Map(validateProgress(JSON.parse(last),kit).rows.map(r=>[r.key,r]));last=null;$('undo').disabled=true;save();render();if(selected)showDetails(kit.players.find(p=>p.key===selected));};
-  $('print').onclick=()=>window.print();render();
+  $('print').onclick=()=>window.print();
+  if($('compare')){
+    $('compare-search').oninput=renderComparison;$('compare-impact').onchange=renderComparison;
+    $('compare-clear').onclick=()=>{compareIds=[];renderComparison();};
+  }
+  render();
 })();

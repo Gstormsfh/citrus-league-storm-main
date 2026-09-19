@@ -2,6 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { universalLinkToPath, routeUniversalLink, resetUniversalLinkState } from '../UniversalLinkDeepLink';
 
 describe('universalLinkToPath', () => {
+  it('never routes website-only kit, checkout or download links into the app', () => {
+    for (const path of ['/draft-kit','/draft-kit?checkout=success','/draft-kit/buy','/draft-kit/download'])
+      expect(universalLinkToPath(`https://citrusfantasysports.com${path}`)).toBeNull();
+    expect(universalLinkToPath('https://citrusfantasysports.com/draft/123')).toBe('/draft/123');
+  });
   it('routes invite links into the SPA with their query intact', () => {
     expect(universalLinkToPath('https://citrusfantasysports.com/create-league?tab=join&code=ABCD')).toBe('/create-league?tab=join&code=ABCD');
     // The invite link the app actually shares (utils/inviteShare.buildInviteLink).

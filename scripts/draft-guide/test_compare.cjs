@@ -1,0 +1,31 @@
+const test=require('node:test');const assert=require('node:assert/strict');
+const {comparisonRows}=require('./draft_desk.cjs');
+const {readFileSync}=require('node:fs');const {JSDOM}=require('jsdom');
+test('offline comparison retains raw totals, respects negative weights and never conflates goalie/skater categories',()=>{
+ const players=[{goalie:true,totals:{goals_against:100,saves:1500}},{goalie:true,totals:{goals_against:120,saves:1500}},{goalie:false,totals:{goals:0}}];
+ const weights={goalie:{goals_against:-3,saves:.5},skater:{goals:6}};
+ const raw=comparisonRows(players,weights,false),impact=comparisonRows(players,weights,true);
+ assert.deepEqual(raw.find(r=>r.key==='goals_against').values,[100,120,null]);
+ assert.deepEqual(impact.find(r=>r.key==='goals_against').values,[-300,-360,null]);
+ assert.deepEqual(impact.find(r=>r.key==='goals_against').edges,[true,false,false]);
+ assert.deepEqual(impact.find(r=>r.key==='saves').edges,[false,false,false]);
+ assert.deepEqual(raw.find(r=>r.key==='goals').values,[null,null,0]);
+ assert.deepEqual(impact.find(r=>r.key==='hits').values,[null,null,null]);
+});
+test('offline compare controls enforce four players, follow manual pick state and never alter progress',()=>{
+ const kit={fingerprint:'test',revision:'test',league:'Test',projectionDate:'2026-09-19',weights:{skater:{goals:2},goalie:{}},players:Array.from({length:5},(_,i)=>({key:'canonical:'+(i+1),name:'Test Player '+i,team:'ABC',position:'C',rank:i+1,points:20,games:10,goalie:false,totals:{goals:10}}))};
+ const template=readFileSync(__dirname+'/draft_desk.html','utf8').replace('__KIT_DATA__',JSON.stringify(kit)).replace('__DESK_SCRIPT__','');
+ const dom=new JSDOM(template,{url:'https://offline.example',runScripts:'outside-only'}),w=dom.window;
+ w.eval(readFileSync(__dirname+'/draft_desk.cjs','utf8'));
+ const click=label=>w.document.querySelector('[aria-label="'+label+'"]').click();
+ for(let i=0;i<4;i++)click('Compare Test Player '+i);
+ assert.equal(w.document.querySelector('#compare-search').disabled,true);
+ assert.match(w.document.querySelector('#compare-status').textContent,/Four players/);
+ assert.equal(w.localStorage.length,0);
+ click('Remove Test Player 1 from comparison');click('Compare Test Player 4');
+ assert.equal(w.document.querySelectorAll('#compare-table thead th').length,5);
+ click('Drafted: Test Player 0');assert.match(w.document.querySelector('#compare-table').textContent,/Drafted/);
+ w.document.querySelector('#compare-clear').click();assert.equal(w.document.querySelectorAll('#compare-table table').length,0);
+ assert.equal(JSON.parse(w.localStorage.getItem('citrus-draft-desk:test')).rows[0].drafted,true);
+ w.close();
+});

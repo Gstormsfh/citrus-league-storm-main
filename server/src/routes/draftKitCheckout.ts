@@ -7,15 +7,23 @@ import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { handleError, ok } from '../lib/responses';
 import { DraftKitCheckoutService, checkoutConfig, checkoutReady } from '../services/DraftKitCheckoutService';
+import { DraftKitExportService } from '../services/DraftKitExportService';
 
 export const draftKitCheckoutRoutes = new Hono<Env>();
-draftKitCheckoutRoutes.get('/offer', (c) => {
-  const config = checkoutConfig(); const available = checkoutReady(config);
+draftKitCheckoutRoutes.get('/offer', async (c) => {
+  const config = checkoutConfig(); let available = checkoutReady(config);
+  if (available) {
+    try { await new DraftKitExportService().configuration(); }
+    catch { available = false; }
+  }
+  c.header('Cache-Control', 'no-store');
   return ok(c, { available, currency: available ? config.currency.toUpperCase() : null, amountMinor: available ? config.amountMinor : null,
     accessUntil: available ? config.accessUntil : null, updatesUntil: available ? config.updatesUntil : null, termsUrl: available ? config.termsUrl : null });
 });
 draftKitCheckoutRoutes.post('/session', authMiddleware, strictRateLimit, async (c) => {
   try {
+    // A flag or stale browser page alone must never sell an undeliverable kit.
+    await new DraftKitExportService().configuration();
     const attemptId = c.req.header('x-checkout-attempt') || '';
     const userDb = createUserClient(c.get('userToken'));
     const result = await new DraftKitCheckoutService(userDb, undefined, undefined, getSupabaseAdmin()).checkout(c.get('userId'), attemptId);

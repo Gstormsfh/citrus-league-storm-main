@@ -22,13 +22,11 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 describe('Purchased desk inside Citrus', () => {
-  it('shows no purchase messaging or external checkout link in a native app', async () => {
-    native.enabled=true;api.get.mockResolvedValue({data:{owned:false}});
-    const back=vi.fn();render(<ConnectedDraftDesk {...props} onReturnToDraft={back} />);
-    expect(await screen.findByText('Draft Desk is not available for this account.')).toBeInTheDocument();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    expect(screen.queryByText(/purchase|buy|price|\$7.99/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button',{name:'Back to draft'}));expect(back).toHaveBeenCalledOnce();
+  it.each([true,false])('never requests or unlocks a kit in native, even for an owner: %s', async owned => {
+    native.enabled=true;api.get.mockResolvedValue(owned?reply():{data:{owned:false}});
+    const {container}=render(<ConnectedDraftDesk {...props} />);
+    expect(container).toBeEmptyDOMElement();
+    expect(api.get).not.toHaveBeenCalled();
   });
   it('shows failed-refresh health without losing the last published board or back navigation', async () => {
     const response = reply();

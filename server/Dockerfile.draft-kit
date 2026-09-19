@@ -18,7 +18,8 @@ COPY --from=deps /app/package.json ./
 COPY server/ ./server/
 COPY packages/shared/ ./packages/shared/
 COPY scripts/draft-guide/ ./scripts/draft-guide/
+COPY scripts/ops/draft-kit-runtime/bootstrap.py ./scripts/ops/draft-kit-runtime/bootstrap.py
 ENV NODE_ENV=production PORT=8080
 ENV DRAFT_KIT_PYTHON=/opt/pdf/bin/python3 CITRUS_TSX=/app/node_modules/.bin/tsx CITRUS_DRAFT_KIT_OFFLINE_ASSETS=true
 EXPOSE 8080
-CMD ["node_modules/.bin/tsx", "server/src/index.ts"]
+CMD ["/opt/pdf/bin/python3", "scripts/ops/draft-kit-runtime/bootstrap.py"]

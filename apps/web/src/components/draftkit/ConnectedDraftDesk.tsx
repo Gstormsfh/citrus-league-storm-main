@@ -5,6 +5,9 @@ import './connectedDesk.css';
 import type { ScoringSettings } from '@citrus/shared';
 import { useAuth } from '@/contexts/AuthContext';
 import { PurchasedDraftDesk } from './PurchasedDraftDesk';
+import { isNativeShell } from '@/lib/nativeAuth';
+import { PlayerCompare } from './PlayerCompare';
+import { deskComparePlayers, weightedCompareStats } from './compareAdapters';
 import { useDerivedDraftState, useDraftConnectionState, useDraftLastFoldGaps } from '@/stores/draftClientStore';
 import { toDraftedPlayerIds } from '@/lib/draftClient/v1Adapters';
 import { deskScoringDifferences, liveDeskProgress, MAX_DESK_FILE_BYTES, readDeskFile,
@@ -28,9 +31,13 @@ const playerStats = (p: DeskPlayer) => p.goalie ? goalieStats :
   p.totals.plus_minus !== undefined ? [...skaterStats, ['plus_minus', '+/−', 'Plus/minus']] : skaterStats;
 
 /** Same authenticated room subscription, no second socket, pick mutation or scoring engine. */
-export function ConnectedDraftDesk({ leagueId, scoring, scoringReady, onReady, onReturnToDraft }: {
+export function ConnectedDraftDesk(props: {
   leagueId: string; scoring: ScoringSettings; scoringReady: boolean; onReady?: (leagueId: string | null) => void; onReturnToDraft?: () => void;
 }) {
+  if (import.meta.env.VITE_NATIVE === '1' || isNativeShell()) return null;
+  return <BrowserConnectedDraftDesk {...props} />;
+}
+function BrowserConnectedDraftDesk({leagueId,scoring,scoringReady,onReady,onReturnToDraft}:Parameters<typeof ConnectedDraftDesk>[0]) {
   const { user } = useAuth();
   const derived = useDerivedDraftState(), connection = useDraftConnectionState(), gaps = useDraftLastFoldGaps();
   const ids = useMemo(() => new Set(derived ? toDraftedPlayerIds(derived) : []), [derived]);
@@ -177,6 +184,7 @@ export function DraftDeskPanel({ live, scoring, scoringReady, initialFile, cloud
         </div>
         {(!scoringReady || differences.length > 0) && <p role="alert" className="rounded-lg border border-[#d78a3a] bg-[#fff1d8] p-3 text-sm">
           {!scoringReady ? 'League scoring has not been verified.' : `This kit differs from the room’s scoring: ${differences.join(', ')}.`} {cloud ? 'Save any pending notes, then reload the room to update your board.' : 'Rankings and FPTS below still use the imported kit. Generate a matching kit to change them.'}</p>}
+        <PlayerCompare key={file.kit.fingerprint} players={deskComparePlayers(file.kit,live.unavailableIds,live.status)} stats={weightedCompareStats(file.kit.weights)} context={`${remaining?'Remaining-season':'Season'} projections · ${file.kit.projectionDate} · ${file.kit.league}. Uses this desk’s scoring and edition.`} availability={statusText[live.status]} />
         <details id={settingsId} open={optionsOpen} onToggle={e => setOptionsOpen(e.currentTarget.open)} className="citrus-desk-options rounded-lg border border-[#d4dacf] p-3 text-xs"><summary className="cursor-pointer font-bold">Scoring, edition & backups</summary><div className="mt-3 space-y-3">
         <p>{cloud ? 'Published Citrus projections' : 'Imported kit'} / Projections {file.kit.projectionDate}</p>
         {scoringReady && differences.length === 0 && <p className="text-xs text-[#526759]">{cloud ? 'Scored for your league from published Citrus projections. Picks update live; ranks stay fixed while this desk is open.' : 'Points weights match this room. Ranks and forecasts stay fixed to your imported edition; this is not a live projection or eligibility refresh.'}</p>}
