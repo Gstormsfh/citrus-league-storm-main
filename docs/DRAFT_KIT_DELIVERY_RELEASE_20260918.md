@@ -56,6 +56,13 @@ copies allowlisted inputs without rebinding editorial claims or approving rights
 - Web TypeScript check, web build and native build passed; lint had no errors
   (existing warnings remain). The native output contains neither the download
   panel nor its purchase strings/API paths.
+- Linux amd64 renderer acceptance passed with no network, a read-only root and
+  source bundle, non-root execution, two CPUs and 2 GiB memory. All five formats
+  generated; full PDF completed in about 45 seconds. Independent parity also
+  passed inside that container. This was renderer acceptance, not an authenticated
+  live API test or a production image switch.
+- A dedicated CI workflow now covers public source/horizon/portrait/PDF contracts;
+  it does not require or publish the private editorial/photo corpus.
 
 ## Deployment remains gated
 
