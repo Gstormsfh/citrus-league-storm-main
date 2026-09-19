@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { apiClient } from '@/api/client';
 import { readSettings,scoringProblem,SETTINGS_KEY } from './savedSettings';
+import { purchaseDate } from './purchaseDates';
 
 type Offer = { available:boolean; deliveryReady:boolean; accessUntil:string|null; updatesUntil:string|null; termsUrl:string|null };
 type Access = { active:boolean; accessUntil:string|null };
@@ -91,13 +92,13 @@ function WebDraftKitDownloads() {
     {offer && !offer.available && !access?.active && <p className="mt-2 text-sm text-white/70">Purchases are not open yet. No payment is collected.</p>}
     {offer?.available && !access?.active && <>
       <p className="mt-2 text-sm">$7.99 CAD, one-time purchase. Applicable taxes are shown at checkout. No automatic renewal.</p>
-      <p className="mt-2 text-sm text-white/70">Revised editions through {offer.updatesUntil?.slice(0,10)}. Re-downloads through {offer.accessUntil?.slice(0,10)}.</p>
+      <p className="mt-2 text-sm text-white/70">Revised editions through {purchaseDate(offer.updatesUntil)}. Re-downloads through {purchaseDate(offer.accessUntil)}.</p>
       {offer.termsUrl && <a className="mt-2 inline-block underline" href={offer.termsUrl}>Read the purchase terms</a>}
       {needsLogin?<a href="/auth?redirect=%2Fdraft-kit%3Ftab%3Dpricing" className="mt-4 inline-block rounded-lg bg-[#f8f5ec] px-5 py-3 font-bold text-[#10291f]">Sign in or create an account</a>:<button type="button" disabled={busy} onClick={()=>void checkout()} className="mt-4 block rounded-lg bg-[#ff6b1a] px-5 py-3 font-bold text-[#10291f] disabled:opacity-50">Buy the kit for $7.99 CAD</button>}
     </>}
     {access?.active && config && <>
       <div className="mt-4 rounded-lg bg-[#f8f5ec] p-4 text-[#10291f]"><strong>Drafting on Citrus? You’re ready.</strong><p className="mt-1 text-sm">Open your league’s draft room. Your purchased kit appears in Draft Desk automatically, with your league’s scoring. No download or upload needed.</p></div>
-      <p className="mt-2 text-sm text-white/70">Access through {access.accessUntil?.slice(0,10)}. Download edition projection date: {config.projectionDate}.</p>
+      <p className="mt-2 text-sm text-white/70">Access through {purchaseDate(access.accessUntil)}. Download edition projection date: {config.projectionDate}.</p>
       <p className="mt-3 text-sm text-white/75">Enter your league's points per stat, not its category totals. A negative weight deducts points. Set every goalie weight to zero for a skater-only board.</p>
       <label className="mt-5 block text-sm font-bold">League name<input value={league} maxLength={64} disabled={busy} onChange={e=>setLeague(e.target.value)} className="mt-2 block w-full rounded border border-white/25 bg-[#10291f] p-3" /></label>
       <div className="mt-5 grid gap-6 sm:grid-cols-2">{Object.entries(weights).map(([group,values])=><fieldset key={group} disabled={busy}><legend className="mb-3 font-bold">{group==='skater'?'Skaters':'Goalies'}</legend>{Object.entries(values).map(([key,value])=><label key={key} className="mb-2 flex items-center justify-between gap-4 text-sm">{labels[key]??key}<input aria-label={`${group} ${labels[key]??key}`} type="number" step="any" min="-10000" max="10000" value={value} onChange={e=>setWeights(old=>({...old,[group]:{...old[group],[key]:e.target.value}}))} className="w-24 rounded border border-white/25 bg-[#10291f] p-2" /></label>)}</fieldset>)}</div>
