@@ -37,6 +37,12 @@ def effective_exposure(player):
     return player['exposure']['used']
 
 
+def runtime_document(document):
+    """PostgreSQL serialization alone does not imply a remaining-season horizon."""
+    return (any(key in document for key in ('refresh_kind','refresh_at','source_revision','daily_context'))
+            or any('remaining' in p for p in document['players']))
+
+
 def validate(document, revision, *, revision_preimage=None):
     if document.get('schema_version') != VERSION:
         raise ValueError('Unsupported canonical schema')
@@ -53,6 +59,10 @@ def validate(document, revision, *, revision_preimage=None):
         raise ValueError('Unsupported canonical revision algorithm')
     if not revision or document.get('revision') != revision or not valid:
         raise ValueError('Canonical revision mismatch')
+    runtime=runtime_document(document)
+    if runtime and (algorithm!='sha256_postgres_jsonb_v1'
+                    or not document.get('source_revision') or not document.get('refresh_at')):
+        raise ValueError('Runtime requires PostgreSQL provenance, source revision and refresh timestamp')
     players = {}
     for p in document['players']:
         pid = p['player_id']
@@ -81,7 +91,7 @@ def validate(document, revision, *, revision_preimage=None):
                 raise ValueError(f'{pid}: invalid remaining schedule')
             if used is not None and used > remaining['team_games']:
                 raise ValueError(f'{pid}: exposure exceeds remaining schedule')
-        elif algorithm == 'sha256_postgres_jsonb_v1' and p['status'] == 'projected':
+        elif runtime and p['status'] == 'projected':
             raise ValueError(f'{pid}: runtime projected player lacks remaining horizon')
         probability = exposure.get('roster_probability')
         if probability is not None and not 0 <= finite(probability, 'probability') <= 1:
@@ -113,6 +123,7 @@ def convert(document, editorial, revision, *, source_name='canonical.json', revi
     """No fuzzy identities, exposure guessing, probability scaling, or publication."""
     canonical = validate(document, revision, revision_preimage=revision_preimage)
     result = deepcopy(editorial)
+    result.pop('edition',None)
     # Previous rank/score caches and editorial lineups are not canonical forecasts.
     previous = {p['name']: p for p in editorial['players']}
     result['players'] = []
@@ -134,6 +145,7 @@ def convert(document, editorial, revision, *, source_name='canonical.json', revi
             'exposureSemantics': exposure['probability_semantics'],
             'canonicalExposure': deepcopy(exposure), 'canonicalRates': deepcopy(p['rates']),
             'canonicalRemaining': deepcopy(p.get('remaining')),
+            'canonicalAvailabilityScenario': deepcopy(p.get('availability_scenario')),
             'canonicalCounts': deepcopy(p['counts']), 'canonicalRole': deepcopy(p['role']),
             'canonicalSources': deepcopy(p['sources']), 'canonicalIssues': deepcopy(p.get('issues', [])),
             'ratePolicy': p['rate_policy'], 'exposurePolicy': p['exposure_policy'],
@@ -186,7 +198,9 @@ def convert(document, editorial, revision, *, source_name='canonical.json', revi
         'inputSha256': deepcopy(document['input_sha256']),
     }
     result['canonicalRevision'] = revision
-    if document.get('revision_algorithm') == 'sha256_postgres_jsonb_v1':
+    if document.get('revision_algorithm'):
+        result['source']['revisionAlgorithm']=document['revision_algorithm']
+    if runtime_document(document):
         if not document.get('source_revision') or not document.get('refresh_at'):
             raise ValueError('Runtime requires source revision and refresh timestamp')
         dates = {p['remaining']['as_of'] for p in document['players'] if 'remaining' in p}

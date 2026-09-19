@@ -10,6 +10,8 @@ apps/web/dist/
 .env
 .env.local
 .env.*.local
+**/.env
+**/.env.*
 
 # Frontend source (not needed for API server — only package.json for workspace)
 apps/web/src/
@@ -38,6 +40,13 @@ supabase/.temp/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Private numerical/editorial release artifacts must never enter API build context.
+output/
+designs/
+.worktrees/
+scripts/draft-guide/review-inputs/
+scripts/draft-guide/assets/headshots/
 
 # Tests
 coverage/
