@@ -75,6 +75,15 @@ export class DraftKitCheckoutService {
     if (attempt.checkout_session_id) {
       const existing = await this.provider().checkout.sessions.retrieve(attempt.checkout_session_id);
       if (existing.status === 'open' && existing.url && new URL(existing.url).origin === 'https://checkout.stripe.com') return { url: existing.url };
+      // Stripe can complete a payment just before its webhook arrives. Re-read
+      // and fulfil the provider state here rather than expiring it and risking
+      // a second payable session during that narrow delivery window.
+      if (existing.status === 'complete') {
+        if (existing.payment_status === 'paid') await this.fulfill(existing.id);
+        throw AppError.conflict(existing.payment_status === 'paid'
+          ? 'You already own this edition.'
+          : 'Your payment is still processing. Please check back shortly.');
+      }
       await this.admin.rpc('expire_draft_kit_checkout_attempt', { p_attempt: attempt.attempt_id });
       return this.checkout(userId, randomUUID());
     }

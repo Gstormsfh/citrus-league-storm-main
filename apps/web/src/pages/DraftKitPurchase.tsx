@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '@/api/client';
 
 type Offer = { available: boolean; currency: string | null; amountMinor: number | null; accessUntil: string | null; termsUrl: string | null };
-const PRICE = '$7.99 CAD';
+const PRICE = 'CA$7.99 + applicable tax';
 
 /** Public website page. Server readiness, not this UI, is the authority to sell. */
 export default function DraftKitPurchase() {
@@ -28,9 +28,9 @@ export default function DraftKitPurchase() {
     <div className="mx-auto max-w-2xl rounded-2xl border border-white/15 bg-white/5 p-6 sm:p-10">
       <p className="text-xs font-bold uppercase tracking-[.2em] text-[#ff9b61]">Season-long fantasy hockey</p>
       <h1 className="mt-4 text-4xl font-black">Citrus Draft Kit</h1>
-      <p className="mt-4 text-lg text-white/80">A browser-based Draft Kit for supported points leagues: rankings and premium Draft Kit access for your Citrus account.</p>
+      <p className="mt-4 text-lg text-white/80">A browser-based seasonal Draft Kit for supported points leagues, with rankings and the released downloads for your Citrus account.</p>
       <div className="mt-7 flex items-end justify-between border-y border-white/15 py-5"><span>One-time seasonal access</span><strong className="text-3xl">{PRICE}</strong></div>
-      <p className="mt-5 text-sm text-white/70">Free season-long fantasy remains free. This purchase does not start a subscription and does not include unimplemented downloads or third-party league connections.</p>
+      <p className="mt-5 text-sm text-white/70">Free season-long fantasy remains free. This is a one-time purchase, not a subscription. Purchases remain unavailable until the current delivered edition is ready.</p>
       {offer?.available && offer.termsUrl ? <a className="mt-5 inline-block underline" href={offer.termsUrl}>Read purchase terms</a> : null}
       <p role="status" className="mt-5 text-sm text-white/75">{message}</p>
       {offer?.available ? <button type="button" onClick={() => void beginCheckout()} disabled={busy} className="mt-5 rounded-lg bg-[#ff6b1a] px-5 py-3 font-bold text-[#10291f] disabled:opacity-50">{busy ? 'Opening secure checkout…' : `Buy for ${PRICE}`}</button> : null}

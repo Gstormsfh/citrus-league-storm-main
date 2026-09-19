@@ -46,6 +46,21 @@ describe('Draft Kit website checkout readiness', () => {
     expect(provider.checkout.sessions.create).toHaveBeenCalledWith(expect.objectContaining({ client_reference_id: USER, line_items: [{ price: config.priceId, quantity: 1 }], mode: 'payment' }), expect.any(Object));
     expect(provider.checkout.sessions.create.mock.calls[0][1].idempotencyKey).toContain('22222222-2222-4222-8222-222222222222');
   });
+  it('fulfils a completed session instead of creating a second payable checkout before webhook delivery', async () => {
+    const db = database();
+    db.rpc.mockResolvedValueOnce({ data: [{ attempt_id: '22222222-2222-4222-8222-222222222222', checkout_session_id: 'cs_completed' }], error: null })
+      .mockResolvedValue({ error: null });
+    const provider = {
+      prices: { retrieve: vi.fn().mockResolvedValue({ active: true, type: 'one_time', currency: 'cad', unit_amount: 799 }) },
+      checkout: { sessions: { create: vi.fn(), retrieve: vi.fn()
+        .mockResolvedValueOnce({ id: 'cs_completed', status: 'complete', payment_status: 'paid' })
+        .mockResolvedValueOnce(paidSession()) } },
+    };
+    await expect(new DraftKitCheckoutService(db as any, config, provider as any, db as any)
+      .checkout(USER, '22222222-2222-4222-8222-222222222222')).rejects.toMatchObject({ status: 409 });
+    expect(provider.checkout.sessions.create).not.toHaveBeenCalled();
+    expect(db.rpc).toHaveBeenCalledWith('fulfill_draft_kit_checkout', expect.objectContaining({ p_session: 'cs_test_kit' }));
+  });
   it('uses the verified provider state for fulfilment retries and refund revocation', async () => {
     const db = database(); const event = { livemode: false, type: 'checkout.session.completed', data: { object: { id: 'cs_test_kit' } } };
     const provider = { webhooks: { constructEvent: vi.fn().mockReturnValue(event) }, checkout: { sessions: { retrieve: vi.fn().mockResolvedValue(paidSession()) } } };
