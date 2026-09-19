@@ -4,6 +4,8 @@ import { apiClient } from '@/api/client';
 import { readSettings,scoringProblem,SETTINGS_KEY } from './savedSettings';
 import { purchaseDate } from './purchaseDates';
 import ExternalDraftCompanion from './ExternalDraftCompanion';
+import {BrowserKitHandoff} from './BrowserKitHandoff';
+import {browserHandoffHash} from '@/lib/browserHandoff';
 
 type Offer = { available:boolean; deliveryReady:boolean; accessUntil:string|null; updatesUntil:string|null; termsUrl:string|null };
 type Access = { active:boolean; accessUntil:string|null };
@@ -96,10 +98,11 @@ function WebDraftKitDownloads() {
       <p className="mt-2 text-sm">$7.99 CAD, one-time purchase. Applicable taxes are shown at checkout. No automatic renewal.</p>
       <p className="mt-2 text-sm text-white/70">Revised editions through {purchaseDate(offer.updatesUntil)}. Re-downloads through {purchaseDate(offer.accessUntil)}.</p>
       {offer.termsUrl && <a className="mt-2 inline-block underline" href={offer.termsUrl}>Read the purchase terms</a>}
-      {needsLogin?<a href="/auth?redirect=%2Fdraft-kit%3Ftab%3Dpricing" className="mt-4 inline-block rounded-lg bg-[#f8f5ec] px-5 py-3 font-bold text-[#10291f]">Sign in or create an account</a>:<button type="button" disabled={busy} onClick={()=>void checkout()} className="mt-4 block rounded-lg bg-[#ff6b1a] px-5 py-3 font-bold text-[#10291f] disabled:opacity-50">Buy the kit for $7.99 CAD</button>}
+      {needsLogin?<a href={'/auth?redirect='+encodeURIComponent('/draft-kit?tab=pricing'+browserHandoffHash('/draft-kit',window.location.hash))} className="mt-4 inline-block rounded-lg bg-[#f8f5ec] px-5 py-3 font-bold text-[#10291f]">Sign in or create an account</a>:<button type="button" disabled={busy} onClick={()=>void checkout()} className="mt-4 block rounded-lg bg-[#ff6b1a] px-5 py-3 font-bold text-[#10291f] disabled:opacity-50">Buy the kit for $7.99 CAD</button>}
     </>}
     {access?.active && config && <>
       <ExternalDraftCompanion />
+      <BrowserKitHandoff league={league} weights={weights} disabled={busy||!valid}/>
       <div className="mt-4 rounded-lg bg-[#f8f5ec] p-4 text-[#10291f]"><strong>Drafting on the Citrus website? You’re ready.</strong><p className="mt-1 text-sm">Open your league’s browser draft room. Your purchased kit appears in Draft Desk automatically, with your league’s scoring. No download or upload needed. Draft Desk is not available in the iPhone or Android app.</p></div>
       <p className="mt-2 text-sm text-white/70">Access through {purchaseDate(access.accessUntil)}. Download edition projection date: {config.projectionDate}.</p>
       <p className="mt-3 text-sm text-white/75">Enter your league's points per stat, not its category totals. A negative weight deducts points. Set every goalie weight to zero for a skater-only board.</p>

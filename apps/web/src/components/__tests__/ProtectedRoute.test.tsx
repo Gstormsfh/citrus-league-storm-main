@@ -14,6 +14,8 @@ import path from 'node:path';
 
 const mockUseAuth = vi.fn();
 const mockUseProfile = vi.fn();
+const native = vi.hoisted(()=>({value:false}));
+vi.mock('@/lib/nativeAuth',()=>({isNativeShell:()=>native.value}));
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
@@ -51,6 +53,16 @@ function renderAt(initialEntry: string) {
 }
 
 describe('ProtectedRoute — Entry 41 P0 redirect preservation', () => {
+  it('retains a valid browser pairing through sign-in without changing native routing',()=>{
+    mockUseAuth.mockReturnValue({user:null,loading:false});mockUseProfile.mockReturnValue({data:null,isPending:false});
+    const route='/create-league?tab=create#citrus-bridge='+'a'.repeat(32)+'.12345678-1234-1234-1234-123456789abc';
+    const web=renderAt(route);expect(new URLSearchParams(screen.getByTestId('auth-probe').textContent??'').get('redirect')).toBe(route);web.unmount();
+    native.value=true;const app=renderAt(route);expect(new URLSearchParams(screen.getByTestId('auth-probe').textContent??'').get('redirect')).toBe('/create-league?tab=create');app.unmount();native.value=false;
+  });
+  it('does not retain arbitrary or malformed fragments',()=>{
+    mockUseAuth.mockReturnValue({user:null,loading:false});mockUseProfile.mockReturnValue({data:null,isPending:false});
+    const v=renderAt('/create-league#citrus-bridge=anything');expect(new URLSearchParams(screen.getByTestId('auth-probe').textContent??'').get('redirect')).toBe('/create-league');v.unmount();
+  });
   it('unauthenticated: preserves path + query as encoded ?redirect=', () => {
     mockUseAuth.mockReturnValue({ user: null, loading: false });
     mockUseProfile.mockReturnValue({ data: null, isPending: false, isError: false, refetch: vi.fn() });

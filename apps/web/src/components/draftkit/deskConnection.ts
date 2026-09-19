@@ -3,6 +3,7 @@ import type { ScoringSettings } from '@citrus/shared';
 export interface DeskPlayer {
   key: string; name: string; team: string; position: string; rank: number;
   points: number; games: number | null; goalie: boolean; totals: Record<string, number>;
+  research?: Array<{headline:string;body:string;date:string;kind:'history'|'season';sources:Array<{label:string;url:string}>}>;
 }
 export interface DeskKit {
   version: 1; fingerprint: string; revision: string; projectionDate: string; league: string;
@@ -55,9 +56,23 @@ export function validateKit(raw: unknown): DeskKit {
       || Object.keys(p.totals).length > 40
       || Object.entries(p.totals).some(([k, v]) => !/^[a-z_]{1,40}$/.test(k) || !finite(v))) return invalid();
     if (!p.goalie && weights.skater.plus_minus && !finite(p.totals.plus_minus)) return invalid();
+    let research:DeskPlayer['research'];
+    if(p.research!==undefined){
+      if(!Array.isArray(p.research)||p.research.length>3)return invalid();
+      research=p.research.map(item=>{
+        if(!object(item)||!text(item.headline,180)||!text(item.body,5000)||!['history','season'].includes(String(item.kind))
+          ||typeof item.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(item.date)||!Array.isArray(item.sources)||item.sources.length>8)return invalid();
+        const sources=item.sources.map(source=>{
+          if(!object(source)||!text(source.label,160)||!text(source.url,2000))return invalid();
+          try{const url=new URL(source.url);if(url.protocol!=='https:'||url.username||url.password)return invalid();}catch{return invalid();}
+          return {label:source.label,url:source.url};
+        });
+        return {headline:item.headline,body:item.body,date:item.date,kind:item.kind as 'history'|'season',sources};
+      });
+    }
     deskPlayerId(p.key); keys.add(p.key);
     return { key: p.key, name: p.name, team: p.team, position: p.position, rank: p.rank as number,
-      points: p.points, games: p.games as number | null, goalie: p.goalie, totals: { ...p.totals } as Record<string, number> };
+      points: p.points, games: p.games as number | null, goalie: p.goalie, totals: { ...p.totals } as Record<string, number>,...(research?{research}:{}) };
   });
   return { version: 1, fingerprint: raw.fingerprint, revision: raw.revision, projectionDate: raw.projectionDate,
     ...(raw.projectionBasis === 'remaining_season' ? { projectionBasis: 'remaining_season' as const } : {}),

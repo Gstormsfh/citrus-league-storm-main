@@ -1,4 +1,5 @@
 import { userMessage } from '@/lib/userMessage';
+import {BrowserLeagueSettingsHandoff} from '@/components/league/BrowserLeagueSettingsHandoff';
 import { useState, useEffect, useMemo, useRef } from "react";
 import { visibleLeagueTypes } from '@/utils/leagueTypeHelpers';
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -149,6 +150,7 @@ const CreateLeague = () => {
   // every playoff CTA in the nav already passes that param, so the
   // playoff funnel is unchanged.
   const [leagueType, setLeagueType] = useState<LeagueType>("fantasy");
+  const applyingBrowserSettings = useRef(false);
   const [scoringFormat, setScoringFormat] = useState<ScoringFormat>("h2h-points");
   const [draftType, setDraftType] = useState<DraftType>("snake");
   const [teamsCount, setTeamsCount] = useState("12");
@@ -305,6 +307,7 @@ const CreateLeague = () => {
   // Reset format settings and smart defaults when league type changes
   useEffect(() => {
     if (leagueType === 'fantasy') {
+      if (applyingBrowserSettings.current) { applyingBrowserSettings.current = false; return; }
       setScoringFormat('h2h-points');
       setDraftType('snake');
       setTeamsCount('12');
@@ -982,6 +985,14 @@ const CreateLeague = () => {
             </AlertDescription>
           </Alert>
           )}
+
+          <BrowserLeagueSettingsHandoff onApply={s=>{
+            applyingBrowserSettings.current=leagueType!=='fantasy';
+            setLeagueType('fantasy');setDefaultTab('create');setLeagueName(s.name);setTeamsCount(String(s.teamsCount));
+            setScoringFormat(s.scoringFormat);setDraftType(s.draftType);setPositionType(s.positionType);
+            setRosterSlots(s.rosterSlots);setLeagueStats(s.stats);setDraftRounds(DRAFT_ROUNDS_MATCH_ROSTER);
+            if(s.minGoalieGames!==undefined)setMinGoalieGames(String(s.minGoalieGames));
+          }}/>
 
           {/* Waitlist Signup */}
           <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] overflow-hidden">

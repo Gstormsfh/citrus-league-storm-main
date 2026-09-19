@@ -1,104 +1,113 @@
-# Citrus draft connection preview
+# Citrus docked draft companion
 
-Opt-in, read-only ESPN and Yahoo hockey draft readers plus a local receiver. This is **not
-a released integration**, not a replacement for purchase authorization, and not
-included in a native build. Yahoo is a separate observation adapter, not a
-verified league/scoring integration. Independent ESPN and Yahoo pairings can
-coexist; their source tabs, receiver tabs and snapshots are isolated.
+Read-only ESPN and Yahoo hockey readers with a native Chrome side panel.
+**Not a production release.** `DRAFT_KIT_BROWSER_COMPANION_ENABLED` remains off
+by default. No native build or App Store purchase flow is changed.
 
-## Run locally
+## Actual sidebar tools
+
+- Citrus player search, rankings and projected stat totals.
+- Targets, notes, local-session save status and notebook backup.
+- Original dated Citrus guide research with sources where available. No filler.
+- Two to ten player comparisons with stable colours, selectable axes, area maps,
+  raw totals and fantasy-scoring impact.
+- Confirmed-pick availability with explicit interrupted/stale states.
+
+Connecting opens the side panel, not a full-screen tab. One-time setup opens
+Citrus only after an explicit click. The signed-in website verifies purchase
+server-side and returns the board to the exact paired session. No auth token or
+provider credentials enter the extension. Users still draft on ESPN/Yahoo.
+
+## Build and review
 
 From the repository root:
 
 ```sh
 node --test apps/draft-bridge-extension/*.test.mjs
-node apps/draft-bridge-extension/preview.mjs
+node apps/draft-bridge-extension/build.mjs /tmp/citrus-companion-build
+
+# Actual component at narrow width, explicitly SIMULATED draft events:
+node apps/draft-bridge-extension/review.mjs REVIEWED_DESK.html EDITORIAL_DIRECTORY
+
+# Installed extension, actual provider DOM, loopback-only QA handoff:
+node apps/draft-bridge-extension/preview.mjs REVIEWED_DESK.html EDITORIAL_DIRECTORY OBSERVED_IDENTITIES.json CANONICAL_DIRECTORY.json
 ```
 
-The second command prints an unpacked extension folder and starts a loopback-only
-receiver on port 8776. It makes a separate development manifest restricted to
-that receiver. It does not widen the production manifest or use production APIs.
+Load the output folder, never the source directory. Chrome requires an operator
+to load/reload unpacked extensions at `chrome://extensions`; browser automation
+cannot perform that protected action.
 
-1. In Chrome, open `chrome://extensions`, enable Developer mode, and load the
-   printed folder with **Load unpacked**. Browser automation cannot perform this
-   protected settings action; the operator must do it.
-2. Open an isolated ESPN hockey practice draft after it has started.
-3. Open **Rules**, then **Pick History**, with **All Rounds** selected. Open the
-   preview extension and choose **Connect this ESPN draft**.
-4. The extension opens a paired local review tab. Make picks in ESPN. The local
-   review never makes a pick, changes a queue or modifies the league.
-5. After reloading ESPN, open Pick History again if the review asks for it.
-6. Disconnect in the review or close either tab to remove the pairing.
+The installed preview prints a new folder and serves port 8776. Its manifest
+allows only the loopback handoff, without widening the production manifest.
+Its explicit QA attachment uses only players matched against the supplied
+canonical directory. Exclusions are listed and the board is labelled as a
+subset. This is not a purchase test. Production requires every board player to
+have a reviewed, unique provider ID and never uses that subset mechanism.
 
-For Yahoo, enter a free hockey mock or an authorized draft room, select
-**Results → Round by Round**, and connect from the extension. Keep that view
-open for this preview. Optional: open Settings → League Settings while Results
-remains open to capture its raw category values. Those values are not translated
-into Citrus points weights. Yahoo player `data-id` values are read from the
-results rows; owner labels are preserved without inventing other teams' IDs.
-The room ID is explicitly not treated as a Yahoo API league key or season.
+The component review on port 8786 uses synthetic event IDs. Those IDs never
+enter the installed preview or production crosswalk.
 
-Restarting the preview command creates a fresh folder. Source changes require
-rebuilding the unpacked package and reloading the extension in Chrome. Do not
-install the source manifest against the live site: its receiver is not integrated
-into the paid web app yet.
+## Source behaviour
 
-## Contract and safeguards
+**ESPN:** read Rules once and recover Pick History with All Rounds. Its visible
+message feed supports returning to Players. Rollbacks must explicitly be marked
+Rolled back; conflicting or incomplete sources pause updates.
 
-- The action grants temporary `activeTab` access only to the chosen source tab.
-  `scripting` runs the self-contained reader in the top frame's isolated world.
-- ESPN reads UI DOM: draft identity, team selector, scoring/roster tables, round and
-  current-pick counter, pick messages and the dedicated Pick History grids.
-- ESPN player IDs come from headshot URLs already attached to player rows.
-  Missing identity fails closed. Names are not guessed or matched fuzzily.
-- ESPN's `is-rolled-back` card must also visibly say `Rolled back` before it is
-  excluded. Recovery reads the Pick History ledger because ESPN does not restore
-  the message feed after a page reload.
-- Pick coverage must be contiguous and match the current-pick counter. Duplicate
-  identities, conflicting sources, changed rules and changed leagues pause
-  updates. Missing rows never clear the last good snapshot.
-- Only the explicitly paired receiver tab, at the exact configured origin/path
-  and in the top frame, may request snapshots. A random per-pair token alone is
-  insufficient. The extension does not accept page-specified source tab IDs.
-- State is held in the extension's own `chrome.storage.session`, expires after
-  six hours, and is removed on disconnect/tab closure. No browser login/session
-  storage is accessed. No cookies, framework internals or sockets are read.
-- No persistent host permissions, content scripts, remote code, analytics or
-  network requests. The extension CSP denies network connections.
-- Receiver polling is every two seconds, without overlap. Unresponsive or old
-  snapshots show an explicit paused state, retaining the prior picks. Text is
-  inserted with `textContent`, not interpreted as HTML.
+**Yahoo:** keep the Picks sidebar open while browsing Players. At re-entry Yahoo
+only rebuilds that feed from the re-entry point. Open Results → Round by Round
+to recover full history. Returning to Players can retain a recovered prefix only
+when the visible suffix overlaps and agrees. Gaps, changed owners, rollback or
+replacement conflicts require full recovery. Room IDs are not invented into
+Yahoo API league keys; manager labels are not invented into other teams' IDs.
 
-## Evidence and limits
+Full confirmed coverage must agree with the pick counter. Missing/ambiguous IDs
+on the board block its paid handoff. Unknown picks outside the fully mapped
+board do not affect it. Unsupported scoring is never silently zeroed or
+fabricated into projections. Kit scoring is not claimed as verified source scoring.
 
-See `docs/EXTERNAL_DRAFT_SYNC_ACCEPTANCE_2026_09_19.md`. The reader was exercised
-against real ESPN hockey practice DOM, including a manager undo, page reload,
-Pick History recovery and return to Players. Unit tests also cover the extension
-messaging boundary and receiver failure states. Those are **not** evidence of an
-installed extension delivering to the real paid Draft Desk.
+The review command accepts an optional fifth argument: a reviewed identity
+exceptions JSON. Each manual exception must still match both saved snapshots;
+this never adds a general nickname/fuzzy-matching rule. The 2026-09-19 review
+maps all 300 board players on each provider using 297 name/team matches and
+three individually reviewed exceptions per provider. No mappings are promoted
+to a database by either review script.
 
-Remaining release gates:
+## Read-only league settings
 
-- Actual installed Chrome extension to paired receiver, including suspension,
-  tab reload/closure, source switching, repeated undo and final pick.
-- Paid server-side access checks and provider-ID-to-Citrus crosswalk resolution.
-  This receiver displays provider IDs; it does not treat them as NHL IDs.
-- Reconcile supported league scoring against the existing canonical projection
-  source. ESPN's default goalie overtime-loss points are preserved in the source
-  snapshot, not silently dropped or invented in Citrus's forecast.
-- Robust keeper, auction and public/private real-league verification. A snake
-  practice result does not establish those formats.
-- Yahoo live extension delivery, full league/team identity and scoring mapping.
-  Its completed 128-pick mock ledger was read successfully, but the mock refused
-  re-entry after completion/reload. The reader fails closed in that case. This
-  does not prove mid-draft recovery or continuous live synchronization.
-- Distribution, privacy/disclosure and provider terms review before advertising
-  availability. No Chrome Web Store approval is implied.
+On the provider's Settings page, choose Read league settings. The sidebar shows
+captured values and unsupported fields. Explicit review opens Citrus's Create
+League form; explicit Apply copies supported settings. Only submitting the
+normal form creates a Citrus league. Unsupported nonzero categories or roster
+slots block automatic prefill. This does not import player rosters, managers,
+history or keepers.
 
-Chrome primary references:
+## Safety and failure signals
 
-- [activeTab](https://developer.chrome.com/docs/extensions/develop/concepts/activeTab)
-- [Scripting](https://developer.chrome.com/docs/extensions/reference/api/scripting)
-- [External messaging](https://developer.chrome.com/docs/extensions/develop/concepts/messaging)
-- [Externally connectable](https://developer.chrome.com/docs/extensions/reference/manifest/externally-connectable)
-- [Origin/port match patterns](https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns)
+- Temporary activeTab access; top-frame isolated-world DOM reads only.
+- No persistent host permissions, content scripts, cookies, private APIs,
+  sockets, framework-state reads, analytics or background network connections.
+- Exact origin/path/top-frame/tab/nonce binding on external handoffs.
+- Session storage expires after six hours. Disconnect or source-tab closure
+  removes it; closing the setup tab does not disconnect the sidebar.
+- Serialized saves/source writes; disconnect wins over in-flight work.
+- Two-second non-overlapping polls, six-second freshness limit. Failed reads
+  retain the last confirmed board and explicitly label the interruption.
+- Notes are session-local, not promised account or cross-device sync.
+
+## Open release gates
+
+1. Installed side panel with actual picks, full board, paid handoff, reload,
+   undo and final pick. Component and reader tests do not prove that whole path.
+2. Complete reviewed crosswalk, published research configuration and supported
+   scoring verification. ESPN OTL and Yahoo GWG need explicit handling; current
+   canonical projections do not supply those categories.
+3. Keeper/auction/category formats, full league-import scope, distribution,
+   privacy/provider review and production feature enablement.
+4. Separate payment launch approval and production purchase verification.
+
+See `docs/DOCKED_COMPANION_ACCEPTANCE_2026_09_19.md` for evidence, not release claims.
+
+Chrome references: [sidePanel](https://developer.chrome.com/docs/extensions/reference/api/sidePanel),
+[activeTab](https://developer.chrome.com/docs/extensions/develop/concepts/activeTab),
+[external messaging](https://developer.chrome.com/docs/extensions/develop/concepts/messaging),
+[externally connectable](https://developer.chrome.com/docs/extensions/reference/manifest/externally-connectable).

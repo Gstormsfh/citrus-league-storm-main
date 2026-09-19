@@ -26,3 +26,56 @@ function settings(d,value='0'){d.body.insertAdjacentHTML('beforeend',`<dialog op
 test('category zeros remain raw source values, never scoring weights',()=>{const d=fixture();settings(d);const r=read(d);assert.equal(r.rules.scoringType,'Head-to-Head');assert.equal(r.rules.scoring[0].sourceValue,0);assert.equal(r.rules.scoring[0].weight,null);});
 test('scoring survives reload but a verified change pauses updates',()=>{let d=fixture();settings(d);const previous=read(d);assert.equal(read(fixture(),previous).rules.scoring.length,2);d=fixture();settings(d,'2');assert.equal(read(d,previous).code,'rules_changed');});
 test('blank or nonnumeric category values are not silently zeroed',()=>{for(const raw of ['','NaN']){const d=fixture();settings(d,raw);assert.equal(read(d).code,'rules');}});
+
+// Structure observed in Yahoo's visible Picks sidebar while Players remains
+// selected: overall-pick span, owner span, and provider-owned player data-id.
+function feedFixture(n=3,{teams=2,rounds=3,finished=false}={}){
+ const owners=Array.from({length:teams},(_,i)=>i===0?'You':`Manager ${i+1}`);
+ let cards='';for(let pick=n;pick>=1;pick--){const round=Math.floor((pick-1)/teams),slot=(pick-1)%teams,owner=owners[round%2?teams-1-slot:slot];
+  cards+=`<div data-pick="${pick}"><span>${pick}</span><div><span>${owner}</span><div class="ys-player" data-id="${100+pick}"><img title="Player ${pick}"></div></div></div>`;
+ }
+ return new JSDOM(`<div id="main-0-DraftClientBootstrap-Proxy"><span>Yahoo Fantasy Hockey Draft</span><span>${finished?'Draft Complete':`Manager 2's Pick • Round ${Math.ceil((n+1)/teams)}, Pick ${n+1}`}</span><span>YOUR TEAM (1/${rounds})</span><button role="tab" aria-selected="true">Players</button><button role="tab" aria-selected="true">Picks</button><div id="feed">${cards}<div>Manager joined the draft.</div></div><table><tbody><tr><td><div class="ys-player" data-id="999"><img title="Not drafted"></div></td></tr></tbody></table><div><div>C</div><div class="ys-player" data-id="101"><img title="Roster duplicate"></div></div></div>`).window.document;
+}
+test('Picks panel captures confirmed identities without leaving Players',()=>{
+ const r=read(feedFixture());assert.equal(r.ok,true);assert.equal(r.readerView,'picks-feed');assert.equal(r.teamCount,2);assert.equal(r.picks.length,3);
+ assert.deepEqual(r.picks.map(p=>[p.overallPick,p.round,p.externalTeamId]),[[1,1,'1'],[2,1,null],[3,2,null]]);
+});
+test('Picks feed supports empty, partial first round and exact round boundary',()=>{
+ for(const n of [0,1,7,8,9,16,17]){const r=read(feedFixture(n,{teams:8,rounds:16}));assert.equal(r.ok,true,`pick ${n}: ${r.code}`);assert.equal(r.teamCount,n<8?null:8);assert.equal(r.picks.length,n);}
+});
+test('Picks feed full completion and reload recover without previous state',()=>{
+ const r=read(feedFixture(48,{teams:8,rounds:6,finished:true}));assert.equal(r.ok,true);assert.equal(r.status,'finished');assert.equal(r.currentPick,49);assert.equal(r.picks.length,48);
+});
+test('Picks feed reflects an undo from the new complete ledger',()=>{
+ const old=read(feedFixture(4));const next=read(feedFixture(3),old);assert.equal(next.ok,true);assert.equal(next.picks.length,3);assert.equal(old.picks.length,4);
+});
+test('switching away from Picks pauses instead of clearing history',()=>{
+ const old=read(feedFixture());const d=feedFixture();d.querySelectorAll('[role=tab]')[1].textContent='Queue';assert.equal(read(d,old).code,'need_results');assert.equal(old.picks.length,3);
+});
+test('Picks feed rejects missing history, reused IDs and changed ownership',()=>{
+ for(const mutate of [d=>d.querySelector('[data-pick="1"]').remove(),d=>d.querySelector('[data-pick="3"] .ys-player').setAttribute('data-id','101'),d=>d.querySelector('[data-pick="3"] div > span').textContent='Unexpected manager']){
+  const d=feedFixture(5);mutate(d);assert.equal(read(d).ok,false);
+ }
+});
+test('Picks feed rejects conflicting containers and bad player identities',()=>{
+ let d=feedFixture();const another=d.createElement('div');d.querySelector('#feed').after(another);another.append(d.querySelector('[data-pick="1"]'));assert.equal(read(d).code,'layout');
+ d=feedFixture();d.querySelector('[data-pick="1"] .ys-player').removeAttribute('data-id');assert.equal(read(d).ok,false);
+});
+test('re-entry suffix requires a recovered overlapping ledger before returning to Players',()=>{
+ const prior=read(feedFixture(12,{teams:8,rounds:16}));
+ const d=feedFixture(14,{teams:8,rounds:16});for(let n=1;n<10;n++)d.querySelector(`[data-pick="${n}"]`).remove();
+ assert.equal(read(d).code,'incomplete');
+ const recovered=read(d,prior);assert.equal(recovered.ok,true);assert.equal(recovered.picks.length,14);assert.equal(recovered.picks[0].externalPlayerId,'101');
+ // Results labels the local owner differently from the feed; both carry the
+ // same verified viewer ID, while all other owner labels must match exactly.
+ prior.picks.filter(p=>p.externalTeamId==='1').forEach(p=>p.ownerLabel='Your Team');
+ assert.equal(read(d,prior).ok,true);
+});
+test('suffix recovery rejects gaps, replacements, rollback and changed owners',()=>{
+ const prior=read(feedFixture(12,{teams:8,rounds:16}));
+ for(const change of [d=>d.querySelector('[data-pick="12"]').remove(),d=>d.querySelector('[data-pick="10"] .ys-player').setAttribute('data-id','777'),d=>d.querySelector('[data-pick="10"] div > span').textContent='Someone else']){
+  const d=feedFixture(14,{teams:8,rounds:16});for(let n=1;n<10;n++)d.querySelector(`[data-pick="${n}"]`).remove();change(d);assert.equal(read(d,prior).code,'incomplete');
+ }
+ const undo=feedFixture(10,{teams:8,rounds:16});for(let n=1;n<10;n++)undo.querySelector(`[data-pick="${n}"]`).remove();assert.equal(read(undo,prior).code,'incomplete');
+ const gap=feedFixture(14,{teams:8,rounds:16});for(let n=1;n<14;n++)gap.querySelector(`[data-pick="${n}"]`).remove();assert.equal(read(gap,prior).code,'incomplete');
+});

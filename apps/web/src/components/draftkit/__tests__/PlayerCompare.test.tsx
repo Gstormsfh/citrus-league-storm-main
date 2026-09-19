@@ -18,6 +18,13 @@ function mount(players=fixture()) {const view=render(<PlayerCompare players={pla
 function add(name:string){fireEvent.change(screen.getByRole('searchbox'),{target:{value:name}});fireEvent.click(screen.getByRole('button',{name:`Compare ${name}`}));}
 beforeEach(()=>{native.enabled=false;});afterEach(cleanup);
 describe('Citrus player comparison',()=>{
+  it('brings the comparison forward in a sidebar after two selections and still permits ten',()=>{
+    const players=fixture();render(<PlayerCompare compact players={players} stats={stats} context="Sidebar"/>);fireEvent.click(screen.getByRole('button',{name:'Compare players'}));
+    add(players[0].name);add(players[1].name);expect(screen.queryByRole('searchbox')).toBeNull();
+    for(const p of players.slice(2,10)){fireEvent.click(screen.getByRole('button',{name:'Add another player'}));add(p.name);}
+    expect(screen.queryByRole('button',{name:'Add another player'})).toBeNull();expect(screen.getAllByRole('columnheader')).toHaveLength(11);
+    fireEvent.click(screen.getByRole('button',{name:'Clear comparison'}));expect(screen.getByRole('searchbox')).toBeInTheDocument();
+  });
   it('selects by identity, caps at ten, removes and clears without changing the player inputs',()=>{
     const players=fixture(),before=JSON.stringify(players);mount(players);
     for(const p of players.slice(0,10))add(p.name);
