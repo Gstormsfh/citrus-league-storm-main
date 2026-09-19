@@ -457,6 +457,8 @@ jobs:
           #
           # These comments are deliberately ABOVE `env_vars: |` and not
           # inside it. See the 2026-08-24 note below.
+          # Commercial values are complete while sales remain closed. Both
+          # checkout and delivery gates require a reviewed launch release.
           env_vars: |
             NODE_ENV=production
             SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
@@ -481,6 +483,17 @@ jobs:
             DRAFT_CANARY_LEAGUE_ID=8c715c23-d3a8-4bd9-86cc-6265083c3e72
             DRAFT_CANARY_USER_ID=39040c29-f860-430a-802e-4ca6e4fa0a7d
             DRAFT_KIT_CHECKOUT_ENABLED=false
+            DRAFT_KIT_PDF_READY=false
+            DRAFT_KIT_STRIPE_PRICE_ID=price_1UHBC7344c85bYub2ayVinQo
+            DRAFT_KIT_CURRENCY=cad
+            DRAFT_KIT_AMOUNT_MINOR=799
+            DRAFT_KIT_TIER=kit
+            DRAFT_KIT_ACCESS_UNTIL=2027-07-01T05:59:59Z
+            DRAFT_KIT_UPDATES_UNTIL=2026-09-30T05:59:59Z
+            DRAFT_KIT_SITE_ORIGIN=https://citrusfantasysports.com
+            DRAFT_KIT_TERMS_URL=https://citrusfantasysports.com/terms-of-service.html
+            DRAFT_KIT_TERMS_VERSION=2026-09-18-draft-kit-v1
+            DRAFT_KIT_TAX_MODE=automatic
           # ── SECRETS FROM SECRET MANAGER, NOT FROM env_vars ───────────
           # (2026-09-16 outage.) SUPABASE_JWT_SECRET signs every draft
           # token and SCHEDULED_TRIGGER_SECRET gates every cron route. Both
@@ -504,9 +517,12 @@ jobs:
           # ops/cloudrun/service.yaml carries the same two names so a
           # `services replace` cannot drop them. deployConfig.test.ts pins
           # both files.
+          # Version-pin commercial credentials for a reproducible rollout.
           secrets: |
             SUPABASE_JWT_SECRET=supabase-jwt-secret:latest
             SCHEDULED_TRIGGER_SECRET=scheduled-trigger-secret:latest
+            STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:1
+            STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:1
           # ── Cloud Run scaling config ────────────────────────────────
           # These flags MUST stay in sync with ops/cloudrun/service.yaml.
           # The April 10 disaster (LIVE_DRAFT_DISASTER_POSTMORTEM.md §3)
