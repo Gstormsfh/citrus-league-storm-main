@@ -2,7 +2,17 @@
 
 Work in progress. Do not confuse a passed preparation run with publication or paid-product acceptance.
 
-## Published state at 05:28 UTC
+## Final verified production state at 05:41 UTC
+
+- Normal replacement path PASSED through a forced invocation of the existing Cloud Scheduler job: execution `citrus-contextual-production-nmh2k`, run `e4d937f0-1435-4868-b830-010a7f623167`, revision `2a12d68a25f0fd45134a9ca457e3c7a8c4ab81d61239f46f2f183a608e234883`. Service completion took 47,706 ms, below its 55-second database limit. This proves the invoked path, not a future scheduled day's inputs.
+- All 67 immutable journal objects were independently downloaded and SHA-verified; complete 623-skater/52,332-row population audit passed. Post-commit database checks include 86 goalies/7,224 daily goalie rows, required category coverage and daily/ROS conservation.
+- Independent collector `citrus-contextual-monitor-zdhcn` reported healthy/published for this exact revision. Normal five-minute collection also remains active.
+- Final private bundle: `/tmp/citrus-paid-production-final-bundle-20260919`. Actual local worker exports: `/tmp/citrus-production-final-downloads-20260919`. Five-format parity and all 109-page pixel-continuity checks passed. Reviewed player identities/roles/availability and 18,523 numerical fields remained unchanged; no new news dates were invented.
+- Bundle archive SHA `7c1206f51bebf5d79ff9b3b6e4c29c0e9dd830f654b7f98b80cb80648b601dc3`. Private destination: `gs://citrus-fantasy-prod-research-evidence/draft-kit/review/20260919/2a12d68a25f0fd45134a9ca457e3c7a8c4ab81d61239f46f2f183a608e234883/bundle.tar.gz`.
+- Concrete closure receipt: `/tmp/citrus-production-closeout-20260919/receipt.json`, SHA `35a221f5572e5a151cb7adc4adaee2c840f9f809de3a5470a5b70e058e7fb9a6`. Explicitly excludes paid buyer acceptance.
+- Local verification: 63 Node operational tests and 64 Python runtime/journal tests pass. Clean implementation is PR 557. No dirty numerical source port, old definition deletion, native upsell or sales activation.
+
+## First publication checkpoint at 05:28 UTC
 
 - Atomic production publication committed: revision `c5afa098a549236a7913f815f87e40eca7289d7937258013041cb92f8d1d8e19`, run `f5dd1ffd-20a8-4959-87f2-1b8117942ba5`, source `70fd8899e67480cf7cd061a3b88e4a4110bc5a2f27ae756c300f48635fec8255` unchanged.
 - Cron 31/34 paused in the publication transaction. Replacement worker is publish-mode, scheduled 09:10 UTC. Separate collector is scheduled every five minutes. Both use named service accounts, one task and no retries.
@@ -34,10 +44,9 @@ Work in progress. Do not confuse a passed preparation run with publication or pa
 
 ## Remaining work
 
-1. Finish and independently verify the forced Scheduler publish-mode execution, especially the real completion RPC deadline and durable journal.
-2. Re-export its final live revision, verify all five private formats and supply the payments task for controlled entitled-buyer acceptance.
-3. Close the paid update-window/source-review gap; see `REVIEW-WINDOW.md` and `successor-review-20260919.json`. Sales remains off.
-4. Preserve this clean operational implementation, exact receipts and old definitions. No dirty numerical worktree import.
+1. Payments task: controlled entitled-buyer acceptance against the exact final bundle. No successful buyer test is inferred from empty task-reader outputs.
+2. Coordinated release review: close the paid update-window/source-review gap; see `REVIEW-WINDOW.md`, `successor-review-20260919.json` and the executable coverage checker. Sales remains off.
+3. Retain existing explicit expiry/failure monitoring. A current consistency pass is not a future-day evidence review or prediction-accuracy guarantee.
 
 ## Concrete release evidence gap
 
