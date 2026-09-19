@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import pg from 'pg';
 import {validateConnection,hash} from './rehearse-production.mjs';
-const sql=readFileSync(new URL('../../../supabase/migrations/20260919043724_contextual_worker_operational_health.sql',import.meta.url),'utf8');
+const sql=readFileSync(new URL('../../../supabase/migrations/20260919044611_contextual_worker_operational_health.sql',import.meta.url),'utf8');
 const db=new pg.Client({connectionString:validateConnection(execFileSync('gcloud',[
  'secrets','versions','access','latest','--secret=supabase-db-url','--project=citrus-fantasy-prod','--quiet'],
  {encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim()),connectionTimeoutMillis:15000});

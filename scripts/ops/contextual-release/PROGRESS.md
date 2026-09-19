@@ -29,6 +29,7 @@ Work in progress. Do not confuse a passed preparation run with publication or pa
 - Active recovery restored exact row images for 59,220 future daily rows, 705 ROS rows, prior active pointer and cron settings in a production rollback-only exercise. Distinct-run recovery and failure cases passed local PostgreSQL fixtures.
 - Read-only health RPCs passed service-only access checks and rejected anon/authenticated callers. Public wrappers are SECURITY INVOKER; privileged reads live in the non-exposed `citrus_projection_ops` schema.
 - Installed production migrations: `contextual_worker_operational_health` and `contextual_worker_reviewed_operations`. Re-read all four optimized definitions/owners/ACLs and matched the rehearsed bytes. No active/source-output/cron switch. Security advisor had no findings naming the changed functions; unrelated existing notices remain.
+- Repository migration filenames were aligned to the actual Supabase apply-migration ledger versions `20260919044611` and `20260919044613`; SQL bytes unchanged. This avoids a later deployment treating these already-installed migrations as pending duplicates.
 - Current health query was approximately 822 ms in the rollback rehearsal. This is one observed read, not draft-night load certification.
 
 ## Remaining work
