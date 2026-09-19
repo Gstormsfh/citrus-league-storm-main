@@ -72,6 +72,25 @@ def max_season(rest: SupabaseRest, table: str) -> int:
   return int(rows[0]["season"])
 
 
+def load_player_rows(rest: SupabaseRest, table: str, columns: str, season: int) -> List[dict]:
+  """Page the complete season while retaining exact-count checks on every page."""
+  rows: List[dict] = []
+  seen = set()
+  while True:
+    page = rest.select_exact(
+      table, select=columns, filters=[("season", "eq", season)],
+      order="player_id.asc", limit=1000, offset=len(rows),
+    )
+    for row in page:
+      player_id = row["player_id"]
+      if player_id in seen:
+        raise RuntimeError(f"{table}: duplicate player {player_id} across pool pages; refusing unstable input")
+      seen.add(player_id)
+    rows.extend(page)
+    if len(page) < 1000:
+      return rows
+
+
 def load_pool(
   rest: SupabaseRest,
   directory_season: Optional[int],
@@ -80,17 +99,15 @@ def load_pool(
   directory_season = directory_season or max_season(rest, "player_directory")
   attribute_season = attribute_season or max_season(rest, "player_season_stats")
 
-  directory_rows = rest.select_exact(
+  directory_rows = load_player_rows(rest,
     "player_directory",
-    select="player_id,full_name,team_abbrev,position_code,is_goalie,shoots_catches,headshot_url,career",
-    filters=[("season", "eq", directory_season)],
-    order="player_id.asc",
+    "player_id,full_name,team_abbrev,position_code,is_goalie,shoots_catches,headshot_url,career",
+    directory_season,
   )
-  stat_rows = rest.select_exact(
+  stat_rows = load_player_rows(rest,
     "player_season_stats",
-    select="player_id,points,games_played,is_goalie",
-    filters=[("season", "eq", attribute_season)],
-    order="player_id.asc",
+    "player_id,points,games_played,is_goalie",
+    attribute_season,
   )
 
   pool = build_pool(directory_rows, stat_rows, directory_season, attribute_season)
