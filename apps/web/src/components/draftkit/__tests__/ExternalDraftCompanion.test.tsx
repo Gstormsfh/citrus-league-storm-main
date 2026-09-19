@@ -16,6 +16,13 @@ describe('external companion connection lifecycle',()=>{
   it('is absent from native and does not request capabilities',()=>{mocks.native=true;render(<ExternalDraftCompanion/>);expect(mocks.get).not.toHaveBeenCalled();});
   it('does not offer integrations when both server gates are disabled',async()=>{mocks.get.mockResolvedValue({data:{yahoo:false,espn:false}});render(<ExternalDraftCompanion/>);await act(async()=>{});expect(screen.queryByText('Open draft companion')).toBeNull();});
   it('automatically refreshes picks and reverses availability on a confirmed undo',async()=>{await open();expect(screen.getByTestId('desk').textContent).toBe('live:8478402');mocks.post.mockResolvedValueOnce({data:snapshot([])});await act(async()=>{await vi.advanceTimersByTimeAsync(15000);});expect(screen.getByTestId('desk').textContent).toBe('live:');});
+  it('provides a safe host-league return path without credentials in the URL',async()=>{
+    await open();const link=screen.getByRole('link',{name:'Open ESPN league ↗'});
+    expect(link.getAttribute('href')).toBe('https://fantasy.espn.com/hockey/league?leagueId=777&seasonId=2027');
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(screen.getByText(/not your host’s autopick queue/)).toBeTruthy();
+  });
   it.each(['waiting','unknown'])('does not label a %s source as a live draft',async status=>{
     mocks.post.mockResolvedValueOnce({data:{file:deskFixture(),snapshot:{...snapshot(),status},warning:null}});
     await open();expect(screen.getByTestId('desk').textContent).toBe('waiting:8478402');

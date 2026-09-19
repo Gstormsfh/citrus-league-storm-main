@@ -58,6 +58,7 @@ export function DraftDeskPanel({ live, scoring, scoringReady, initialFile, cloud
   initialFile?: DeskFile; cloud?: { onEdit: (key: string, patch: { note?: string; target?: boolean }) => void; status: string }; onReturnToDraft?: () => void;
 }) {
   const connectionText = live.sourceLabel && live.status === 'live' ? `${live.sourceLabel} source snapshots (15-second checks)` : statusText[live.status];
+  const pickInstruction = live.sourceLabel ? `Make your picks in your ${live.sourceLabel} draft room.` : 'Make your picks in the Players tab.';
   const [file, setFile] = useState<DeskFile | null>(initialFile ?? null), [pendingFile, setPendingFile] = useState<DeskFile | null>(null);
   const [error, setError] = useState(''), [search, setSearch] = useState(''), [position, setPosition] = useState('');
   const [hideTaken, setHideTaken] = useState(true), [onlyTargets, setOnlyTargets] = useState(false);
@@ -153,7 +154,7 @@ export function DraftDeskPanel({ live, scoring, scoringReady, initialFile, cloud
     {mobile && <button className={`${control} mt-4 w-full min-h-11 font-bold`} aria-pressed={rows.get(player.key)?.target ?? false} onClick={() => edit(player.key, { target: !rows.get(player.key)?.target })}>{rows.get(player.key)?.target ? '★ On your shortlist' : '☆ Add to shortlist'}</button>}
     <label className="mt-4 block text-xs font-bold">Your note for {player.name}<textarea className={`${control} mt-2 min-h-20 w-full`} maxLength={500} value={rows.get(player.key)?.note ?? ''} onChange={e => edit(player.key, { note: e.target.value })} /></label>
     <p className="mt-1 text-xs text-[#526759]">500 characters maximum. {cloud ? 'Changes save automatically.' : 'Save your session to keep it.'}</p>
-    {mobile && <p className="mt-4 text-xs text-[#526759]">Shortlisting does not queue a pick. Make your pick in the Players tab.</p>}
+    {mobile && <p className="mt-4 text-xs text-[#526759]">Shortlisting does not queue a pick. {pickInstruction}</p>}
   </>;
   const fileInput = <label className="block text-sm font-bold">{file ? 'Load another desk or saved session' : 'Load your Citrus draft desk'}
     <input type="file" accept=".html,.json,text/html,application/json" className={`${control} mt-2 block w-full`} onChange={e => { void load(e.target.files?.[0]); e.target.value = ''; }} />
@@ -165,7 +166,7 @@ export function DraftDeskPanel({ live, scoring, scoringReady, initialFile, cloud
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#ff9a61]">Your draft companion</p>
         <h2 className="mt-1 font-barlow text-3xl font-black uppercase lg:text-4xl">Citrus Draft Desk</h2>
       </div>{file && <button aria-expanded={optionsOpen} aria-controls={settingsId} className="min-h-11 rounded-lg border border-white/30 px-3 text-xs font-bold" onClick={() => setOptionsOpen(!optionsOpen)}>Desk options</button>}</div>
-      {!mobile && <p className="mt-2 max-w-xl text-sm text-[#d5ded2]">Your custom board, with picks tracked for you. Keep a shortlist and your own notes. Make your picks in the Players tab.</p>}
+      {!mobile && <p className="mt-2 max-w-xl text-sm text-[#d5ded2]">Keep a shortlist and your own notes alongside your custom board. {pickInstruction}</p>}
       <p role="status" className="mt-3 text-xs font-bold text-[#d5ded2]">{connectionText}{!mobile && lastUpdate && !unavailable ? <span className="ml-2 font-normal">Last draft update {lastUpdate}</span> : null}</p>
     </header>
     <div className="citrus-desk-body space-y-3">

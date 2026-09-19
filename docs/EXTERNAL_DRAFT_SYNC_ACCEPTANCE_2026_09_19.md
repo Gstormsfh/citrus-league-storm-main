@@ -1,6 +1,8 @@
 # Yahoo/ESPN companion: acceptance ledger
 
-Status: implemented for controlled testing, NOT enabled or verified live.
+Status: controlled test implementation only. The ESPN public-mock acceptance
+FAILED: the current read endpoint did not expose picks during the observed draft.
+Neither provider is enabled or verified for customer live syncing.
 
 ## Boundaries
 
@@ -131,3 +133,73 @@ Local checks for this revision: 67 targeted server tests, all 325 import tests
 (overlapping coverage), 10 browser-component tests, server and web typechecks.
 A CI-only test-helper header type error was corrected.
 Neither provider release switch has been enabled. No native build changed.
+
+## Live mock investigation (September 19, 08:38–08:48 UTC)
+
+The user explicitly approved free mock participation and exploration. No paid
+subscriptions were activated. No real customer league was drafted or reset.
+
+### ESPN: completed public mock, failed source-sync acceptance
+
+- Launched league-specific practice `943083829` from disposable league
+  `609963081`, using its four-team settings and ESPN's automated opponents.
+  The practice room ran; pause and the confirmed undo dialog were exercised
+  only there. A credential-free call to its league endpoint was refused.
+- Joined free public **Pro 8-Team H2H Points Mock**, ID `1026536089`, at seat 3.
+  Observed its full 22-round draft reach completion. The room included automated
+  opponents. Our team received McDavid at overall pick 3; do not treat this as
+  evidence of a successful Citrus pick command. Citrus does not submit host picks.
+- The existing `EspnClient` returned HTTP 200 for this mock's metadata and 176
+  empty draft slots before play. The existing `ExternalDraftSnapshotService`
+  parsed it successfully. This established transport/schema compatibility only.
+- Twelve bounded samples, 15 seconds apart from `08:41:11.525Z` through
+  `08:43:58.772Z`, all returned `in_progress` with zero selected players.
+  The visible room meanwhile showed picks, including MacKinnon at 1,
+  Kucherov at 2 and McDavid at 3, and progressed through later rounds.
+- An independent `mRoster` read at `08:43:07.951Z` also returned zero roster
+  entries for all eight teams. That view is not a demonstrated workaround.
+- A later read at `08:44:42.869Z` still returned zero picks during the draft.
+  After the browser displayed completion, the same endpoint returned HTTP 404.
+  No completed recap was recovered by that endpoint in this test.
+- Conclusion: this transport failed **for this mock**. Do not extrapolate that
+  all private/real ESPN league behavior is identical, but do not enable the
+  current polling implementation or promise live picks based on HTTP 200.
+  Receipt time and `inProgress` are insufficient proof of pick freshness.
+
+### Yahoo: real mock interaction, not authenticated API acceptance
+
+- Joined free H2H category mock **Wash Out 2294412**, with other participants
+  plus automated teams. This is separate from real league `4651`.
+- Entered Yahoo's draft client and clicked Draft for McDavid. The UI confirmed
+  him as the last pick and added him to our roster. Inspected Players, Board,
+  Results, Standings, queue controls and expanded layout. Screenshots were
+  displayed in the task. No undo/reset was attempted in this shared room.
+- Reloaded the same Yahoo room during round 13. It rejoined at round 14 and
+  retained the drafted roster and pick numbers, including McDavid at 1 and
+  Fantilli at 140. This is Yahoo's reconnect behavior, not Citrus sync proof.
+- The draft-client ID is a mock ID, not an authenticated Yahoo API league key.
+  Do not fabricate a game key or interpret the parent league's results as this
+  mock. No Yahoo OAuth/API live snapshot was verified.
+- The mock's category scoring is outside the current points-only companion.
+  No Citrus settings were modified to pretend otherwise.
+
+### Consequences for implementation
+
+- Keep both release switches OFF. Fix source transport before marketing sync.
+- Prefer a user-authorized, least-privilege browser bridge for further ESPN
+  investigation, with mock/real league identity explicitly separated. Its
+  production acceptance must include source player IDs, full-board resync,
+  reconnect, undo, permissions, privacy and extension distribution. It is a
+  proposed next path, not an implemented or validated integration.
+- Do not extract browser cookies, copy member-bearing draft URLs into return
+  links, or scrape hidden app state to get around the failed transport.
+- External companion now links back to its host league in a separate tab and
+  correctly names the host draft room in its pick instructions. It explicitly
+  distinguishes Citrus targets from the host autopick queue. Native guards stay.
+- See `DRAFT_ROOM_FIELD_STUDY_2026_09_19.md` for sourced product observations and
+  the prioritized Citrus implementation plan.
+
+Validation for the navigation revision: 20 focused web tests passed, web
+typecheck (`tsc --noEmit -p tsconfig.app.json`) and targeted ESLint passed.
+The preceding source-parser commit `8a7cd9c4` passed all PR CI checks. These
+navigation changes do not constitute a deployed browser acceptance test.

@@ -80,6 +80,11 @@ function ExternalSession({source,disconnect}:{source:Source;disconnect:()=>void}
   const [stale,setStale]=useState(true),[sequence,setSequence]=useState(0);
   const [confirmDisconnect,setConfirmDisconnect]=useState(false);
   const sourceLabel=source.platform==='yahoo'?'Yahoo':'ESPN';
+  // Return to the league without copying session-bearing draft-room URLs.
+  // The host owns entry into its live room and the actual pick submission.
+  const hostLeagueUrl=source.platform==='espn'
+    ? `https://fantasy.espn.com/hockey/league?leagueId=${encodeURIComponent(source.leagueId)}&seasonId=${source.season+1}`
+    : `https://hockey.fantasysports.yahoo.com/hockey/${encodeURIComponent(source.leagueId.split('.l.')[1])}`;
   const fileRef=useRef<DeskFile|null>(null);
   useEffect(()=>{
     const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined,running=false,lastReceipt=0;
@@ -114,6 +119,8 @@ function ExternalSession({source,disconnect}:{source:Source;disconnect:()=>void}
   },[source,attempt]);
   const live:DeskLiveState={sourceLabel,sequence,unavailableIds:new Set(snapshot?.unavailableIds??[]),status:stale?'disconnected':snapshot?.status==='finished'?'finished':snapshot?.status==='in_progress'?'live':'waiting'};
   return <div className="mt-4">
+    <a className={`${button} mb-3 inline-flex`} href={hostLeagueUrl} target="_blank" rel="noopener noreferrer">Open {sourceLabel} league ↗</a>
+    <p className="mb-3 text-xs">Enter the draft from your host league. Citrus targets are a separate shortlist, not your host’s autopick queue.</p>
     <p role="status" className="text-sm">{health}</p>
     {snapshot&&<p className="mt-1 text-xs">Last receipt: {new Date(snapshot.receivedAt).toLocaleTimeString()}. {snapshot.unavailableIds.length} players drafted or kept.</p>}
     {error&&<p role="alert" className="mt-2 text-sm text-red-800">{error}</p>}
