@@ -215,10 +215,36 @@ export const aiRateLimit = rateLimitMiddleware({ name: 'ai', maxRequests: 30, ma
 /** Auth rate limit — 5 req/min per IP (brute force protection) */
 export const authRateLimit = rateLimitMiddleware({ name: 'auth', maxRequests: 5, windowMs: 60_000, perUser: false });
 
-/** Standard API rate limit — 600 req/min per IP, 1200 per user
- *  Bumped from 300 because users with multiple tabs open (common on
- *  playoff night — watching game + managing roster) + Realtime
- *  subscriptions + react-query refetches can legitimately push past
- *  300 in a burst. This is per-IP so shared-household cases (family
- *  on same router) also benefit. */
-export const standardRateLimit = rateLimitMiddleware({ name: 'standard', maxRequests: 600, maxUserRequests: 1200 });
+/**
+ * Standard API rate limit — 600 req/min per IP, 1200 per user.
+ *
+ * Bumped from 300 because users with multiple tabs open (common on
+ * playoff night — watching game + managing roster) + Realtime
+ * subscriptions + react-query refetches can legitimately push past
+ * 300 in a burst. This is per-IP so shared-household cases (family
+ * on same router) also benefit.
+ *
+ * LOAD TESTING (2026-09-19). The per-IP ceiling is the one number a
+ * single-origin load generator cannot work around: 500 simulated users
+ * share one egress IP, so the generator measures this limiter rather
+ * than the server. X-Forwarded-For cannot be used to fake distinct
+ * clients either — Google Frontend rewrites it before Cloud Run sees
+ * it (verified 2026-09-19: 900 requests carrying one spoofed IP passed
+ * clean, while 4,029 carrying 50 spoofed IPs produced 429s, which is
+ * only possible if the header was ignored).
+ *
+ * So the IP ceiling is overridable by env, and nothing else is. The
+ * default is unchanged, so production behaviour is identical unless the
+ * variable is deliberately set; the PER-USER cap is intentionally NOT
+ * overridable, so a raised IP ceiling still cannot let one account
+ * hammer the API. Set RATE_LIMIT_STANDARD_IP_MAX on staging for the
+ * duration of a load test and unset it afterwards.
+ */
+const STANDARD_IP_MAX = (() => {
+  const raw = process.env.RATE_LIMIT_STANDARD_IP_MAX;
+  if (!raw) return 600;
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : 600;
+})();
+
+export const standardRateLimit = rateLimitMiddleware({ name: 'standard', maxRequests: STANDARD_IP_MAX, maxUserRequests: 1200 });
