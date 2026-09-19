@@ -15,7 +15,11 @@ export function BrowserKitHandoff({league,weights,disabled}:{league:string;weigh
     const send=(type:string,extra={})=>new Promise<any>((resolve,reject)=>{
       if(!runtime){reject(Error('Open kit setup from the Citrus extension.'));return;}
       const timer=setTimeout(()=>reject(Error('The extension did not respond. Reopen setup from your sidebar.')),8000);
-      runtime.sendMessage(match[1],{type,nonce:match[2],...extra},result=>{clearTimeout(timer);runtime.lastError?reject(Error('The extension connection is unavailable.')):resolve(result);});
+      runtime.sendMessage(match[1],{type,nonce:match[2],...extra},result=>{
+        clearTimeout(timer);
+        if(runtime.lastError)reject(Error('The extension connection is unavailable.'));
+        else resolve(result);
+      });
     });
     try{
       const source=await send('SNAPSHOT');if(!source?.ok)throw Error(source?.message??'The source draft is unavailable.');

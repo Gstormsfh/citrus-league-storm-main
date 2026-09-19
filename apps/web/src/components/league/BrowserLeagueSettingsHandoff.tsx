@@ -11,7 +11,14 @@ export function BrowserLeagueSettingsHandoff({onApply}:{onApply:(s:LeagueSetting
     setBusy(true);setMessage('');setReview(null);
     try{
       const runtime=(window as any).chrome?.runtime;if(!runtime)throw Error('Open this page from the Citrus sidebar.');
-      const response:any=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('The extension did not respond.')),8000);runtime.sendMessage(match![1],{type:'LEAGUE_SETTINGS',nonce:match![2]},(r:any)=>{clearTimeout(timer);runtime.lastError?reject(Error('Extension connection unavailable.')):resolve(r);});});
+      const response:any=await new Promise((resolve,reject)=>{
+        const timer=setTimeout(()=>reject(Error('The extension did not respond.')),8000);
+        runtime.sendMessage(match![1],{type:'LEAGUE_SETTINGS',nonce:match![2]},(r:any)=>{
+          clearTimeout(timer);
+          if(runtime.lastError)reject(Error('Extension connection unavailable.'));
+          else resolve(r);
+        });
+      });
       if(!response?.ok)throw Error(response?.message??'No league settings returned.');setReview(reviewBrowserLeagueSettings(response.settings));
     }catch(e){setMessage(e instanceof Error?e.message:'Could not review settings.');}finally{setBusy(false);}
   }
