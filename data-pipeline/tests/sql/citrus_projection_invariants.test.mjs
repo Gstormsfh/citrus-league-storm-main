@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const migration = readFileSync('supabase/migrations/20260914190000_citrus_projection_invariants.sql', 'utf8');
+const identityMigration = readFileSync('supabase/migrations/20260919161758_identity_only_projection_provenance_contract.sql', 'utf8');
 const RUN = '00000000-0000-0000-0000-0000000000f1';
 
 async function setup() {
@@ -17,6 +18,7 @@ async function setup() {
     CREATE TABLE nhl_games(game_id serial, season int, game_type text, home_team text, away_team text, game_date date);
   `);
   await db.exec(migration);
+  await db.exec(identityMigration);
   const run = async () => (await db.query('SELECT check_name, status, measured FROM citrus_projection_invariants() ORDER BY check_name')).rows;
   const statuses = async () => Object.fromEntries((await run()).map(r => [r.check_name, r.status]));
   return {db, run, statuses};
@@ -109,5 +111,49 @@ test('only the service role may run it', async () => {
     await db.exec('SET ROLE authenticated');
     await assert.rejects(db.query('SELECT * FROM citrus_projection_invariants()'), /permission denied/);
     await db.exec('RESET ROLE');
+  } finally { await db.close(); }
+});
+
+const identityOnly = {
+  player_id: '9', name: 'Identity only player', team: 'AAA', position: 'LW', is_goalie: false,
+  provenance: 'DIRECTORY_IDENTITY_ONLY', status: 'unresolved', directory_present: true,
+  rates: {}, counts: null, rate_policy: 'refresh_model', exposure_policy: 'unallocated',
+  exposure: {kind: 'unallocated', unit: 'games', baseline: null, used: null, roster_probability: null, probability_semantics: 'unknown'},
+  role: {line: null, pp: null, conditioned: false, notes: null, evidence: []},
+  availability: {status: 'unknown', authority: 'unknown', as_of: null},
+  sources: [{record: 'player_directory', player_id: '9', artifact: 'input.json', sha256: 'a'.repeat(64), review_source: {artifact: 'review.json', sha256: 'b'.repeat(64)}}],
+  issues: ['Identity established; forecast pending review.'],
+};
+
+test('only complete evidence-backed identity quarantine is exempt from forecast provenance', async () => {
+  const {db, statuses} = await setup();
+  try {
+    await publish(db);
+    await db.query('INSERT INTO canonical_published_players VALUES (2026, $1, $2)', ['9', identityOnly]);
+    assert.equal((await statuses()).published_rows_carry_provenance, 'pass');
+    for (const patch of [
+      {rates: {goals: 0}}, {counts: {goals: 0}}, {projected_goals: 0},
+      {status: 'projected'}, {provenance: null}, {directory_present: false}, {player_id: '0'},
+      {exposure: {...identityOnly.exposure, used: 0}},
+      {exposure: {...identityOnly.exposure, baseline: 12}},
+      {role: {...identityOnly.role, line: 4}}, {availability: {}},
+      {sources: []}, {sources: 'malformed'}, {sources: [{...identityOnly.sources[0], sha256: 'bad'}]},
+      {sources: [{...identityOnly.sources[0], player_id: '10'}]},
+      {sources: [{...identityOnly.sources[0], review_source: null}]},
+      {is_goalie: true}, {issues: []},
+    ]) {
+      await db.query('UPDATE canonical_published_players SET payload=$1 WHERE player_id=$2', [{...identityOnly, ...patch}, '9']);
+      assert.equal((await statuses()).published_rows_carry_provenance, 'fail', JSON.stringify(patch));
+    }
+    for (const key of Object.keys(identityOnly)) {
+      const missing = {...identityOnly}; delete missing[key];
+      await db.query('UPDATE canonical_published_players SET payload=$1 WHERE player_id=$2', [missing, '9']);
+      assert.equal((await statuses()).published_rows_carry_provenance, 'fail', `missing ${key}`);
+    }
+    const goalie = {...identityOnly, is_goalie: true, exposure: {...identityOnly.exposure, unit: 'starts'}};
+    await db.query('UPDATE canonical_published_players SET payload=$1 WHERE player_id=$2', [goalie, '9']);
+    assert.equal((await statuses()).published_rows_carry_provenance, 'pass');
+    await db.exec('SET ROLE authenticated');
+    await assert.rejects(db.query('SELECT citrus_is_identity_only_projection($1)', [identityOnly]), /permission denied/);
   } finally { await db.close(); }
 });
