@@ -112,7 +112,7 @@ function ExternalSession({source,disconnect}:{source:Source;disconnect:()=>void}
     document.addEventListener('visibilitychange',visibility);void poll();
     return()=>{controller.abort();clearTimeout(timer);clearInterval(watchdog);document.removeEventListener('visibilitychange',visibility);};
   },[source,attempt]);
-  const live:DeskLiveState={sourceLabel,sequence,unavailableIds:new Set(snapshot?.unavailableIds??[]),status:stale?'disconnected':snapshot?.status==='finished'?'finished':snapshot?.status==='waiting'?'waiting':'live'};
+  const live:DeskLiveState={sourceLabel,sequence,unavailableIds:new Set(snapshot?.unavailableIds??[]),status:stale?'disconnected':snapshot?.status==='finished'?'finished':snapshot?.status==='in_progress'?'live':'waiting'};
   return <div className="mt-4">
     <p role="status" className="text-sm">{health}</p>
     {snapshot&&<p className="mt-1 text-xs">Last receipt: {new Date(snapshot.receivedAt).toLocaleTimeString()}. {snapshot.unavailableIds.length} players drafted or kept.</p>}

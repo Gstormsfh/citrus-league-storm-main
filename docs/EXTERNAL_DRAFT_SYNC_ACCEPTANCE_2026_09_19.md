@@ -65,4 +65,69 @@ before paid Tax Basic activation (0.5% per transaction, no monthly fee), awaitin
 explicit approval. No tax identifier is stored in the repository. Automatic
 filing is not included in that plan. Checkout remains disabled.
 
-The user offered two leagues; links and disposable-draft confirmation are pending.
+## Real-account inspection and disposable leagues (September 19, 2026)
+
+The user supplied both league links and explicitly authorized creating free,
+disposable leagues and test draft actions. Existing customer leagues remain
+read-only. No invitations were sent and no additional accounts were created.
+
+- Yahoo test league: `128040`, **Citrus QA Disposable 2026**. Created by copying
+  the supplied league's settings, without copying its managers. Draft unscheduled.
+  Private. Yahoo requires four joined teams and an even team count before it can
+  finalize. One manager is joined; no placeholder-team creation option was found
+  in the inspected commissioner tools.
+- ESPN test league: `609963081`, **Citrus QA Disposable 2026**. Four-team H2H points,
+  snake draft, unscheduled. Briefly made viewable for the public read-client check,
+  then restored to private. No league invitations or public recruitment.
+  ESPN says all managers must join before the draft can run.
+- Additional disposable managers/accounts requested from the user. A mock draft
+  or an offline result is not proof of live league-pick synchronization.
+- Supplied ESPN real league was not reactivated for 2027. No reactivation or
+  reminder email was performed.
+- Supplied Yahoo real league's draft is September 20 at 20:00 EDT. It is not a
+  disposable test fixture and must not be reset or populated with test picks.
+
+### Verified source observations and fixes
+
+The real ESPN endpoint returned HTTP 200 while the test league was viewable.
+Its 88 preallocated slots all used numeric `playerId: -1`, `keeper: false`;
+`drafted` and `inProgress` were both false. `keeperCount` was zero and teams did
+not include `draftStrategy`. The adapter now interprets this as waiting with zero
+selected players, validates slot identities even for empty slots, and rejects
+missing IDs, other negative IDs and contradictory completed-draft placeholders.
+The standalone reader now requests `mSettings` for the keeper-count check.
+The history parser also excludes unfilled sentinel rows from imported picks.
+
+After the fix, a second real read returned waiting/zero picks successfully.
+After restoring private visibility, a credential-free read was refused with
+`NeedsCredentialsError`. This verifies public/private boundaries, NOT private
+credential connection or mid-draft picks.
+
+ESPN also sends zero-weight derived stat rows (including points). The companion
+now ignores only zero-weight rows for points leagues before translation. Nonzero
+unsupported weights still block rankings. The browser no longer labels an
+unknown source draft status as live. Regression tests cover these differences.
+
+### Remaining compatibility findings
+
+- The supplied Yahoo settings award game-winning goals; the published desk
+  projection contract does not supply that stat.
+- Default ESPN points settings award goalie overtime losses; the published desk
+  contract does not supply that stat either. After the zero-weight fix, the real
+  ESPN scoring check correctly names overtime losses as the blocker.
+- Do not zero these weights or invent projections just to open the companion.
+  Matching these leagues requires an audited extension of the canonical
+  projection publication, shared scorer adapter and all consuming surfaces.
+- Production `/import` currently offers screenshots for Yahoo and explicitly
+  says one-tap connection is pending. Signed-in Yahoo browser access is not an
+  authenticated Citrus OAuth connection or proof of approved API provisioning.
+- Useful product requirements observed: explicit draft-readiness checklist;
+  imported scoring review before connection; forward/utility slot awareness;
+  goalie minimums and position caps; traded-pick/keeper ownership; visible source
+  freshness; and a clear return to the provider draft. These are requirements,
+  not claims that every item has been implemented.
+
+Local checks for this revision: 67 targeted server tests, all 325 import tests
+(overlapping coverage), 10 browser-component tests, server and web typechecks.
+A CI-only test-helper header type error was corrected.
+Neither provider release switch has been enabled. No native build changed.

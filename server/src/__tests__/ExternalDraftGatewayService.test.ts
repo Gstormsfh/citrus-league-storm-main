@@ -51,4 +51,12 @@ describe('external draft gateway',()=>{
     expect(()=>externalDraftWeights({...settings,scoringType:'h2h_categories'})).toThrow('cannot match');
     expect(()=>externalDraftWeights({...settings,scoringItems:[...settings.scoringItems,{sourceStatId:'999',citrusKey:'faceoff_wins',points:1,group:'skater',enabled:true,reverse:false}]})).toThrow('does not project');
   });
+  it('ignores ESPN zero-weight derived categories but rejects nonzero unsupported scoring',()=>{
+    const settings=parseEspnSeason('777',{core:payload()}).settings;
+    const zero={sourceStatId:'16',citrusKey:'points',points:0,group:'skater' as const,enabled:true,reverse:false};
+    expect(externalDraftWeights({...settings,scoringItems:[...settings.scoringItems,zero]})).toEqual(externalDraftWeights(settings));
+    expect(()=>externalDraftWeights({...settings,scoringItems:[...settings.scoringItems,{...zero,points:1}]})).toThrow('cannot match');
+    expect(()=>externalDraftWeights({...settings,scoringItems:[...settings.scoringItems,{...zero,sourceStatId:'9',citrusKey:'ot_losses',group:'goalie',points:1}]})).toThrow('does not project ot losses');
+    expect(()=>externalDraftWeights({...settings,scoringItems:[...settings.scoringItems,{...zero,citrusKey:'game_winning_goals',points:1}]})).toThrow('does not project game winning goals');
+  });
 });

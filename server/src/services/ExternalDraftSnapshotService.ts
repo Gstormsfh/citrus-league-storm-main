@@ -75,10 +75,21 @@ export function yahooDraftSnapshot(content: unknown, keeperContent: unknown, lea
 export function espnDraftSnapshot(body: unknown, leagueId: string, season: number): ExternalDraftSnapshot {
   if (!object(body) || String(body.id) !== leagueId || body.seasonId !== season + 1 || !object(body.draftDetail)) throw invalid();
   const detail = body.draftDetail;
-  const picks: ExternalDraftPick[] = collection(detail.picks).map(row => {
+  for (const flag of ['drafted', 'inProgress']) {
+    if (detail[flag] !== undefined && typeof detail[flag] !== 'boolean') throw invalid();
+  }
+  const slots = new Set<number>();
+  const picks: ExternalDraftPick[] = collection(detail.picks).flatMap(row => {
     const player = id(row.playerId), team = id(row.teamId);
-    if (!player || !team || (row.keeper !== undefined && typeof row.keeper !== 'boolean')) throw invalid();
-    return { externalPlayerId: player, externalTeamId: team, overallPick: Number(row.overallPickNumber), keeper: row.keeper === true };
+    const slot = Number(row.overallPickNumber);
+    if (!team || !Number.isSafeInteger(slot) || slot <= 0 || slots.has(slot)
+      || (row.keeper !== undefined && typeof row.keeper !== 'boolean')) throw invalid();
+    slots.add(slot);
+    // Verified against the disposable 2027 ESPN league: unfilled draft slots
+    // are explicit playerId -1 records, not missing data or selected players.
+    if (row.playerId === -1 && row.keeper === false && detail.drafted === false) return [];
+    if (!player) throw invalid();
+    return [{ externalPlayerId: player, externalTeamId: team, overallPick: slot, keeper: row.keeper === true }];
   });
   // Keeper availability can exist before the keeper's assigned draft slot appears.
   for (const team of collection(body.teams)) {
@@ -95,7 +106,7 @@ export function espnDraftSnapshot(body: unknown, leagueId: string, season: numbe
     }
   }
   // Do not infer a running draft or completion from pick count or wall-clock time.
-  return { platform: 'espn', leagueId, season, status: detail.drafted === true ? 'finished' : detail.inProgress === true ? 'in_progress' : 'unknown', picks: validatePicks(picks) };
+  return { platform: 'espn', leagueId, season, status: detail.drafted === true ? 'finished' : detail.inProgress === true ? 'in_progress' : detail.drafted === false && detail.inProgress === false ? 'waiting' : 'unknown', picks: validatePicks(picks) };
 }
 
 /** Read-only provider adapters. No Citrus draft, roster, or projection writes. */
@@ -108,7 +119,9 @@ export class ExternalDraftSnapshotService {
   }
   async espn(client: EspnClient, leagueId: string, season: number, credentials?: EspnCredentials) {
     if (!id(leagueId) || !Number.isInteger(season) || season < 2000 || season > 2100) throw AppError.badRequest('Invalid ESPN league or season.');
-    const result = await client.fetchSeason(leagueId, season + 1, ['mDraftDetail', 'mTeam'], credentials);
+    // Non-keeper leagues omit team.draftStrategy. Explicit keeperCount from
+    // mSettings is required to distinguish no keepers from missing data.
+    const result = await client.fetchSeason(leagueId, season + 1, ['mDraftDetail', 'mTeam', 'mSettings'], credentials);
     return espnDraftSnapshot(result.body, leagueId, season);
   }
 }

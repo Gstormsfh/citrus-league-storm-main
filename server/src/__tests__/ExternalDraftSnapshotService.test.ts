@@ -23,6 +23,27 @@ describe('external draft snapshots (contract fixtures, not live-provider accepta
     expect(espnDraftSnapshot(espn([ep]),'123',2026)).toMatchObject({season:2026,status:'unknown',picks:[{externalPlayerId:'1234'}]});
     expect(()=>espnDraftSnapshot(espn([ep]),'123',2027)).toThrow();
   });
+  it('accepts observed ESPN unfilled slots without treating them as players', () => {
+    const body = {...espn([{...ep, playerId: -1}]), settings: {draftSettings: {keeperCount: 0}}, teams: [{id: 1}]};
+    Object.assign(body.draftDetail, {inProgress: false});
+    expect(espnDraftSnapshot(body, '123', 2026)).toMatchObject({status:'waiting', picks:[]});
+    body.draftDetail.picks.push({...ep, overallPickNumber: 2});
+    Object.assign(body.draftDetail, {inProgress: true});
+    expect(espnDraftSnapshot(body, '123', 2026)).toMatchObject({status:'in_progress', picks:[{externalPlayerId:'1234',overallPick:2}]});
+    body.draftDetail.picks[1] = {...ep, playerId:-1, overallPickNumber:2};
+    expect(espnDraftSnapshot(body, '123', 2026).picks).toEqual([]);
+  });
+  it('rejects malformed slots, sentinels, flags and contradictory completed drafts', () => {
+    for (const playerId of [0, null, undefined, '-1', -2]) {
+      expect(()=>espnDraftSnapshot(espn([{...ep,playerId}]),'123',2026)).toThrow();
+    }
+    expect(()=>espnDraftSnapshot(espn([{...ep,playerId:-1,keeper:true}]),'123',2026)).toThrow();
+    expect(()=>espnDraftSnapshot(espn([{...ep,playerId:-1},ep]),'123',2026)).toThrow();
+    expect(()=>espnDraftSnapshot(espn([{...ep,playerId:-1,overallPickNumber:0}]),'123',2026)).toThrow();
+    const body=espn([{...ep,playerId:-1}]);body.draftDetail.drafted=true;
+    expect(()=>espnDraftSnapshot(body,'123',2026)).toThrow();
+    expect(()=>espnDraftSnapshot({...espn(),draftDetail:{picks:[],drafted:'false'}},'123',2026)).toThrow();
+  });
   it.each(['draft_results','league_key','season'])('rejects missing Yahoo %s rather than clearing the board', field => {
     const body=yahoo([yp]);delete (body.league as Record<string,unknown>)[field];
     expect(()=>yahooDraftSnapshot(body,keepers(),'461.l.123',2026)).toThrow();
@@ -61,7 +82,7 @@ describe('external draft snapshots (contract fixtures, not live-provider accepta
     const fetchSeason=vi.fn().mockResolvedValue({body:espn([ep])});
     const service=new ExternalDraftSnapshotService();
     await service.espn({fetchSeason} as never,'123',2026);
-    expect(fetchSeason).toHaveBeenCalledExactlyOnceWith('123',2027,['mDraftDetail','mTeam'],undefined);
+    expect(fetchSeason).toHaveBeenCalledExactlyOnceWith('123',2027,['mDraftDetail','mTeam','mSettings'],undefined);
     fetchSeason.mockRejectedValueOnce(Error('private'));
     await expect(service.espn({fetchSeason} as never,'123',2026)).rejects.toThrow('private');
     expect(fetchSeason).toHaveBeenCalledTimes(2);

@@ -247,7 +247,9 @@ export function parseEspnSeason(leagueId: string, payloads: EspnSeasonPayloads):
   // ---- draft and keepers --------------------------------------------------
   const picksRaw: Json[] = payloads.draft?.draftDetail?.picks ?? core.draftDetail?.picks ?? [];
   const picks: ImportedPick[] = picksRaw
-    .filter((p) => p && p.playerId != null)
+    // ESPN preallocates future draft slots with playerId -1. Those are not
+    // selections and must never become phantom historical players.
+    .filter((p) => p && Number.isSafeInteger(Number(p.playerId)) && Number(p.playerId) > 0)
     .map((p) => ({
       overallPick: Number(p.overallPickNumber ?? p.id ?? 0),
       round: toNum(p.roundId),

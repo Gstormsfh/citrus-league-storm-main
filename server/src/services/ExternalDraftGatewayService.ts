@@ -18,7 +18,12 @@ type ObjectValue = Record<string, unknown>;
 const object = (v: unknown): v is ObjectValue => !!v && typeof v === 'object' && !Array.isArray(v);
 
 export function externalDraftWeights(settings: ImportedSettings) {
-  const translated = new ScoringTranslationService().translate(settings);
+  // ESPN includes disabled point categories as enabled records with a zero
+  // weight. They do not affect points; category leagues still remain blocked.
+  const pointsLeague = ['h2h_points', 'points'].includes(settings.scoringType);
+  const translated = new ScoringTranslationService().translate(pointsLeague
+    ? { ...settings, scoringItems: settings.scoringItems.filter(item => item.points !== 0) }
+    : settings);
   if (!translated.scoringFormat || !['h2h-points','total-points'].includes(translated.scoringFormat) || translated.unmapped.length)
     throw AppError.badRequest('This companion cannot match all of this league’s scoring rules. Category leagues and unsupported point categories cannot use this edition.');
   // Missing source weights mean zero, never Citrus defaults.

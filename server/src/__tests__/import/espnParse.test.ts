@@ -51,6 +51,19 @@ describe('mapEspnScoringType', () => {
   });
 });
 
+describe('ESPN unfilled draft slots', () => {
+  it('does not import preallocated sentinel rows as player selections', () => {
+    const picks = [
+      {playerId:-1,teamId:1,overallPickNumber:1,keeper:false},
+      {playerId:1234,teamId:1,overallPickNumber:2,keeper:false},
+      {playerId:0,teamId:1,overallPickNumber:3,keeper:false},
+    ];
+    const season=parseEspnSeason('123456',{core:{...fixture,draftDetail:{drafted:false,inProgress:false,picks}}});
+    expect(season.picks).toHaveLength(1);
+    expect(season.picks[0]).toMatchObject({overallPick:2,player:{externalPlayerId:'1234'}});
+  });
+});
+
 describe('parseEspnSeason on the 2020 keeper league', () => {
   const season = parseEspnSeason('123456', { core: fixture });
 

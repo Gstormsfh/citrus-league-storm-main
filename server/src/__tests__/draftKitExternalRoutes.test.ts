@@ -12,7 +12,7 @@ import {websiteDraftKit} from '../middleware/websiteDraftKit';
 const app=new Hono().use('/external/*',websiteDraftKit).route('/external',draftKitExternalRoutes);
 const body={platform:'espn',leagueId:'777',season:2026};
 const headers={authorization:'Bearer test','content-type':'application/json'};
-const post=(payload:unknown=body,path='snapshot',h=headers)=>app.request('/external/'+path,{method:'POST',headers:h,body:JSON.stringify(payload)});
+const post=(payload:unknown=body,path='snapshot',h:Record<string,string>=headers)=>app.request('/external/'+path,{method:'POST',headers:h,body:JSON.stringify(payload)});
 beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('DRAFT_KIT_ESPN_SYNC_ENABLED','false');vi.stubEnv('DRAFT_KIT_YAHOO_SYNC_ENABLED','false');mocks.access.mockResolvedValue({active:true});mocks.snapshot.mockResolvedValue({complete:true});mocks.open.mockResolvedValue({file:{}});});
 afterEach(()=>vi.unstubAllEnvs());
 describe('external draft release and access gates',()=>{
