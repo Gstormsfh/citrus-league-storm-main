@@ -46,6 +46,91 @@ def fixtures():
 
 
 class CanonicalImportTests(unittest.TestCase):
+    def test_customer_snapshot_rejects_stale_availability_roles_and_team_slots(self):
+        from customer_data import verify_snapshot
+        d,e=fixtures()
+        out=convert(d,e,d['revision'],source_name='canonical.json')
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'canonical.json').write_text(json.dumps(d))
+            self.assertEqual(verify_snapshot(out,source_root=root),d['revision'])
+            for field,value in (('availability',{'status':'healthy'}),('line','F4'),
+                                ('powerPlay','PP2'),('note','An obsolete report'),
+                                ('canonicalIssues',['Missing warning']),('isGoalie',True)):
+                changed=deepcopy(out);changed['players'][0][field]=value
+                with self.subTest(field=field),self.assertRaisesRegex(ValueError,'Guide record'):
+                    verify_snapshot(changed,source_root=root)
+            changed=deepcopy(out);changed['teams'][0]['lineupSlots'][0]['player_id']='2'
+            with self.assertRaisesRegex(ValueError,'team structure'):
+                verify_snapshot(changed,source_root=root)
+            changed=deepcopy(out);changed['canonicalContract']['publication_ready']=True
+            with self.assertRaisesRegex(ValueError,'metadata'):
+                verify_snapshot(changed,source_root=root)
+            changed=deepcopy(out);changed['publication']['blockers']=[]
+            with self.assertRaisesRegex(ValueError,'metadata'):
+                verify_snapshot(changed,source_root=root)
+            changed=deepcopy(out);changed['source']['asOf']='2026-09-30'
+            with self.assertRaisesRegex(ValueError,'source metadata'):
+                verify_snapshot(changed,source_root=root)
+
+    def test_postgres_full_season_source_is_not_a_runtime(self):
+        from hashlib import sha256
+        d, e = fixtures()
+        d['revision_algorithm'] = 'sha256_postgres_jsonb_v1'
+        preimage = json.dumps({k: v for k, v in d.items() if k != 'revision'})
+        d['revision'] = sha256(preimage.encode()).hexdigest()
+        e['edition'] = {'kind': 'effective_runtime', 'horizon': 'remaining_season'}
+        out = convert(d, e, d['revision'], revision_preimage=preimage)
+        self.assertEqual(out['players'][0]['games'], 10)
+        self.assertEqual(out['players'][0]['canonicalCounts'], d['players'][0]['counts'])
+        self.assertIsNone(out['players'][1]['games'])
+        self.assertNotIn('edition', out)
+        self.assertEqual(out['source']['revisionAlgorithm'], 'sha256_postgres_jsonb_v1')
+        self.assertFalse(out['publication']['publicationReady'])
+        with self.assertRaises(ValueError):
+            convert(d, e, d['revision'])
+
+    def test_partial_runtime_cannot_pass_as_full_season_source(self):
+        from hashlib import sha256
+        for marker in ('refresh_at', 'source_revision', 'refresh_kind', 'remaining'):
+            d, e = fixtures()
+            d['revision_algorithm'] = 'sha256_postgres_jsonb_v1'
+            if marker == 'remaining':
+                d['players'][0]['remaining'] = {'used': 10, 'team_games': 84, 'as_of': '2026-09-12'}
+            else:
+                d[marker] = 'incomplete-runtime'
+            preimage = json.dumps({k: v for k, v in d.items() if k != 'revision'})
+            d['revision'] = sha256(preimage.encode()).hexdigest()
+            with self.subTest(marker=marker), self.assertRaises(ValueError):
+                convert(d, e, d['revision'], revision_preimage=preimage)
+
+    def test_customer_snapshot_checks_postgres_preimage_and_full_season_numbers(self):
+        from hashlib import sha256
+        from unittest.mock import patch
+        from customer_data import verify_snapshot
+        d, e = fixtures()
+        d['revision_algorithm'] = 'sha256_postgres_jsonb_v1'
+        preimage = json.dumps({k: v for k, v in d.items() if k != 'revision'})
+        d['revision'] = sha256(preimage.encode()).hexdigest()
+        out = convert(d, e, d['revision'], revision_preimage=preimage)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root/'review-inputs').mkdir()
+            (root/'review-inputs/canonical.json').write_text(json.dumps(d))
+            with patch('customer_data.ROOT', root):
+                with self.assertRaisesRegex(ValueError, 'preimage is required'):
+                    verify_snapshot(out)
+                path = root/'review-inputs/canonical.preimage.json'
+                path.write_text(preimage)
+                self.assertEqual(verify_snapshot(out), d['revision'])
+                changed = deepcopy(out)
+                changed['players'][0]['games'] = 9
+                with self.assertRaisesRegex(ValueError, 'differs from canonical'):
+                    verify_snapshot(changed)
+                path.write_text(preimage+' ')
+                with self.assertRaisesRegex(ValueError, 'revision mismatch'):
+                    verify_snapshot(out)
+
     def test_runtime_preimage_and_remaining_horizon_are_authoritative(self):
         from hashlib import sha256
         d, e = fixtures()

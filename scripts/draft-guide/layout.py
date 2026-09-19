@@ -1,5 +1,6 @@
 """Shared print primitives for the configurable Citrus draft guide."""
 import io
+import os
 from pathlib import Path
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
@@ -10,7 +11,7 @@ from reportlab.platypus import Paragraph
 from PIL import Image
 
 ROOT=Path(__file__).resolve().parent
-ASSETS=ROOT/'assets'
+ASSETS=Path(os.environ.get('CITRUS_DRAFT_KIT_ASSETS',str(ROOT/'assets')))
 W,H=612,792
 CREAM='#F8F5EC'; INK='#10291F'; ORANGE='#FF6B1A'; MUTED='#5A6C60'; RULE='#D4DACF'; WHITE='#FFFFFF'
 for name,file in [('Display','BarlowCondensed-Bold.ttf'),('Body','Barlow-Regular.ttf'),('Semi','Barlow-SemiBold.ttf'),('Bold','Barlow-Bold.ttf')]:

@@ -65,7 +65,7 @@ export default function DraftKit() {
   const { board, loading, error } = useDraftKitBoard(isDemoLeague(activeLeagueId) ? null : activeLeagueId);
   const [params, setParams] = useSearchParams();
   const [cohort, setCohort] = useState<Cohort>('F');
-  const [tab, setTab] = useState<Tab>('board');
+  const [tab, setTab] = useState<Tab>(() => params.get('tab') === 'pricing' ? 'pricing' : 'board');
 
   const selectedId = params.get('player') ? Number(params.get('player')) : null;
 
