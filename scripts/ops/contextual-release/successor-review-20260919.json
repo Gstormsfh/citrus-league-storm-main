@@ -1,0 +1,59 @@
+{
+  "schema": "citrus.successor-policy-review.v1",
+  "status": "draft_not_authorized",
+  "production_authorized": false,
+  "customer_release_ready": false,
+  "reviewedAt": "2026-09-19",
+  "currentPolicySha256": "26893b8573829ac1b52f4b9be8284eae416f7d1a0d648b9f2a8fceaa06226bbd",
+  "sourceRevision": "70fd8899e67480cf7cd061a3b88e4a4110bc5a2f27ae756c300f48635fec8255",
+  "sourceFileSha256": "361b0c4b183eb17c14d32b65227f45e25676e6b77f675de1a730989f1cb6d1da",
+  "proposedOperationalCoverageThrough": "2026-09-29",
+  "currentEarliestExpiry": "2026-09-21T00:00:00Z",
+  "numericalChanges": false,
+  "evidenceToday": [
+    {
+      "publishedAt": "2026-09-16",
+      "source": "Tampa Bay Lightning",
+      "url": "https://www.nhl.com/lightning/news/the-fourcheck-tampa-bay-lightning-forward-nikita-kucherov-contract-injury-updates-and-more-from-media-day",
+      "finding": "Gourde's absence extends to December; James is expected to miss roughly two opening weeks.",
+      "decision": "Retain existing conditional windows and review deadline. No new numerical or return-date authorization."
+    },
+    {
+      "publishedAt": "2026-09-17",
+      "source": "Minnesota Wild",
+      "url": "https://www.nhl.com/wild/news/wild-training-camp-preview-091726",
+      "finding": "Wallstedt and Pickard open the season; Gustavsson's recovery has no public return date.",
+      "decision": "Retain the existing source. The alternative goalie allocation remains review-only."
+    },
+    {
+      "publishedAt": "2026-09-16",
+      "source": "NHL.com",
+      "url": "https://www.nhl.com/news/auston-matthews-healthy-fully-committed-to-toronto-maple-leafs",
+      "finding": "Matthews reported healthy entering camp.",
+      "decision": "Current health does not authorize replacing season workload with the full team schedule."
+    }
+  ],
+  "sourceReviewDependencies": [
+    {"path": "source_release_review.review_after", "expires": "2026-09-21", "action": "Separately review source authorization; do not modify the operational policy alone."},
+    {"path": "finishing_refresh_policy.review_after", "expires": "2026-09-21", "action": "Reaffirm bounded historical-method evidence and limitations without retuning rates."},
+    {"playerId": "8476826", "name": "Yanni Gourde", "path": "availability_scenario.review_after", "expires": "2026-09-21", "action": "Review latest camp evidence and conditional replacement allocation."},
+    {"playerId": "8483752", "name": "Dominic James", "path": "availability_scenario.review_after", "expires": "2026-09-21", "action": "Review latest camp evidence and conditional replacement allocation."},
+    {"playerId": "8479325", "name": "Charlie McAvoy", "path": "availability_scenario.review_after", "expires": "2026-09-29", "action": "Review suspension calendar before promising coverage inclusive of September 29."},
+    {"playerId": "8482092", "name": "Ridly Greig", "path": "availability_scenario.review_after", "expires": "2026-09-29", "action": "Review suspension calendar before promising coverage inclusive of September 29."}
+  ],
+  "evidenceNotYetAvailable": [
+    "Camp, injury and roster changes after September 19 cannot be verified today.",
+    "Future upstream cycles and future scheduled worker success cannot be certified by today's forced Scheduler invocation.",
+    "A later source review and its exact newly signed/revisioned policy do not exist merely because a plan names an owner."
+  ],
+  "requiredSuccessorGates": [
+    "Hash-verified source review including every earliest-expiring policy and availability record",
+    "Explicit operational-only versus source/numerical delta comparison",
+    "Fresh revision for any changed source authorization, preserving exact numerical records unless separately reviewed",
+    "Staging preparation, complete population audit, protected publication and independent monitor",
+    "All-format private edition parity and entitled-buyer acceptance",
+    "Accepted operational review/update arrangement covering the actual commercial promise"
+  ],
+  "salesDecision": "Keep sales disabled; today's verified live forecast does not itself satisfy the full advertised update window.",
+  "expiryBehavior": "Worker and independent collector reject expired policy. Last complete forecast remains published, with failure and missing-heartbeat alerts enabled. No legacy-writer fallback."
+}
