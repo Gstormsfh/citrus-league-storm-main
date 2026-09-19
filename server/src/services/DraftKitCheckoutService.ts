@@ -79,7 +79,7 @@ export class DraftKitCheckoutService {
       // and fulfil the provider state here rather than expiring it and risking
       // a second payable session during that narrow delivery window.
       if (existing.status === 'complete') {
-        if (existing.payment_status === 'paid') await this.fulfill(existing.id);
+        if (existing.payment_status === 'paid') await this.fulfill(existing.id, this.admin);
         throw AppError.conflict(existing.payment_status === 'paid'
           ? 'You already own this edition.'
           : 'Your payment is still processing. Please check back shortly.');
@@ -122,15 +122,17 @@ export class DraftKitCheckoutService {
     }
     return { received: true };
   }
-  private async fulfill(sessionId: string) {
-    const s = await this.provider().checkout.sessions.retrieve(sessionId, { expand: ['line_items.data.price', 'payment_intent'] });
+  private async fulfill(sessionId: string, db: SupabaseClient = this.db) {
+    const s = await this.provider().checkout.sessions.retrieve(sessionId, { expand: ['line_items.data.price', 'payment_intent', 'payment_intent.latest_charge'] });
     const intent = s.payment_intent as Stripe.PaymentIntent; const item = s.line_items?.data[0];
+    const charge = intent?.latest_charge as Stripe.Charge | null;
     if (s.metadata?.product !== 'seasonal_draft_kit' || s.payment_status !== 'paid' || s.status !== 'complete'
       || !UUID.test(s.client_reference_id || '') || s.metadata.user_id !== s.client_reference_id || s.mode !== 'payment'
       || s.currency !== this.config.currency || s.amount_subtotal !== this.config.amountMinor || s.livemode !== stripeKeyIsLive(this.config.secret)
-      || s.line_items?.data.length !== 1 || item?.quantity !== 1 || item.price?.id !== this.config.priceId || intent?.status !== 'succeeded')
+      || s.line_items?.data.length !== 1 || item?.quantity !== 1 || item.price?.id !== this.config.priceId || intent?.status !== 'succeeded'
+      || charge?.refunded || charge?.disputed)
       throw AppError.badRequest('Payment does not match this Draft Kit offer.');
-    const { error } = await this.db.rpc('fulfill_draft_kit_checkout', { p_session: s.id, p_user: s.client_reference_id,
+    const { error } = await db.rpc('fulfill_draft_kit_checkout', { p_session: s.id, p_user: s.client_reference_id,
       p_intent: intent.id, p_tier: this.config.tier, p_amount: this.config.amountMinor, p_currency: this.config.currency,
       p_access_until: this.config.accessUntil, p_terms: this.config.termsVersion });
     if (error) throw AppError.serviceUnavailable('Payment received; access could not be saved yet.');

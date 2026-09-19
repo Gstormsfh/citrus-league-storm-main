@@ -26,6 +26,9 @@ draftKitCheckoutRoutes.post('/session', authMiddleware, strictRateLimit, async (
 });
 draftKitCheckoutRoutes.post('/webhook', async (c) => {
   try { const signature = c.req.header('stripe-signature'); if (!signature) throw AppError.badRequest('Missing payment signature.');
-    return ok(c, await new DraftKitCheckoutService(getSupabaseAdmin()).webhook(await c.req.text(), signature)); }
+    const admin = getSupabaseAdmin();
+    const result = await new DraftKitCheckoutService(admin).webhook(await c.req.text(), signature);
+    void new AuditService(admin).log('ADMIN_ACTION', null, { action: 'draft_kit_payment_webhook_processed' });
+    return ok(c, result); }
   catch (error) { return handleError(c, error, 'Payment webhook failed'); }
 });
