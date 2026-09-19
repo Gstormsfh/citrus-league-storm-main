@@ -86,6 +86,20 @@ afterEach(() => {
 // ── Tests ──────────────────────────────────────────────────────────────
 
 describe('ApiError', () => {
+  it('rejects untrusted override origins before sending an authenticated request',async()=>{
+    mockSession(VALID_TOKEN);mockFetchOk();
+    await expect(apiClient.post('/api/draft-kit/pdf/download',{}, {retries:0,endpointOrigin:'https://example.com'})).rejects.toThrow('Unrecognized Citrus API origin');
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+  it('uses the trusted direct API for long downloads without changing default requests',async()=>{
+    mockSession(VALID_TOKEN);mockFetchOk();
+    const origin='https://citrus-api-gb5jc2sd5q-nn.a.run.app';
+    await apiClient.post('/api/draft-kit/pdf/download',{}, {retries:0,endpointOrigin:origin,timeoutMs:200000});
+    expect(mockFetch.mock.calls[0][0]).toBe(origin+'/api/draft-kit/pdf/download');
+    expect(mockFetch.mock.calls[0][1].headers.Authorization).toBe('Bearer '+VALID_TOKEN);
+    await apiClient.get('/api/health');
+    expect(mockFetch.mock.calls[1][0]).toBe('/api/health');
+  });
   it('sets message, status, data, and name', () => {
     const data = { detail: 'not found' };
     const err = new ApiError('Not found', 404, data);

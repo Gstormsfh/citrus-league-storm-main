@@ -213,8 +213,13 @@ def write_log(db: SupabaseRest, r: Dict[str, Any], ignored: bool) -> None:
     writes to -- so check_monitor_liveness() notices if these stop arriving."""
     row = {
         "check_name": "invariant_" + str(r.get("check_name")),
-        "status": r.get("status"),
+        # The RPC vocabulary includes warn/info; the shared log table accepts
+        # pass/fail/warning. Keep the original level in details, and never
+        # turn an informational or unknown result into a recorded pass.
+        "status": {"pass": "pass", "fail": "fail", "warn": "warning",
+                   "warning": "warning", "info": "warning"}.get(r.get("status"), "fail"),
         "details": json.dumps({
+            "source_status": r.get("status"),
             "measured": r.get("measured"),
             "threshold": r.get("threshold"),
             "detail": r.get("detail"),

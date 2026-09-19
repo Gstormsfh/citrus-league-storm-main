@@ -13,6 +13,10 @@ const button = 'rounded-lg border border-[#66816e] px-4 py-2 text-sm font-bold';
 
 /** Mounted with an account + league key. No paid kit is persisted in browser storage. */
 export function PurchasedDraftDesk(props: Props) {
+  if (import.meta.env.VITE_NATIVE === '1' || isNativeShell()) return null;
+  return <BrowserPurchasedDraftDesk {...props} />;
+}
+function BrowserPurchasedDraftDesk(props: Props) {
   const { leagueId, onReady } = props;
   const [result, setResult] = useState<Reply | null>(null), [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -36,11 +40,6 @@ export function PurchasedDraftDesk(props: Props) {
     {props.onReturnToDraft && <button className={`${button} ml-2`} onClick={props.onReturnToDraft}>Back to draft</button>}
   </section>;
   if (!result) return <p role="status" className="p-6">Getting your Citrus Draft Desk ready…</p>;
-  if (!result.owned && (import.meta.env.VITE_NATIVE === '1' || isNativeShell())) return <section className="rounded-xl bg-[#f8f5ec] p-6 text-[#10291f]">
-    <h2 className="text-2xl font-bold">Draft Desk</h2>
-    <p className="my-3">Draft Desk is not available for this account.</p>
-    {props.onReturnToDraft && <button className={button} onClick={props.onReturnToDraft}>Back to draft</button>}
-  </section>;
   if (!result.owned) return <section className="rounded-xl bg-[#f8f5ec] p-6 text-[#10291f]">
     <h2 className="text-2xl font-bold">Bring your draft kit into the room.</h2>
     <p className="my-3">Purchased the Citrus kit? Your board loads here automatically, with this league’s scoring and confirmed picks.</p>

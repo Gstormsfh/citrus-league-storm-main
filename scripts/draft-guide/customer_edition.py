@@ -119,7 +119,7 @@ class CustomerGuide(Guide):
         if deck:self.block(deck,36,110,540,35,9.5,MUTED)
     def finish(self,section,**record):
         self.text('PROJECTIONS AS OF '+self.as_of,36,744,6.5,'Semi',MUTED)
-        self.text('REVIEW EDITION',576,744,6.5,'Semi',MUTED,'right')
+        self.text('CUSTOMIZED FOR YOUR LEAGUE',576,744,6.5,'Semi',MUTED,'right')
         self.footer(section);self.manifest.append(dict(page=self.number,section=section,**record));self.end()
     def picture(self,x,y,w,h,player=None):
         name=player['name'] if player and player['name'] in KNOWN else None

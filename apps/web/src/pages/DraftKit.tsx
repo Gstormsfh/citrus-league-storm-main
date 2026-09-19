@@ -48,6 +48,7 @@ import {
 } from '@/components/draftkit';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useDraftKitBoard } from '@/hooks/useDraftKitBoard';
+import { PlayerCompare } from '@/components/draftkit/PlayerCompare';
 
 const COHORTS: Cohort[] = ['F', 'D', 'G'];
 
@@ -190,6 +191,14 @@ export default function DraftKit() {
 
             {tab === 'board' && (
               <>
+                {!board.locked && <PlayerCompare
+                  key={`${activeLeagueId}:${board.projectionSeason}:${board.projection_source?.revision??'board'}`}
+                  players={board.cards.map(c=>({id:String(c.playerId),name:c.name,team:c.team,position:c.position,image:c.headshotUrl,goalie:c.cohort==='G',rank:c.cohortRank,points:c.projectedFantasyPoints,games:c.projectedGames,
+                    stats:Object.fromEntries(c.metrics.map(m=>[m.key,m.format==='pct3'&&m.value!=null&&m.value>1?m.value/1000:m.value]))}))}
+                  stats={[...new Map(board.cards.flatMap(c=>c.metrics.map(m=>[m.key,{key:m.key,label:m.label,decimals:m.format==='rate3'||m.format==='pct3'?3:2}] as const))).values()]}
+                  rankLabel="Position-cohort rank"
+                  context={`${seasonLabel} projected fantasy totals. Advanced metrics below are historical, from ${board.metricsSeason}-${String(board.metricsSeason+1).slice(2)}, not forecasts. Ranks are within F, D or G, not overall.`}
+                />}
                 <div className="-mx-4 mb-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
                   <div className="flex w-max gap-2">
                     {COHORTS.map((c) => (

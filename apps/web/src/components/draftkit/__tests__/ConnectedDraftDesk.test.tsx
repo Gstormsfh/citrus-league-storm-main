@@ -19,6 +19,12 @@ beforeEach(() => useDraftClientStore.getState().reset());
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Citrus connected draft desk', () => {
+  it('directs external draft customers to their host instead of the Citrus Players tab', async () => {
+    render(<DraftDeskPanel live={{...live, sourceLabel:'ESPN'}} scoring={scoring} scoringReady />);
+    await upload();
+    expect(screen.getByText(/Make your picks in your ESPN draft room/)).toBeInTheDocument();
+    expect(screen.queryByText(/Make your picks in the Players tab/)).not.toBeInTheDocument();
+  });
   it('follows confirmed picks, undos and keepers through the real room store', async () => {
     const store = useDraftClientStore.getState();
     store.setSnapshot({ lobbyId: 'lobby', format: 'snake', recentEvents: [], stateSnapshot });

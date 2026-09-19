@@ -48,6 +48,13 @@ describe('Private PDF export worker',()=>{
     expect(mocks.spawn).toHaveBeenCalledWith('/configured/python',expect.arrayContaining(['/configured/guide.json']),{stdio:['pipe','pipe','pipe']});
     expect(JSON.parse(child.stdin.end.mock.calls[0][0]).league).toBe('League; injected');
   });
+  it('allows only the owned direct delivery origins',async()=>{
+    const service=setup();
+    vi.stubEnv('DRAFT_KIT_DOWNLOAD_ORIGIN','https://citrus-api-gb5jc2sd5q-nn.a.run.app');
+    expect((await service.configuration()).downloadOrigin).toBe('https://citrus-api-gb5jc2sd5q-nn.a.run.app');
+    vi.stubEnv('DRAFT_KIT_DOWNLOAD_ORIGIN','https://example.com');
+    await expect(service.configuration()).rejects.toMatchObject({status:503});
+  });
   it('passes versioned source and editorial roots from server configuration only',async()=>{
     setup();const service=new DraftKitExportService('/configured/python','/configured/guide.json','/release/source','/release/editorial');
     const child=childResult('rank,player');mocks.spawn.mockReturnValue(child);

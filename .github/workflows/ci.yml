@@ -539,6 +539,9 @@ jobs:
         shell: bash
         run: npm run test --workspace=apps/web 2>&1 | tee /tmp/test-web.log
 
+      - name: Test opt-in draft bridge preview
+        run: node --test apps/draft-bridge-extension/*.test.mjs
+
       - name: Report run
         if: always()
         continue-on-error: true
@@ -581,8 +584,7 @@ jobs:
           service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   # Contract tests for the repo's operational scripts (scripts/**/*.test.mjs).
-  # node:test only, no npm ci: they must stay dependency-free so they run
-  # anywhere node does. The first one pins scripts/delivery/land-bundle.ps1
+  # node:test with pinned PGlite for SQL regressions. The first one pins scripts/delivery/land-bundle.ps1
   # (refspec fetch, never a checkout, refuses master, $LASTEXITCODE after every
   # git/gh call) -- PowerShell cannot run on this runner, so the script is
   # checked as text.
@@ -603,6 +605,13 @@ jobs:
       - name: Run script contract tests
         shell: bash
         run: npm run test:scripts 2>&1 | tee /tmp/test-scripts.log
+
+      - name: Run scheduled repair SQL regressions
+        shell: bash
+        run: |
+          node --test data-pipeline/tests/sql/citrus_projection_invariants.test.mjs \
+            data-pipeline/tests/sql/talbot_affiliation_review.test.mjs \
+            2>&1 | tee -a /tmp/test-scripts.log
 
       - name: Report run
         if: always()

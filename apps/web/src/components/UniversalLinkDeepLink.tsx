@@ -23,6 +23,8 @@ export function universalLinkToPath(raw: string): string | null {
     return null;
   }
   if (url.protocol !== 'https:' || !UNIVERSAL_LINK_HOSTS.has(url.hostname)) return null;
+  // Paid website tools never route into the native app, including buyer returns.
+  if (url.pathname === '/draft-kit' || url.pathname.startsWith('/draft-kit/')) return null;
   // /auth?redirect=... is the invite link (utils/inviteShare.ts) and belongs in-app;
   // /auth/callback and friends are OAuth returns and stay with the browser.
   const inviteAuth = url.pathname === '/auth' && url.searchParams.has('redirect');

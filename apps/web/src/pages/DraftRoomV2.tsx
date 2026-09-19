@@ -28,7 +28,7 @@ import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 // Player index is pre-fetched non-blocking; the room renders
 // immediately with `#<id>` fallbacks and hydrates as names resolve.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ConnectionBanner } from '@/components/draft/v2/ConnectionBanner';
@@ -60,7 +60,9 @@ import { DraftHistory } from '@/components/draft/DraftHistory';
 import { mugFromDirectory } from '@/components/roster/headshot';
 import { TeamRosters } from '@/components/draft/TeamRosters';
 import { DraftQueue } from '@/components/draft/DraftQueue';
-import { ConnectedDraftDesk } from '@/components/draftkit/ConnectedDraftDesk';
+import { isNativeShell } from '@/lib/nativeAuth';
+const ConnectedDraftDesk = import.meta.env.VITE_NATIVE === '1' ? () => null : lazy(() => import('@/components/draftkit/ConnectedDraftDesk').then(m => ({default:m.ConnectedDraftDesk})));
+const RoomPlayerCompare = import.meta.env.VITE_NATIVE === '1' ? () => null : lazy(() => import('@/components/draftkit/RoomPlayerCompare'));
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 // Direct file imports, not the `@/components/pressbox` barrel: the barrel
 // re-exports LeagueHeader, which reaches LeagueContext and the Supabase
@@ -1950,6 +1952,7 @@ function MainTabs({
   const pendingActions = usePendingActions();
   const [tab, setTab] = useState<'players' | 'queue' | 'board' | 'myteam' | 'history' | 'desk'>('players');
   const [deskReadyLeague, setDeskReadyLeague] = useState<string | null>(null);
+  const browserTools = import.meta.env.VITE_NATIVE !== '1' && !isNativeShell();
   const roomTabsRef = useRef<HTMLDivElement>(null);
   const returnFromDesk = () => {
     setTab('players');
@@ -2823,7 +2826,7 @@ function MainTabs({
       )}
       <div id="draft-player-drawer" hidden={!isMobile && !drawerOpen} data-testid="draft-player-drawer">
       <Tabs ref={roomTabsRef} value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-        {deskReadyLeague === leagueId && tab !== 'desk' && <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#a8be9d] bg-[#f8f5ec] p-3 text-sm text-[#10291f]">
+        {browserTools && deskReadyLeague === leagueId && tab !== 'desk' && <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#a8be9d] bg-[#f8f5ec] p-3 text-sm text-[#10291f]">
           <p><strong>Your draft kit is ready.</strong> Scored for this league. Picks tracked automatically.</p>
           <button className="rounded-md bg-[#10291f] px-4 py-2 font-bold text-[#f8f5ec]" onClick={() => setTab('desk')}>Open Draft Desk</button>
         </div>}
@@ -2845,14 +2848,14 @@ function MainTabs({
                   { key: 'board', label: 'Board' },
                   { key: 'myteam', label: 'My team' },
                   { key: 'history', label: 'History' },
-                  { key: 'desk', label: 'Desk' },
+                  ...(browserTools ? [{ key: 'desk', label: 'Desk' }] : []),
                 ]
               : [
                   // No Board trigger: the board is rendered above this strip
                   // at every desktop width and never hides behind a tab.
                   { key: 'players', label: 'Players' },
                   { key: 'history', label: 'History' },
-                  { key: 'desk', label: 'Draft Desk' },
+                  ...(browserTools ? [{ key: 'desk', label: 'Draft Desk' }] : []),
                 ]
           }
         />
@@ -2898,9 +2901,10 @@ function MainTabs({
           </>
         )}
 
-        <TabsContent value="desk" forceMount className="mt-4 data-[state=inactive]:hidden">
-          <ConnectedDraftDesk leagueId={leagueId} scoring={leagueScoring} scoringReady={leagueScoringContext.ready} onReady={setDeskReadyLeague} onReturnToDraft={returnFromDesk} />
-        </TabsContent>
+        {browserTools && <TabsContent value="desk" forceMount className="mt-4 data-[state=inactive]:hidden">
+          <Suspense fallback={<p role="status">Loading Draft Desk…</p>}><ConnectedDraftDesk leagueId={leagueId} scoring={leagueScoring} scoringReady={leagueScoringContext.ready} onReady={setDeskReadyLeague} onReturnToDraft={returnFromDesk} /></Suspense>
+        </TabsContent>}
+        {browserTools && <div hidden={tab !== 'players'}><Suspense fallback={null}><RoomPlayerCompare key={leagueId} entries={dashboardIndex} projections={projectedFptsMap} scoring={leagueScoring} scoringReady={leagueScoringContext.ready} draftedIds={draftedIds} /></Suspense></div>}
         <TabsContent value="players" className="mt-4">
           {playersLoading ? (
             <Card className="p-4 text-muted-foreground" data-testid="pool-loading">

@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Citrus Draft Connection Preview",
+  "version": "0.2.0",
+  "description": "Opt-in, read-only ESPN and Yahoo hockey draft readers. Development preview, not a released paid feature.",
+  "minimum_chrome_version": "120",
+  "permissions": ["activeTab", "scripting", "storage", "sidePanel"],
+  "side_panel": { "default_path": "sidepanel.html" },
+  "action": { "default_popup": "popup.html", "default_title": "Connect this draft to Citrus" },
+  "background": { "service_worker": "worker.mjs", "type": "module" },
+  "externally_connectable": { "matches": ["https://citrusfantasysports.com/draft-kit*", "https://citrusfantasysports.com/create-league*"] },
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'" }
+}

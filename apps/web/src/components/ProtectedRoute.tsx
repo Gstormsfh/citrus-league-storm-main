@@ -3,6 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { StormyLoading } from '@/components/citrus2';
 import { Button } from '@/components/ui/button';
+import { browserHandoffHash } from '@/lib/browserHandoff';
+import { isNativeShell } from '@/lib/nativeAuth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -33,7 +35,9 @@ export const ProtectedRoute = ({ children, requireProfile = false }: ProtectedRo
     // consumes ?redirect= and validates it with startsWith('/') (open-
     // redirect safe); encodeURIComponent makes the nested query round-trip.
     // Worst case (malformed param) degrades to today's behavior: home.
-    const dest = encodeURIComponent(location.pathname + location.search);
+    const handoff = import.meta.env.VITE_NATIVE !== '1' && !isNativeShell()
+      ? browserHandoffHash(location.pathname, location.hash) : '';
+    const dest = encodeURIComponent(location.pathname + location.search + handoff);
     return <Navigate to={`/auth?redirect=${dest}`} replace />;
   }
 

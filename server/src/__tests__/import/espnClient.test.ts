@@ -125,6 +125,7 @@ describe('EspnClient.fetchSeason', () => {
     const { impl, calls } = fakeFetch([[SEASONS, { status: 200, body: {} }]]);
     await new EspnClient(impl).fetchSeason('1', 2021, ['mTeam']);
     expect(calls[0].init?.redirect).toBe('manual');
+    expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
   });
 
   it('uses global fetch when no implementation is injected', () => {

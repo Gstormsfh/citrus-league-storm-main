@@ -63,6 +63,8 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const RETRYABLE_STATUSES = new Set([502, 503, 504]);
 
 interface RequestOptions {
+  /** Only the two owned Cloud Run APIs are permitted; never an arbitrary URL. */
+  endpointOrigin?: string;
   headers?: Record<string, string>;
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -191,7 +193,11 @@ async function doFetch(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const url = `${API_BASE_URL}${path}`;
+  const directOrigins = ['https://citrus-api-gb5jc2sd5q-nn.a.run.app', 'https://citrus-api-3azzwszd2q-uc.a.run.app'];
+  if (options?.endpointOrigin && !directOrigins.includes(options.endpointOrigin)) {
+    throw new Error('Unrecognized Citrus API origin');
+  }
+  const url = `${options?.endpointOrigin || API_BASE_URL}${path}`;
 
   // Apply a timeout to prevent hung fetches from locking the UI forever.
   // Callers can pass their own signal or override the timeout.

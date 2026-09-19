@@ -5,10 +5,25 @@ const api=vi.hoisted(()=>({get:vi.fn(),post:vi.fn()}));
 const platform=vi.hoisted(()=>({isNativePlatform:vi.fn(()=>false)}));
 vi.mock('@capacitor/core',()=>({Capacitor:platform}));
 vi.mock('@/api/client',()=>({apiClient:api}));
+vi.mock('../ExternalDraftCompanion',()=>({default:()=>null}));
 const available={available:true,deliveryReady:true,accessUntil:'2027-07-01',updatesUntil:'2027-06-30',termsUrl:'https://citrusfantasysports.com/terms'};
 beforeEach(()=>{vi.clearAllMocks();platform.isNativePlatform.mockReturnValue(false);window.localStorage.clear();window.history.replaceState({},'','/');});
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
 describe('Customer purchase and download states',()=>{
+  it('sends a stable checkout attempt across transport failures',async()=>{
+    api.get.mockImplementation((path:string)=>Promise.resolve({data:path.endsWith('/offer')?available:{active:false,accessUntil:null}}));
+    api.post.mockRejectedValue(new Error('Test transport failure'));
+    render(<DraftKitDownloads />);
+    const buy=await screen.findByRole('button',{name:'Buy the kit for $7.99 CAD'});
+    await waitFor(()=>expect(buy).toBeEnabled());
+    fireEvent.click(buy);
+    await screen.findByText('Test transport failure');
+    const first=api.post.mock.calls[0][2];
+    expect(first.headers['x-checkout-attempt']).toMatch(/^[0-9a-f-]{36}$/);
+    fireEvent.click(buy);
+    await waitFor(()=>expect(api.post).toHaveBeenCalledTimes(2));
+    expect(api.post.mock.calls[1][2]).toEqual(first);
+  });
   it('never loads offers or exposes purchase controls in the native app',()=>{
     platform.isNativePlatform.mockReturnValue(true);
     const {container}=render(<DraftKitDownloads />);
@@ -66,7 +81,7 @@ describe('Customer purchase and download states',()=>{
     vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{});
     render(<DraftKitDownloads />);
     fireEvent.click(await screen.findByRole('button',{name:'Offline draft desk'}));
-    expect(await screen.findByText(/Offline desk downloaded/)).toHaveTextContent('opens automatically in the draft room');
+    expect(await screen.findByText(/Offline desk downloaded/)).toHaveTextContent('opens automatically in the browser draft room');
     expect(screen.getByRole('status')).toHaveTextContent('may differ from this dated download');
   });
   it('keeps failures visible and permits a purchase-status retry',async()=>{

@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "status": "reviewed-identity-only-not-promoted",
+  "reviewedAt": "2026-09-19",
+  "canonicalSnapshot": "docs/evidence/browser-canonical-directory-20260919.json",
+  "providerSnapshot": "docs/evidence/browser-provider-identities-20260919.json",
+  "entries": [
+    {
+      "platform": "espn",
+      "externalPlayerId": "5080145",
+      "key": "canonical:8483445",
+      "observed": {
+        "name": "Cutter Gauthier",
+        "team": "FA",
+        "position": "F"
+      },
+      "canonical": {
+        "name": "Cutter Gauthier",
+        "team": "ANA",
+        "position": "LW"
+      },
+      "reason": "ESPN card shows Cutter Gauthier, forward, jersey 61; canonical directory agrees on name, forward position and jersey. ESPN displays FA; no team or projection update is inferred.",
+      "evidence": [
+        "https://www.espn.com/nhl/player/stats/_/id/5080145/cutter-gauthier",
+        "docs/evidence/browser-provider-identities-20260919.json",
+        "docs/evidence/browser-canonical-directory-20260919.json"
+      ]
+    },
+    {
+      "platform": "espn",
+      "externalPlayerId": "5136617",
+      "key": "canonical:8484166",
+      "observed": {
+        "name": "Adam Fantilli",
+        "team": "FA",
+        "position": "F"
+      },
+      "canonical": {
+        "name": "Adam Fantilli",
+        "team": "CBJ",
+        "position": "C"
+      },
+      "reason": "ESPN card shows Adam Fantilli, forward, jersey 19; canonical directory agrees on name, centre position and jersey. ESPN displays FA; no team or projection update is inferred.",
+      "evidence": [
+        "https://www.espn.com/nhl/player/stats/_/id/5136617/adam-fantilli",
+        "docs/evidence/browser-provider-identities-20260919.json",
+        "docs/evidence/browser-canonical-directory-20260919.json"
+      ]
+    },
+    {
+      "platform": "espn",
+      "externalPlayerId": "4233566",
+      "key": "canonical:8480012",
+      "observed": {
+        "name": "Elias Pettersson",
+        "team": "VAN",
+        "position": "F"
+      },
+      "canonical": {
+        "name": "Elias Pettersson",
+        "team": "VAN",
+        "position": "C"
+      },
+      "reason": "Provider row is the Vancouver forward, not the same-named Vancouver defenceman. Canonical 8480012 is C; 8483678 is D.",
+      "evidence": [
+        "docs/evidence/browser-provider-identities-20260919.json",
+        "docs/evidence/browser-canonical-directory-20260919.json"
+      ]
+    },
+    {
+      "platform": "yahoo",
+      "externalPlayerId": "7520",
+      "key": "canonical:8480012",
+      "observed": {
+        "name": "Elias Pettersson",
+        "team": "VAN",
+        "position": "F"
+      },
+      "canonical": {
+        "name": "Elias Pettersson",
+        "team": "VAN",
+        "position": "C"
+      },
+      "reason": "Provider row is the Vancouver forward, not the same-named Vancouver defenceman. Canonical 8480012 is C; 8483678 is D.",
+      "evidence": [
+        "https://sports.yahoo.com/nhl/players/7520",
+        "docs/evidence/browser-provider-identities-20260919.json",
+        "docs/evidence/browser-canonical-directory-20260919.json"
+      ]
+    },
+    {
+      "platform": "yahoo",
+      "externalPlayerId": "33674",
+      "key": "canonical:8485702",
+      "observed": {
+        "name": "Max Shabanov",
+        "team": "MIN",
+        "position": "F"
+      },
+      "canonical": {
+        "name": "Maxim Shabanov",
+        "team": "MIN",
+        "position": "RW"
+      },
+      "reason": "Yahoo uses Max; the official NHL Max Shabanov link redirects to Maxim Shabanov with canonical ID 8485702. Both current identity records show MIN.",
+      "evidence": [
+        "https://sports.yahoo.com/nhl/players/33674",
+        "https://www.nhl.com/islanders/player/max-shabanov-8485702?article=",
+        "https://www.nhl.com/wild/player/maxim-shabanov-8485702/stats?article=",
+        "docs/evidence/browser-provider-identities-20260919.json",
+        "docs/evidence/browser-canonical-directory-20260919.json"
+      ]
+    },
+    {
+      "platform": "yahoo",
+      "externalPlayerId": "6827",
+      "key": "canonical:8478438",
+      "observed": {
+        "name": "Thomas Novak",
+        "team": "PIT",
+        "position": "F"
+      },
+      "canonical": {
+        "name": "Tommy Novak",
+        "team": "PIT",
+        "position": "C"
+      },
+      "reason": "Yahoo uses Thomas. The official Penguins Thomas Novak URL identifies the Tommy Novak profile at canonical ID 8478438. Both identity records show PIT.",
+      "evidence": [
+        "https://www.nhl.com/penguins/player/thomas-novak-8478438/stats",
+        "docs/evidence/browser-provider-identities-20260919.json",
+        "docs/evidence/browser-canonical-directory-20260919.json"
+      ]
+    }
+  ]
+}

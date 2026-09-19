@@ -28,7 +28,7 @@ spec:
         run.googleapis.com/startup-cpu-boost: "true"
     spec:
       containerConcurrency: 80
-      timeoutSeconds: 60
+      timeoutSeconds: 240
       containers:
         - image: us-central1-docker.pkg.dev/citrus-fantasy-prod/citrus-api/server:latest
           ports:
@@ -42,6 +42,48 @@ spec:
               value: production
             - name: PORT
               value: "8080"
+            - name: DRAFT_KIT_PDF_READY
+              value: "true"
+            - name: DRAFT_KIT_DOWNLOAD_ORIGIN
+              value: "https://citrus-api-gb5jc2sd5q-nn.a.run.app"
+            - name: DRAFT_KIT_CHECKOUT_ENABLED
+              value: "false"
+            - name: DRAFT_KIT_BUNDLE_URI
+              value: "gs://citrus-fantasy-prod-research-evidence/draft-kit/review/20260919/2a12d68a25f0fd45134a9ca457e3c7a8c4ab81d61239f46f2f183a608e234883/delivery-bundle.tar.gz"
+            - name: DRAFT_KIT_BUNDLE_SHA256
+              value: "1686e19c9029106d50019dda7d014a1ff7d60d82f811c9cf78203f66ca61fb0f"
+            - name: DRAFT_KIT_BUNDLE_REVISION
+              value: "2a12d68a25f0fd45134a9ca457e3c7a8c4ab81d61239f46f2f183a608e234883"
+            - name: DRAFT_KIT_STRIPE_PRICE_ID
+              value: "price_1UHBC7344c85bYub2ayVinQo"
+            - name: DRAFT_KIT_CURRENCY
+              value: cad
+            - name: DRAFT_KIT_AMOUNT_MINOR
+              value: "799"
+            - name: DRAFT_KIT_TIER
+              value: kit
+            - name: DRAFT_KIT_ACCESS_UNTIL
+              value: "2027-07-01T05:59:59Z"
+            - name: DRAFT_KIT_UPDATES_UNTIL
+              value: "2026-09-30T05:59:59Z"
+            - name: DRAFT_KIT_SITE_ORIGIN
+              value: "https://citrusfantasysports.com"
+            - name: DRAFT_KIT_TERMS_URL
+              value: "https://citrusfantasysports.com/terms-of-service.html"
+            - name: DRAFT_KIT_TERMS_VERSION
+              value: "2026-09-18-draft-kit-v1"
+            - name: DRAFT_KIT_TAX_MODE
+              value: automatic
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: "1"
+                  name: STRIPE_SECRET_KEY
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: "1"
+                  name: STRIPE_WEBHOOK_SECRET
             - name: SUPABASE_URL
               valueFrom:
                 secretKeyRef:

@@ -59,7 +59,10 @@ export class DraftKitExportService {
     if (!isFullPreseasonEdition(data))
       throw AppError.serviceUnavailable('A reviewed full-season edition is required.');
     // Never serialize the source player universe to an unentitled caller.
-    return { weights: data.weights, projectionDate: data.source.asOf.slice(0,10), revision: data.canonicalRevision };
+    const downloadOrigin = process.env.DRAFT_KIT_DOWNLOAD_ORIGIN || undefined;
+    if (downloadOrigin && !['https://citrus-api-gb5jc2sd5q-nn.a.run.app', 'https://citrus-api-3azzwszd2q-uc.a.run.app'].includes(downloadOrigin))
+      throw AppError.serviceUnavailable('Download routing needs review.');
+    return { weights: data.weights, projectionDate: data.source.asOf.slice(0,10), revision: data.canonicalRevision, ...(downloadOrigin ? {downloadOrigin} : {}) };
   }
   async download(format: PdfDownloadFormat, league: string, weights: unknown): Promise<Buffer> {
     if (!Object.prototype.hasOwnProperty.call(DOWNLOADS, format)) throw AppError.badRequest('Unknown download format.');

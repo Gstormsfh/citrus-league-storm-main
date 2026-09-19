@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+html,body,#root{margin:0;min-height:100%;background:#f8f5ec;color:#10291f;font-family:Arial,sans-serif}
+*{box-sizing:border-box}
+.citrus-browser-sidebar{width:100%;min-width:280px}
+.bridge-source{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 16px;background:#10291f;color:#f8f5ec;font-size:12px}
+.bridge-source span{color:#ffad77}
+.bridge-setup{padding:24px 18px;line-height:1.6}
+.bridge-setup h1{font-size:30px;line-height:1.1;font-weight:800;margin:12px 0 20px}
+.bridge-eyebrow{color:#a3410b;font-size:10px;font-weight:bold;letter-spacing:.15em}
+.bridge-setup button{width:100%;margin:20px 0 12px;padding:14px;background:#ff6b1a;border-radius:8px;font-weight:bold}
+.bridge-setup button:disabled{opacity:.5}
+.bridge-small{font-size:12px;padding:8px 16px;line-height:1.5}
+.bridge-warning{background:#fff0dd;border-left:3px solid #d95b10;padding:10px 12px;margin:8px;font-size:12px;line-height:1.5}
+.citrus-browser-sidebar .citrus-connected-desk{border:0;border-radius:0}
+.citrus-browser-sidebar .citrus-desk-header{padding:14px 12px}
+.citrus-browser-sidebar .citrus-desk-board{max-height:none}
+.citrus-browser-sidebar .citrus-desk-body{padding:12px}
