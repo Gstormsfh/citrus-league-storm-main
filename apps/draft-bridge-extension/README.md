@@ -1,8 +1,10 @@
 # Citrus draft connection preview
 
-Opt-in, read-only ESPN hockey draft reader plus a local receiver. This is **not
+Opt-in, read-only ESPN and Yahoo hockey draft readers plus a local receiver. This is **not
 a released integration**, not a replacement for purchase authorization, and not
-included in a native build. Yahoo is not implemented in this extension.
+included in a native build. Yahoo is a separate observation adapter, not a
+verified league/scoring integration. Independent ESPN and Yahoo pairings can
+coexist; their source tabs, receiver tabs and snapshots are isolated.
 
 ## Run locally
 
@@ -28,6 +30,14 @@ that receiver. It does not widen the production manifest or use production APIs.
 5. After reloading ESPN, open Pick History again if the review asks for it.
 6. Disconnect in the review or close either tab to remove the pairing.
 
+For Yahoo, enter a free hockey mock or an authorized draft room, select
+**Results → Round by Round**, and connect from the extension. Keep that view
+open for this preview. Optional: open Settings → League Settings while Results
+remains open to capture its raw category values. Those values are not translated
+into Citrus points weights. Yahoo player `data-id` values are read from the
+results rows; owner labels are preserved without inventing other teams' IDs.
+The room ID is explicitly not treated as a Yahoo API league key or season.
+
 Restarting the preview command creates a fresh folder. Source changes require
 rebuilding the unpacked package and reloading the extension in Chrome. Do not
 install the source manifest against the live site: its receiver is not integrated
@@ -37,9 +47,9 @@ into the paid web app yet.
 
 - The action grants temporary `activeTab` access only to the chosen source tab.
   `scripting` runs the self-contained reader in the top frame's isolated world.
-- Reads UI DOM: draft identity, team selector, scoring/roster tables, round and
+- ESPN reads UI DOM: draft identity, team selector, scoring/roster tables, round and
   current-pick counter, pick messages and the dedicated Pick History grids.
-- Player IDs come from ESPN headshot URLs already attached to player rows.
+- ESPN player IDs come from headshot URLs already attached to player rows.
   Missing identity fails closed. Names are not guessed or matched fuzzily.
 - ESPN's `is-rolled-back` card must also visibly say `Rolled back` before it is
   excluded. Recovery reads the Pick History ledger because ESPN does not restore
@@ -78,7 +88,10 @@ Remaining release gates:
   snapshot, not silently dropped or invented in Citrus's forecast.
 - Robust keeper, auction and public/private real-league verification. A snake
   practice result does not establish those formats.
-- Yahoo implementation and independent verification.
+- Yahoo live extension delivery, full league/team identity and scoring mapping.
+  Its completed 128-pick mock ledger was read successfully, but the mock refused
+  re-entry after completion/reload. The reader fails closed in that case. This
+  does not prove mid-draft recovery or continuous live synchronization.
 - Distribution, privacy/disclosure and provider terms review before advertising
   availability. No Chrome Web Store approval is implied.
 

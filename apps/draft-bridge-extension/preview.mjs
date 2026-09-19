@@ -7,7 +7,7 @@ import {createServer} from 'node:http';
 const here=dirname(fileURLToPath(import.meta.url));
 const port=8776,origin=`http://127.0.0.1:${port}`;
 const out=await mkdtemp(join(tmpdir(),'citrus-draft-bridge-preview-'));
-for(const name of ['capture.mjs','worker.mjs','popup.mjs','popup.html','popup.css'])await copyFile(join(here,name),join(out,name));
+for(const name of ['capture.mjs','yahoo-capture.mjs','worker.mjs','popup.mjs','popup.html','popup.css'])await copyFile(join(here,name),join(out,name));
 const manifest=JSON.parse(await readFile(join(here,'manifest.json'),'utf8'));
 manifest.name='Citrus Draft Connection LOCAL Preview';
 manifest.externally_connectable.matches=[`${origin}/draft-kit*`];

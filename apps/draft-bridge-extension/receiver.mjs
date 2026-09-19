@@ -7,7 +7,7 @@ function send(type){return new Promise((resolve,reject)=>{
  const timer=setTimeout(()=>reject(new Error('The source check timed out. Previous picks are retained.')),5000);
  chrome.runtime.sendMessage(match[1],{type,nonce:match[2]},response=>{
   clearTimeout(timer);
-  if(chrome.runtime.lastError)reject(new Error('Connection unavailable. Reconnect from the ESPN draft room.'));
+  if(chrome.runtime.lastError)reject(new Error('Connection unavailable. Reconnect from the source draft room.'));
   else resolve(response);
  });
 });}
@@ -18,16 +18,18 @@ async function poll(){
   const result=await send('SNAPSHOT');if(stopped)return;
   if(!result?.ok)throw new Error(result?.message??'Source not ready. Previous picks are retained.');
   const s=result.snapshot,now=Date.now();
-  if(!s?.ok||s.version!==1||s.platform!=='espn'||!Array.isArray(s.picks)||s.picks.length>3200||!Number.isFinite(result.receivedAt)||result.receivedAt>now+1000||now-result.receivedAt>6000)throw new Error('The source snapshot is stale or invalid. Previous picks are retained.');
-  const key=`${s.platform}:${s.leagueId}:${s.season}`;
+  if(!s?.ok||s.version!==1||!['espn','yahoo'].includes(s.platform)||!Array.isArray(s.picks)||s.picks.length>3200||!Number.isFinite(result.receivedAt)||result.receivedAt>now+1000||now-result.receivedAt>6000)throw new Error('The source snapshot is stale or invalid. Previous picks are retained.');
+  const key=`${s.platform}:${s.roomId??s.leagueId}:${s.season}`;
   if(identity&&identity!==key)throw new Error('The source league changed. Reconnect explicitly.');
   identity=key;lastReceipt=result.receivedAt;
   el('count').textContent=String(s.picks.length);el('draft-state').textContent=s.status==='in_progress'?'In progress':s.status==='paused'?'Paused':'Finished';
   el('checked').textContent=new Date(lastReceipt).toLocaleTimeString();el('league').textContent=s.title;
-  el('identity').textContent=`ESPN league ${s.leagueId} · ${s.teams.length} teams · ${s.totalRounds} rounds`;
-  rows('picks',[...s.picks].reverse().map(p=>[p.overallPick,p.name,s.teams.find(t=>t.id===p.externalTeamId)?.name??'Unknown',p.externalPlayerId]));
-  rows('scoring',s.rules.scoring.map(r=>[r.group,r.label,r.weight]));
-  state('Connected to ESPN',s.status==='finished'?'Draft complete. The full confirmed history is retained.':'Following confirmed picks. Keep the source draft tab open.',false);
+  const yahoo=s.platform==='yahoo',source=yahoo?'Yahoo':'ESPN';
+  el('identity').textContent=yahoo?`Yahoo room ${s.roomId} · ${s.teamCount??'Unknown'} teams · ${s.totalRounds} rounds · League/team mapping unverified`:`ESPN league ${s.leagueId} · ${s.teams.length} teams · ${s.totalRounds} rounds`;
+  rows('picks',[...s.picks].reverse().map(p=>[p.overallPick,p.name,p.ownerLabel??s.teams.find(t=>t.id===p.externalTeamId)?.name??'Unknown',p.externalPlayerId]));
+  rows('scoring',s.rules.scoring.map(r=>[r.group,r.label,yahoo?`${r.sourceValue} (not mapped to points)`:r.weight]));
+  el('scoring-note').textContent=yahoo?`Yahoo scoring: ${s.rules.scoringType}. No Citrus scoring conversion has been applied. Category values of zero do not mean zero fantasy value.`:'Source settings are not a claim that every category is supported by Citrus projections.';
+  state(`Connected to ${source}`,s.status==='finished'?'Draft complete. The full confirmed history is retained.':yahoo?'Following Yahoo Results → Round by Round. Keep that source view open.':'Following confirmed picks. Keep the source draft tab open.',false);
  }catch(error){if(!stopped)state('Updates paused',error.message);}
  finally{pending=false;}
 }

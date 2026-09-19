@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Citrus Draft Connection Preview",
   "version": "0.1.0",
-  "description": "Opt-in, read-only ESPN hockey draft connection. Development preview, not a released paid feature.",
+  "description": "Opt-in, read-only ESPN and Yahoo hockey draft readers. Development preview, not a released paid feature.",
   "minimum_chrome_version": "120",
   "permissions": ["activeTab", "scripting", "storage"],
   "action": { "default_popup": "popup.html", "default_title": "Connect this draft to Citrus" },

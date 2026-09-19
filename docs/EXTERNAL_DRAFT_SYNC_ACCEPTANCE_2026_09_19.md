@@ -251,3 +251,36 @@ extension-to-web message delivery remain unverified. The local receiver is a
 connection review, not the paid Draft Desk. Server-authorized player-ID mapping,
 canonical scoring compatibility, Yahoo, real-league/keeper/auction coverage and
 extension distribution remain release gates. Do not market live Yahoo/ESPN sync.
+
+## Yahoo reader developed alongside ESPN
+
+Entered free eight-team **Shootout 2294514**, seat 1, from the provided Yahoo
+account. Used Yahoo's Autodraft control for the mock; no subscription purchased,
+no invites, and no changes to real league 4651. Inspected the running Board,
+Results/Teams, Results/Round by Round and League Settings. The mock completed.
+
+Added `yahoo-capture.mjs` and platform routing in the same extension/receiver.
+The reader captured the **completed** full 128-pick ledger, ending with Jet
+Greaves (Yahoo player ID 9118) at pick 128. The first executed reader sample was
+after completion; do not describe this as 128 live updates or a continuous sync
+test. IDs are read from `.ys-player[data-id]`, not guessed from abbreviated names.
+The current-pick banner and round-grouped table form the coverage contract.
+
+The reader captured Head-to-Head category labels and their displayed source
+values. Yahoo displays zero in its category Stat Values column. These are kept
+as raw source values with `weight: null`, not applied as zero point weights.
+The preview explicitly reports unverified league/team mapping, null league key
+and season, and retains other owners as labels. Only the viewer's team ID is
+known from the actual draft-client URL. Nothing is posted to the paid Desk.
+
+After reloading the completed room, Yahoo displayed “Unable to load” and asked
+the user to re-enter. No history was available at that point. That is a failed
+completed-mock re-entry check, not proof of successful reconnect. The previous
+snapshot must remain visible as stale. Mid-draft recovery with the new reader,
+keeper/undo scenarios and actual extension delivery remain unverified.
+
+Both platform readers are packaged together with independent tab-bound pairings.
+Added an explicit coexistence test: disconnecting ESPN leaves the Yahoo pairing
+and its picks intact. Combined local suite: 59 tests pass. Chrome's protected
+extension installation step is still awaiting the operator. No production or
+native switch was enabled.
