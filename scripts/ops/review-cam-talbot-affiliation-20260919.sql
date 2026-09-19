@@ -8,6 +8,7 @@ BEGIN;
 LOCK TABLE public.player_affiliation_events IN SHARE ROW EXCLUSIVE MODE;
 DO $review$
 DECLARE previous public.player_affiliation_events%ROWTYPE;
+        appended_id uuid;
 BEGIN
   SELECT * INTO previous FROM public.player_affiliation_events
    WHERE season=2026 AND player_id=8475660 ORDER BY sequence DESC LIMIT 1;
@@ -26,7 +27,13 @@ BEGIN
   VALUES (2026,8475660,'affiliated','CBJ',null,'CBJ','official_transaction','2026-09-15',
     '["https://www.nhl.com/bluejackets/news/cbj-sign-cam-talbot"]'::jsonb,
     'Columbus announced Cam Talbot signed on September 15, superseding the earlier unsigned review.',
-    'codex:scheduled-ci-affiliation-review:2026-09-19',previous.id);
+    'codex:scheduled-ci-affiliation-review:2026-09-19',previous.id)
+    RETURNING id INTO appended_id;
+  IF NOT EXISTS (SELECT 1 FROM public.player_current_directory
+      WHERE season=2026 AND player_id=8475660 AND team_abbrev='CBJ'
+        AND current_affiliation->>'event_id'=appended_id::text) THEN
+    RAISE EXCEPTION 'Talbot correction did not reach current identity; refusing commit';
+  END IF;
 END;
 $review$;
 SELECT player_id,team_abbrev,current_affiliation FROM public.player_current_directory
