@@ -1,5 +1,6 @@
 import { MatchupWeekBoundary } from '@/pages/MatchupWeekBoundary';
 import { DesktopProduct } from '@/components/DesktopProduct';
+import { WebsiteOnlyProduct } from '@/components/WebsiteOnlyProduct';
 import React, { Suspense, lazy, useEffect } from "react";
 import { CitrusToaster } from "@/components/notifications/CitrusToaster";
 import { logger } from '@/utils/logger';
@@ -86,6 +87,9 @@ const PlayerDashboard = lazyWithErrorHandling(() => import("./pages/PlayerDashbo
 const DraftKit = import.meta.env.VITE_NATIVE === '1'
   ? () => null
   : lazyWithErrorHandling(() => import("./pages/DraftKit"));
+const DraftKitPurchase = import.meta.env.VITE_NATIVE === '1'
+  ? () => null
+  : lazyWithErrorHandling(() => import("./pages/DraftKitPurchase"));
 const GMOffice = lazyWithErrorHandling(() => import("./pages/GMOffice"));
 const StormyAssistant = lazyWithErrorHandling(() => import("./pages/StormyAssistant"));
 const News = lazyWithErrorHandling(() => import("./pages/News"));
@@ -277,7 +281,8 @@ const App = () => {
                 {/* Draft Kit — paid analytics section. Authed because the
                     entitlement gate needs an identity to resolve; the free
                     tier still gets a real preview from the server. */}
-                <Route path="/draft-kit/*" element={<DesktopProduct route><ProtectedRoute><ErrorBoundary><DraftKit /></ErrorBoundary></ProtectedRoute></DesktopProduct>} />
+                <Route path="/draft-kit/buy" element={<WebsiteOnlyProduct><ErrorBoundary><DraftKitPurchase /></ErrorBoundary></WebsiteOnlyProduct>} />
+                <Route path="/draft-kit/*" element={<WebsiteOnlyProduct><ProtectedRoute><ErrorBoundary><DraftKit /></ErrorBoundary></ProtectedRoute></WebsiteOnlyProduct>} />
                 <Route path="/gm-office" element={<ProtectedRoute><ErrorBoundary><GMOffice /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office/stormy" element={<ProtectedRoute><ErrorBoundary><StormyAssistant /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/news" element={<News />} />
