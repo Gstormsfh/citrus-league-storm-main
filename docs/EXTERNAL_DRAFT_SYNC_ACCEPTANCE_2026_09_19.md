@@ -134,7 +134,7 @@ Local checks for this revision: 67 targeted server tests, all 325 import tests
 A CI-only test-helper header type error was corrected.
 Neither provider release switch has been enabled. No native build changed.
 
-## Live mock investigation (September 19, 08:38–08:48 UTC)
+## Live mock investigation (September 19, 08:38–08:53 UTC)
 
 The user explicitly approved free mock participation and exploration. No paid
 subscriptions were activated. No real customer league was drafted or reset.
@@ -177,6 +177,10 @@ subscriptions were activated. No real customer league was drafted or reset.
 - Reloaded the same Yahoo room during round 13. It rejoined at round 14 and
   retained the drafted roster and pick numbers, including McDavid at 1 and
   Fantilli at 140. This is Yahoo's reconnect behavior, not Citrus sync proof.
+- Yahoo subsequently displayed Draft Complete with our 16/16 roster and team,
+  round-by-round and position-grid recap tabs. ESPN's isolated practice was
+  resumed after its undo test and also reached completion. No test draft was
+  left paused or waiting for our participation at the end of the investigation.
 - The draft-client ID is a mock ID, not an authenticated Yahoo API league key.
   Do not fabricate a game key or interpret the parent league's results as this
   mock. No Yahoo OAuth/API live snapshot was verified.
