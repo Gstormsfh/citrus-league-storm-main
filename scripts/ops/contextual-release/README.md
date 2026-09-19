@@ -11,7 +11,8 @@ This directory contains the narrow operational release overlay, not a replacemen
 - Legacy writers: cron 31/34 paused atomically with first contextual publication. Their exact definitions are preserved, not deleted. No automatic fallback to flat allocation.
 - Active source: `70fd8899e67480cf7cd061a3b88e4a4110bc5a2f27ae756c300f48635fec8255`.
 - Deployed image: `northamerica-northeast1-docker.pkg.dev/citrus-fantasy-prod/citrus-projection-worker/contextual@sha256:901b96560c81a32429c3753d4c14f1e525f40cd5455da59e266b3498cae227c9`.
-- Operational policy: SHA `26893b8573829ac1b52f4b9be8284eae416f7d1a0d648b9f2a8fceaa06226bbd`, exclusive review boundary September 21. See `REVIEW-WINDOW.md`; this is not coverage through the advertised September 29 paid window.
+- Worker operational policy: SHA `26893b8573829ac1b52f4b9be8284eae416f7d1a0d648b9f2a8fceaa06226bbd`, exclusive review boundary September 21. See `REVIEW-WINDOW.md` for the accepted review process. Internal review deadlines are separate from the customer's update-access window.
+- Independent monitor-only amendment: image digest `sha256:c5fe621eb29a1bdc1b9f63d94f5d686eb00f6226faebfcc0ab5a18954d513214`, policy SHA `f0d16c781c839e4401f0715e28cf274a263885b3bc463d4f8731a39dadb51c37`. Adds 24-hour review notices. Worker image, source, numerical methods and every expiry date remain unchanged.
 
 The `runtime/` files are copied to `scripts/ops/` inside that image. Their imports deliberately reference the image's reviewed model package, not a second checked-in copy of numerical code. `prepare-production-image.mjs` verifies every bound base input/method/evidence file before producing the operational overlay.
 
@@ -41,3 +42,7 @@ Python runtime tests require the hash-verified base image's model dependencies a
 `export-production-edition.mjs REVISION NEW_DIRECTORY` reads an exact repeatable-read production snapshot and independently verifies Decimal-preserving payload/preimage pairs. Its receipt remains customer-ready false. The application export service, all-format parity check, PDF visual review and controlled entitled-buyer flow are separate acceptance steps.
 
 Today's source review, render parity and healthy collector do not promise future hockey accuracy or certify future camp reports. Retain uncalibrated interval labels, explicit scenario semantics, the review-only MIN alternative and disabled optional goalie calendar. Never set a paid-ready flag from this README.
+
+`review-current-source.mjs BASE_IMAGE_FILES OLD_PRODUCTION_OVERLAY EXPORTED_SOURCE NEW_RECEIPT` independently rehashes the bound release artifacts and compares the full current source to the immutable reviewed source. It records the retrospective evidence limitations and exact next scenario reviews. It does not approve future facts or extend dates.
+
+`prepare-monitor-review-image.mjs OLD_POLICY NEW_DIRECTORY` builds only the monitoring overlay against the pinned production image. `activate-review-notice.mjs NEW_RECEIPT_DIRECTORY` requires a real healthy heartbeat containing the new notice fields, uses the existing operations email only, avoids duplicate policies and sends no test event. Do not rerun historical first-install scripts to add this notice.

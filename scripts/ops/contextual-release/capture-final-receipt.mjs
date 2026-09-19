@@ -38,7 +38,7 @@ try{
   capturedAt:new Date().toISOString(),publicationReady:false,active:snapshot.active,legacyJobs:legacy,health,
   execution:{name:execution.metadata.name,start:execution.status.startTime,end:execution.status.completionTime,succeededCount:execution.status.succeededCount},
   completionMilliseconds:cloud.completionMilliseconds,independentMonitor:logs[0].jsonPayload,
-  paidWindowReview:reviewCoverage(source,policy,'2026-09-29')};
+  paidWindowReview:reviewCoverage(source,policy,'2026-09-30T05:59:59Z')};
  writeFileSync(out+'/receipt.json',JSON.stringify(receipt,null,2),{flag:'wx',mode:0o600});
  for(const [name,path] of Object.entries({cloud:'/tmp/citrus-production-scheduled-audit-20260919/cloud-receipt.json',population:'/tmp/citrus-production-scheduled-population-20260919.json',
   publication:'/tmp/citrus-production-publication-20260919/result.json',readiness:'/tmp/citrus-production-readiness-20260919/publish-readiness.json',

@@ -4,6 +4,12 @@ export const channels=[
  'projects/citrus-fantasy-prod/notificationChannels/8361286418214240409',
 ];
 const filter='resource.type="cloud_run_job" AND resource.labels.job_name="citrus-contextual-monitor" AND jsonPayload.event="contextual.independent.health"';
+export function reviewDuePolicy(){return {
+ displayName:'Citrus projections: internal review due within 24 hours',enabled:false,combiner:'OR',
+ notificationChannels:[channels[0]],alertStrategy:{notificationRateLimit:{period:'86400s'},autoClose:'86400s'},
+ documentation:{mimeType:'text/markdown',content:'An existing internal forecast review deadline is within 24 hours. This is not an external permission request. Inspect review_items in the matching monitor log. Engineering owns method/source and release review; Garrett owns manual injury/status confirmation. Revalidate the named assumptions using the revision-bound review process. Do not extend dates automatically. Existing expiry and failed-refresh alerts remain active. Runbook: scripts/ops/contextual-release/REVIEW-WINDOW.md.'},
+ conditions:[{displayName:'Internal review deadline is approaching',conditionMatchedLog:{filter:filter+' AND jsonPayload.review_due=true'}}],
+};}
 export function monitoringProposal(){return {
  project:'citrus-fantasy-prod',deploymentReady:false,
  metric:{name:'citrus_contextual_monitor_heartbeat',description:'Independent projection monitor ran, healthy or unhealthy.',

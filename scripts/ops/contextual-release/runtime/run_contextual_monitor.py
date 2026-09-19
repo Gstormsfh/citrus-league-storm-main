@@ -16,6 +16,7 @@ from projections.contextual_projection_service import ContextualProjectionServic
 from projections.contextual_refresh_worker import encoded, strict_json
 from operational_gates import PROJECT, SOURCE, check_policy, dependencies, output_health, require, stamp
 from run_contextual_refresh import read_policy
+from review_deadlines import review_notice
 
 BUCKET = 'citrus-fantasy-prod-research-evidence'
 JOB = 'projects/citrus-fantasy-prod/locations/northamerica-northeast1/jobs/citrus-contextual-production'
@@ -93,6 +94,11 @@ def main():
         policy = read_policy(ROOT/'release/production-policy.json', os.environ.get('CITRUS_POLICY_SHA256'),
                              project=PROJECT, as_of=now.date().isoformat())
         require(policy['methods_sha256'].get('scripts/ops/run_contextual_monitor.py') == sha256(Path(__file__).read_bytes()).hexdigest(), 'monitor_unbound')
+        source_path = 'output/qa/reviewed-source-release-20260918-v1/canonical.json'
+        require(source_path in policy['review_evidence_sha256'], 'review_source_unbound')
+        require('scripts/ops/review_deadlines.py' in policy['methods_sha256'], 'review_notice_unbound')
+        source = strict_json((ROOT/source_path).read_text())
+        event.update(review_notice(source, policy, now))
         service = ContextualProjectionService(os.environ['SUPABASE_URL'], os.environ.get('SUPABASE_SERVICE_ROLE_KEY'), timeout=30)
         _, snapshot = service._request('rpc/canonical_contextual_dependencies', body='{}')
         _, health = service._request('rpc/canonical_contextual_output_health', body='{}')

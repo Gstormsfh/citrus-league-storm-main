@@ -1,10 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {channels,monitoringProposal} from './monitoring.mjs';
+import {channels,monitoringProposal,reviewDuePolicy} from './monitoring.mjs';
 test('monitoring proposal is disabled and reuses only the two existing production routes',()=>{
  const p=monitoringProposal();assert.equal(p.deploymentReady,false);
  for(const policy of p.policies){assert.equal(policy.enabled,false);assert.deepEqual(policy.notificationChannels,channels);}
  assert.ok(!JSON.stringify(p).includes('@'));assert.equal(p.policies.length,2);
+});
+test('advance review notice uses only existing operations email and does not replace failure policies',()=>{
+ const p=reviewDuePolicy();assert.equal(p.enabled,false);
+ assert.deepEqual(p.notificationChannels,[channels[0]]);
+ assert.equal(p.alertStrategy.notificationRateLimit.period,'86400s');
+ assert.ok(p.conditions[0].conditionMatchedLog.filter.includes('review_due=true'));
+ assert.equal(monitoringProposal().policies.length,2);
 });
 test('both healthy and unhealthy runs count as checker liveness; separate policy reports failed checks',()=>{
  const p=monitoringProposal();assert.ok(!p.metric.filter.includes('healthy'));

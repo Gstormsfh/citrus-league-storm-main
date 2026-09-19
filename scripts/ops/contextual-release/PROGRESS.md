@@ -2,6 +2,16 @@
 
 Work in progress. Do not confuse a passed preparation run with publication or paid-product acceptance.
 
+## Internal review-process closeout at 06:04 UTC
+
+- Clarified that review dates are internal engineering safeguards, not third-party approvals. The coordinating release task accepted operational review ownership; Garrett retains manual injury/status authority. The exact workflow and named upcoming player reviews are in `REVIEW-WINDOW.md`. A future review deadline is not proof of a present source failure or a requirement to pre-verify future facts.
+- Corrected coverage diagnostics to the actual purchase endpoint `2026-09-30T05:59:59Z`. September 29 UTC is not the same as Edmonton end-of-day. No customer term was changed.
+- Reverified all 47 bound methods/input/evidence artifacts and all 1,355 complete source player records against the immutable approved source. No numerical records or review dates changed. Receipt `/tmp/citrus-current-source-review-20260919.json`, SHA `e79c20838288f05fc16393a30860f48ee9e1e5aff0b6782afbef076c7c881f2f`.
+- Built and deployed a monitor-only overlay with the 24-hour advance notice. Digest `sha256:c5fe621eb29a1bdc1b9f63d94f5d686eb00f6226faebfcc0ab5a18954d513214`, policy SHA `f0d16c781c839e4401f0715e28cf274a263885b3bc463d4f8731a39dadb51c37`. Execution `citrus-contextual-monitor-2h52d` succeeded at 06:02:43 UTC. Worker image, projection values and existing expiry/failure behavior are unchanged.
+- The real updated monitor reported healthy/published, `review_due=false`, and the expected 24-hour notice fields for the unchanged live revision. Only after that heartbeat, review-notice policy `8072942692270355385` was enabled and read back at 06:03:39 UTC. Receipt `/tmp/citrus-review-notice-enabled-20260919/receipt.json`. Existing operations email only; no test log or additional test email was sent. The deadline-warning condition is covered by local tests, not falsely claimed as an already delivered future warning.
+- Local verification: 66 Node operational tests and 45 targeted Python runtime/notice/journal tests passed. The added notice boundary tests cover exactly 24 hours, expiry, source mismatch, invalid dates and zero mutation.
+- Commercial acceptance remains separate. This entry is not permission to enable sales or evidence of a completed Stripe purchase test.
+
 ## Final verified production state at 05:41 UTC
 
 - Normal replacement path PASSED through a forced invocation of the existing Cloud Scheduler job: execution `citrus-contextual-production-nmh2k`, run `e4d937f0-1435-4868-b830-010a7f623167`, revision `2a12d68a25f0fd45134a9ca457e3c7a8c4ab81d61239f46f2f183a608e234883`. Service completion took 47,706 ms, below its 55-second database limit. This proves the invoked path, not a future scheduled day's inputs.

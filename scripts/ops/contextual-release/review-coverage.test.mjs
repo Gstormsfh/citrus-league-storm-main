@@ -15,3 +15,17 @@ test('missing source review or wrong source fails closed without inventing dates
  const [s,p]=fixture();delete s.finishing_refresh_policy;assert.throws(()=>reviewCoverage(s,p,'2026-09-29'));
  assert.throws(()=>reviewCoverage({...s,revision:'b'},p,'2026-09-29'));
 });
+test('Edmonton opening-night access extends beyond September 30 UTC midnight',()=>{
+ const [s,p]=fixture();
+ for(const value of [p,s.source_release_review,s.finishing_refresh_policy,s.players[0].availability_scenario])value.review_after='2026-09-30';
+ assert.equal(reviewCoverage(s,p,'2026-09-29').blockers.length,0);
+ const r=reviewCoverage(s,p,'2026-09-29T23:59:59-06:00');
+ assert.equal(r.requestedThroughInclusive,'2026-09-30T05:59:59.000Z');
+ assert.equal(r.blockers.length,4);
+ assert.deepEqual(r.blockers,reviewCoverage(s,p,'2026-09-30T05:59:59Z').blockers);
+});
+test('timezone-free timestamps and invalid review dates cannot imply coverage',()=>{
+ const [s,p]=fixture();
+ for(const when of ['2026-09-29T23:59:59','2026-02-30','2026-02-30T12:00:00Z'])assert.throws(()=>reviewCoverage(s,p,when));
+ p.review_after='2026-02-30';assert.throws(()=>reviewCoverage(s,p,'2026-09-29'));
+});
